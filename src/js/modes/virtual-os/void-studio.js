@@ -1,24 +1,23 @@
 // MiraXCode Virtual OS — Wave 10
 import { $, esc, uid, nowIso } from './utils.js';
 import { makeZip } from './zip.js';
+import { createVoidStorage, ROOT_ID, TRASH_ID } from './storage.js';
 
 
 const VoidStudio = (() => {
-  const DB_NAME = "hashui_void_studio_v1";
-  const STORE = "projects";
-  const META_KEY = "hashui_void_studio_meta_v1";
-  const ROOT_ID = "__root__";
-  const TRASH_ID = "__trash__";
   const SYSTEM_ICON_FINDER = "__system_finder__";
   const SYSTEM_ICON_SETTINGS = "__system_settings__";
   const SYSTEM_ICON_TRASH = "__system_trash__";
 
+  const state = {
+    dbPromise: null,
+    projects: [],
+    activeProject: null,
+    activeFolderId: ROOT_ID,
+  };
+
   let initialized = false;
   let mounted = false;
-  let dbPromise = null;
-  let projects = [];
-  let activeProject = null;
-  let activeFolderId = ROOT_ID;
   let selectedId = "";
   let editingId = "";
   let runAbort = null;
@@ -92,337 +91,50 @@ const VoidStudio = (() => {
     }
   }
 
-  function openDb() {
-    if (dbPromise) return dbPromise;
-    dbPromise = new Promise((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 1);
-      req.onupgradeneeded = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
-      };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error || new Error("IndexedDB failed"));
-    });
-    return dbPromise;
-  }
-
-  async function txStore(mode = "readonly") {
-    const db = await openDb();
-    return db.transaction(STORE, mode).objectStore(STORE);
-  }
-
-  function requestToPromise(req) {
-    return new Promise((resolve, reject) => {
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error || new Error("IndexedDB request failed"));
-    });
-  }
-
-  async function loadProjects() {
-    const store = await txStore("readonly");
-    const all = await requestToPromise(store.getAll());
-    // Always use a single universal workspace — merge all legacy projects into one
-    if (!all.length) {
-      activeProject = makeProject("Virtual OS");
-      await saveProject();
-    } else {
-      // Use the most recently updated record as the one workspace
-      all.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-      activeProject = all[0];
-      activeProject.name = "Virtual OS";
-    }
-    projects = [activeProject];
-    normalizeProject(activeProject);
-  }
-
-  async function saveProject() {
-    if (!activeProject) return;
-    activeProject.updatedAt = nowIso();
-    normalizeProject(activeProject);
-    const store = await txStore("readwrite");
-    await requestToPromise(store.put(activeProject));
-    const i = projects.findIndex(p => p.id === activeProject.id);
-    if (i >= 0) projects[i] = activeProject;
-    else projects.unshift(activeProject);
-    try { localStorage.setItem(META_KEY, JSON.stringify({ activeId: activeProject.id })); } catch {}
-  }
-
-  function makeProject(name) {
-    const t = nowIso();
-    return { id: uid("project"), name: name || "Untitled Project", createdAt: t, updatedAt: t, files: [], systemIconPositions: {} };
-  }
-
-  function normalizeProject(project) {
-    project.files = Array.isArray(project.files) ? project.files.filter(Boolean) : [];
-    project.systemIconPositions = project.systemIconPositions && typeof project.systemIconPositions === "object"
-      ? project.systemIconPositions
-      : {};
-    for (const id of [SYSTEM_ICON_FINDER, SYSTEM_ICON_SETTINGS, SYSTEM_ICON_TRASH]) {
-      const pos = project.systemIconPositions[id];
-      if (!pos || !Number.isFinite(Number(pos.x)) || !Number.isFinite(Number(pos.y))) {
-        delete project.systemIconPositions[id];
-      } else {
-        project.systemIconPositions[id] = { x: Number(pos.x), y: Number(pos.y) };
-      }
-    }
-    const seen = new Set();
-    project.files = project.files.filter(item => {
-      if (!item.id || seen.has(item.id)) return false;
-      seen.add(item.id);
-      item.type = item.type === "folder" ? "folder" : "file";
-      item.parentId = item.parentId || ROOT_ID;
-      item.name = safeName(item.name || (item.type === "folder" ? "folder" : "file.txt"));
-      item.updatedAt = item.updatedAt || nowIso();
-      if (item.deletedAt) {
-        item.deletedAt = String(item.deletedAt);
-        item.trashParentId = item.trashParentId || item.parentId || ROOT_ID;
-        item.trashPath = item.trashPath || item.path || item.name;
-        item.trashRoot = !!item.trashRoot;
-      } else {
-        delete item.deletedAt;
-        delete item.trashParentId;
-        delete item.trashPath;
-        delete item.trashRoot;
-      }
-      if (item.type === "folder") item.content = "";
-      else item.content = String(item.content ?? "");
-      return true;
-    });
-    rebuildPaths();
-  }
-
-  function safeName(name) {
-    return String(name || "")
-      .replace(/[\\/:*?"<>|]+/g, "-")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 120) || "untitled";
-  }
-
-  function normalizeVirtualPath(path) {
-    const clean = String(path || "")
-      .replace(/\\/g, "/")
-      .replace(/^\/+/, "")
-      .split("/")
-      .map(p => safeName(p))
-      .filter(p => p && p !== "." && p !== "..")
-      .join("/");
-    return clean || "index.html";
-  }
-
-  function getItem(id) {
-    if (!activeProject) return null;
-    return activeProject.files.find(f => f.id === id) || null;
-  }
-
-  function childrenOf(parentId) {
-    if (!activeProject) return [];
-    if (parentId === TRASH_ID) {
-      return activeProject.files
-        .filter(f => f.deletedAt && f.trashRoot)
-        .sort(fileSorter);
-    }
-    const parent = getItem(parentId);
-    const wantsDeleted = !!parent?.deletedAt;
-    return activeProject.files
-      .filter(f => (f.parentId || ROOT_ID) === parentId && !!f.deletedAt === wantsDeleted)
-      .sort(fileSorter);
-  }
-
-  function fileSorter(a, b) {
-    return a.type === b.type ? a.name.localeCompare(b.name) : a.type === "folder" ? -1 : 1;
-  }
-
-  function visibleProjectFiles() {
-    return (activeProject?.files || []).filter(f => !f.deletedAt);
-  }
-
-  function trashedProjectFiles() {
-    return (activeProject?.files || []).filter(f => f.deletedAt);
-  }
-
-  function descendantIds(rootId) {
-    const ids = new Set([rootId]);
-    let changed = true;
-    while (changed) {
-      changed = false;
-      for (const item of activeProject?.files || []) {
-        if (ids.has(item.parentId) && !ids.has(item.id)) {
-          ids.add(item.id);
-          changed = true;
-        }
-      }
-    }
-    return ids;
-  }
-
-  function parentPath(parentId) {
-    if (!parentId || parentId === ROOT_ID) return "";
-    const p = getItem(parentId);
-    return p ? p.path : "";
-  }
-
-  function writableFolderId(id = activeFolderId) {
-    if (!id || id === TRASH_ID) return ROOT_ID;
-    if (id === ROOT_ID) return ROOT_ID;
-    const item = getItem(id);
-    return item?.type === "folder" && !item.deletedAt ? item.id : ROOT_ID;
-  }
-
-  function rebuildPaths() {
-    if (!activeProject) return;
-    const byId = new Map(activeProject.files.map(f => [f.id, f]));
-    const pathFor = (item, stack = new Set()) => {
-      if (!item || stack.has(item.id)) return item?.name || "";
-      if (item.parentId === ROOT_ID || !byId.has(item.parentId)) return item.name;
-      stack.add(item.id);
-      const p = byId.get(item.parentId);
-      return `${pathFor(p, stack)}/${item.name}`;
+  function clampDesktopPosition(pos) {
+    const desktop = $("voidDesktop");
+    const maxX = Math.max(8, (desktop?.clientWidth || window.innerWidth || 640) - 98);
+    const maxY = Math.max(8, (desktop?.clientHeight || window.innerHeight || 480) - 96);
+    return {
+      x: Math.max(8, Math.min(maxX, Number(pos?.x) || 8)),
+      y: Math.max(8, Math.min(maxY, Number(pos?.y) || 8)),
     };
-    activeProject.files.forEach(item => { item.path = normalizeVirtualPath(pathFor(item)); });
   }
 
-  function ensureFolderPath(folderPath, baseParent = ROOT_ID) {
-    const parts = normalizeVirtualPath(folderPath || "").split("/").filter(Boolean);
-    let parentId = baseParent;
-    for (const part of parts) {
-      let folder = childrenOf(parentId).find(f => f.type === "folder" && f.name === part);
-      if (!folder) {
-        folder = { id: uid("folder"), parentId, type: "folder", name: part, path: "", content: "", mime: "inode/directory", updatedAt: nowIso() };
-        activeProject.files.push(folder);
-        rebuildPaths();
-      }
-      parentId = folder.id;
-    }
-    return parentId;
-  }
-
-  function addFileByPath(path, content, mime = "text/plain") {
-    const clean = normalizeVirtualPath(path);
-    const parts = clean.split("/");
-    const name = safeName(parts.pop());
-    const parentId = parts.length ? ensureFolderPath(parts.join("/")) : ROOT_ID;
-    let existing = childrenOf(parentId).find(f => f.type === "file" && f.name === name);
-    if (!existing) {
-      existing = { id: uid("file"), parentId, type: "file", name, path: "", content: "", mime, updatedAt: nowIso() };
-      activeProject.files.push(existing);
-    }
-    existing.content = String(content ?? "");
-    existing.mime = mime;
-    existing.updatedAt = nowIso();
-    rebuildPaths();
-    return existing;
-  }
-
-  function searchText(s) {
-    return String(s || "")
-      .toLowerCase()
-      .replace(/\.[a-z0-9]+$/i, "")
-      .replace(/[_\-./]+/g, " ")
-      .replace(/\b(file|folder|named|called|the|a|an|into|inside|to|in|put|move|rename|delete|remove|create|make)\b/g, " ")
-      .replace(/[^a-z0-9 ]+/g, " ")
-      .split(/\s+/)
-      .filter(Boolean)
-      .map(t => t.length > 3 && t.endsWith("s") ? t.slice(0, -1) : t)
-      .join(" ");
-  }
-
-  function itemSearchText(item) {
-    return searchText(`${item.name} ${item.path}`);
-  }
-
-  function findVirtualItem(query, type = "") {
-    const q = searchText(query);
-    if (!q) return null;
-    const tokens = q.split(/\s+/).filter(Boolean);
-    let best = null;
-    let bestScore = 0;
-    for (const item of activeProject.files) {
-      if (item.deletedAt) continue;
-      if (type && item.type !== type) continue;
-      const hay = itemSearchText(item);
-      let score = 0;
-      for (const token of tokens) {
-        if (hay === token) score += 8;
-        else if (hay.split(/\s+/).includes(token)) score += 5;
-        else if (hay.includes(token)) score += 2;
-      }
-      if (item.name.toLowerCase() === String(query).toLowerCase()) score += 10;
-      if (score > bestScore) {
-        best = item;
-        bestScore = score;
-      }
-    }
-    return bestScore > 0 ? best : null;
-  }
-
-  function cleanInstructionName(value) {
-    return safeName(String(value || "")
-      .replace(/[.!?]+$/g, "")
-      .replace(/^["']|["']$/g, "")
-      .replace(/\s+(?:folder|directory)$/i, "")
-      .trim());
-  }
-
-  function trimInstructionTarget(value) {
-    return String(value || "")
-      .replace(/[.!?]+$/g, "")
-      .replace(/^["']|["']$/g, "")
-      .trim();
-  }
-
-  function moveItemToFolder(item, folderName) {
-    if (!item) return false;
-    const targetFolderName = cleanInstructionName(folderName);
-    if (!targetFolderName) return false;
-    const existingFolder = findVirtualItem(targetFolderName, "folder");
-    const folderId = existingFolder?.id || ensureFolderPath(targetFolderName);
-    if (!canMoveToParent(item, folderId)) return false;
-    item.parentId = folderId;
-    item.desktopPosition = null;
-    item.updatedAt = nowIso();
-    rebuildPaths();
-    activeFolderId = folderId;
-    selectedId = item.id;
-    return true;
-  }
-
-  function canMoveToParent(item, parentId) {
-    if (!item) return false;
-    if (item.deletedAt) return false;
-    if (!parentId || parentId === ROOT_ID) return true;
-    const target = getItem(parentId);
-    if (!target || target.deletedAt || target.type !== "folder" || target.id === item.id) return false;
-    let parent = target;
-    while (parent) {
-      if (parent.id === item.id) return false;
-      if (parent.parentId === ROOT_ID) break;
-      parent = getItem(parent.parentId);
-    }
-    return true;
-  }
+  const {
+    loadProjects,
+    saveProject,
+    safeName,
+    normalizeVirtualPath,
+    getItem,
+    childrenOf,
+    visibleProjectFiles,
+    trashedProjectFiles,
+    descendantIds,
+    parentPath,
+    writableFolderId,
+    rebuildPaths,
+    ensureFolderPath,
+    addFileByPath,
+    findVirtualItem,
+    cleanInstructionName,
+    trimInstructionTarget,
+    moveItemToFolder,
+    canMoveToParent,
+    moveItemToParent: storageMoveItemToParent,
+  } = createVoidStorage({ state, clampDesktopPosition, log });
 
   async function moveItemToParent(itemId, parentId = ROOT_ID, desktopPosition = null) {
     const item = getItem(itemId);
-    if (!item) return false;
-    if (item.deletedAt) {
-      log("Restore the item from Trash before moving it.", "warn");
-      return false;
+    const oldParentId = item?.parentId || ROOT_ID;
+    const ok = await storageMoveItemToParent(itemId, parentId, desktopPosition);
+    if (ok && item) {
+      selectedId = item.id;
+      if (oldParentId === state.activeFolderId && (parentId || ROOT_ID) !== state.activeFolderId) {
+        selectedId = item.id;
+      }
     }
-    const targetParentId = parentId || ROOT_ID;
-    if (!canMoveToParent(item, targetParentId)) {
-      log("Move was blocked to protect the virtual folder tree.", "warn");
-      return false;
-    }
-    const oldParentId = item.parentId || ROOT_ID;
-    item.parentId = targetParentId;
-    item.desktopPosition = targetParentId === ROOT_ID ? clampDesktopPosition(desktopPosition) : null;
-    item.updatedAt = nowIso();
-    rebuildPaths();
-    selectedId = item.id;
-    if (oldParentId === activeFolderId && targetParentId !== activeFolderId) selectedId = item.id;
-    await saveProject();
-    return true;
+    return ok;
   }
 
   function setDragOffset(e, el) {
@@ -471,7 +183,7 @@ const VoidStudio = (() => {
   async function tryApplyWorkspaceInstruction(prompt) {
     const text = String(prompt || "").trim();
     const lower = text.toLowerCase();
-    if (!text || !activeProject) return false;
+    if (!text || !state.activeProject) return false;
 
     let m = text.match(/\b(?:put|move)\b\s+(.+?)\s+\b(?:into|inside|in|to)\b\s+(?:a\s+|the\s+)?folder(?:\s+(?:named|called))?\s+["']?([^"'\n]+?)["']?$/i);
     if (!m) m = text.match(/\b(?:put|move)\b\s+(.+?)\s+\b(?:into|inside|in|to)\b\s+["']?([^"'\n]+?)["']?$/i);
@@ -485,6 +197,7 @@ const VoidStudio = (() => {
         log("Move was blocked to protect the virtual folder tree.", "warn");
         return true;
       }
+      selectedId = item.id;
       await saveProject();
       log(`Moved ${item.name} into /${getItem(item.parentId)?.path || ""}`, "ok");
       renderAll();
@@ -539,7 +252,7 @@ const VoidStudio = (() => {
     m = text.match(/\b(?:create|make|add)\b\s+(?:a\s+)?folder\s+(?:named|called)?\s*["']?([^"'\n]+?)["']?$/i);
     if (m) {
       const folderId = ensureFolderPath(cleanInstructionName(m[1]));
-      activeFolderId = folderId;
+      state.activeFolderId = folderId;
       selectedId = folderId;
       await saveProject();
       log(`Created folder /${getItem(folderId)?.path || ""}`, "ok");
@@ -549,7 +262,7 @@ const VoidStudio = (() => {
 
     m = text.match(/\b(?:create|make|add)\b\s+(?:a\s+)?file\s+(?:named|called)?\s*["']?([^"'\n]+?)["']?$/i);
     if (m) {
-      const base = activeFolderId === ROOT_ID ? "" : parentPath(activeFolderId) + "/";
+      const base = state.activeFolderId === ROOT_ID ? "" : parentPath(state.activeFolderId) + "/";
       const item = addFileByPath(base + trimInstructionTarget(m[1]), "", guessMime(m[1]));
       selectedId = item.id;
       await saveProject();
@@ -563,7 +276,7 @@ const VoidStudio = (() => {
   }
 
   function renderAll() {
-    if (!mounted || !activeProject) return;
+    if (!mounted || !state.activeProject) return;
     renderHeader();
     renderModelSelect();
     renderDesktop();
@@ -581,7 +294,7 @@ const VoidStudio = (() => {
     const dlBtn = $("voidDownloadFolderBtn");
     if (!dlBtn) return;
     const sel = selectedId ? getItem(selectedId) : null;
-    const inTrash = activeFolderId === TRASH_ID || !!getItem(activeFolderId)?.deletedAt;
+    const inTrash = state.activeFolderId === TRASH_ID || !!getItem(state.activeFolderId)?.deletedAt;
     const isFolder = sel?.type === "folder" && !sel.deletedAt;
     dlBtn.disabled = !isFolder;
     dlBtn.title = isFolder
@@ -606,7 +319,7 @@ const VoidStudio = (() => {
   function renderEditMode() {
     const btn = $("voidEditModeBtn");
     if (!btn) return;
-    const target = selectedId ? getItem(selectedId) : (activeFolderId !== ROOT_ID ? getItem(activeFolderId) : null);
+    const target = selectedId ? getItem(selectedId) : (state.activeFolderId !== ROOT_ID ? getItem(state.activeFolderId) : null);
     btn.classList.toggle("active", forceEditMode);
     btn.textContent = forceEditMode ? "Editing" : "Edit";
     btn.title = forceEditMode
@@ -626,9 +339,9 @@ const VoidStudio = (() => {
         ? `${fileCount} file${fileCount !== 1 ? "s" : ""} · ${folderCount} folder${folderCount !== 1 ? "s" : ""}`
         : "";
     }
-    const folder = activeFolderId === ROOT_ID || activeFolderId === TRASH_ID ? null : getItem(activeFolderId);
+    const folder = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? null : getItem(state.activeFolderId);
     const pathEl = $("voidPath");
-    if (pathEl) pathEl.textContent = activeFolderId === TRASH_ID ? "/Trash" : "/" + (folder?.path || "");
+    if (pathEl) pathEl.textContent = state.activeFolderId === TRASH_ID ? "/Trash" : "/" + (folder?.path || "");
     updateVoidClock();
   }
 
@@ -659,12 +372,12 @@ const VoidStudio = (() => {
   function renderBreadcrumb() {
     const host = $("voidBreadcrumb");
     if (!host) return;
-    if (activeFolderId === TRASH_ID) {
+    if (state.activeFolderId === TRASH_ID) {
       host.innerHTML = `<span class="void-bc-item active">Trash</span>`;
       return;
     }
     const segments = [];
-    let cur = activeFolderId;
+    let cur = state.activeFolderId;
     const activeItem = cur && cur !== ROOT_ID ? getItem(cur) : null;
     const rootSegment = activeItem?.deletedAt ? { id: TRASH_ID, name: "Trash" } : { id: ROOT_ID, name: "Virtual OS" };
     while (cur && cur !== ROOT_ID) {
@@ -688,7 +401,7 @@ const VoidStudio = (() => {
     const status  = $("voidFinderStatus");
     const actions = $("voidFinderBarActions");
     if (!status || !actions) return;
-    const items = childrenOf(activeFolderId);
+    const items = childrenOf(state.activeFolderId);
     const sel   = selectedId ? getItem(selectedId) : null;
     if (sel) {
       const sizeStr = sel.type === "file" ? ` · ${formatBytes(byteSize(sel))}` : "";
@@ -712,10 +425,10 @@ const VoidStudio = (() => {
       );
     } else {
       const trashCount = trashedProjectFiles().filter(f => f.trashRoot).length;
-      status.textContent = activeFolderId === TRASH_ID
+      status.textContent = state.activeFolderId === TRASH_ID
         ? `${trashCount} item${trashCount !== 1 ? "s" : ""} in Trash`
         : `${items.length} item${items.length !== 1 ? "s" : ""}`;
-      actions.innerHTML = activeFolderId === TRASH_ID && trashCount
+      actions.innerHTML = state.activeFolderId === TRASH_ID && trashCount
         ? `<button class="void-mini-btn danger" data-act="empty-trash">Empty Trash</button>`
         : "";
       actions.querySelectorAll("[data-act]").forEach(btn =>
@@ -963,7 +676,7 @@ const VoidStudio = (() => {
     if (!item) return 0;
     if (item.type === "file") return byteSize(item);
     const ids = descendantIds(item.id);
-    return (activeProject?.files || [])
+    return (state.activeProject?.files || [])
       .filter(f => ids.has(f.id) && f.type === "file" && !!f.deletedAt === !!item.deletedAt)
       .reduce((total, f) => total + byteSize(f), 0);
   }
@@ -1021,7 +734,7 @@ const VoidStudio = (() => {
   }
 
   function systemIconPosition(id, index = 0) {
-    return activeProject?.systemIconPositions?.[id] || defaultSystemIconPosition(index);
+    return state.activeProject?.systemIconPositions?.[id] || defaultSystemIconPosition(index);
   }
 
   function setSystemIconDrag(e, iconId) {
@@ -1036,23 +749,13 @@ const VoidStudio = (() => {
   }
 
   async function moveSystemIcon(iconId, desktopPosition) {
-    if (!activeProject || ![SYSTEM_ICON_FINDER, SYSTEM_ICON_SETTINGS, SYSTEM_ICON_TRASH].includes(iconId)) return false;
-    activeProject.systemIconPositions = activeProject.systemIconPositions || {};
-    activeProject.systemIconPositions[iconId] = clampDesktopPosition(desktopPosition);
+    if (!state.activeProject || ![SYSTEM_ICON_FINDER, SYSTEM_ICON_SETTINGS, SYSTEM_ICON_TRASH].includes(iconId)) return false;
+    state.activeProject.systemIconPositions = state.activeProject.systemIconPositions || {};
+    state.activeProject.systemIconPositions[iconId] = clampDesktopPosition(desktopPosition);
     await saveProject();
     selectedSystemIconId = iconId;
     selectedId = "";
     return true;
-  }
-
-  function clampDesktopPosition(pos) {
-    const desktop = $("voidDesktop");
-    const maxX = Math.max(8, (desktop?.clientWidth || window.innerWidth || 640) - 98);
-    const maxY = Math.max(8, (desktop?.clientHeight || window.innerHeight || 480) - 96);
-    return {
-      x: Math.max(8, Math.min(maxX, Number(pos?.x) || 8)),
-      y: Math.max(8, Math.min(maxY, Number(pos?.y) || 8)),
-    };
   }
 
   // Pointer-event drag for desktop icons — reliable in WebKit where HTML5 drag fails on <button>.
@@ -1173,7 +876,7 @@ const VoidStudio = (() => {
           const target = getItem(folderBtn.dataset.id);
           if (target?.type === "folder" && canMoveToParent(item, target.id)) {
             if (await moveItemToParent(item.id, target.id)) {
-              activeFolderId = target.id;
+              state.activeFolderId = target.id;
               log(`Moved ${item.name} into /${target.path}`, "ok");
               renderAll();
               return;
@@ -1204,7 +907,7 @@ const VoidStudio = (() => {
             e.preventDefault();
             e.stopPropagation();
             el.classList.remove("drop-target");
-            activeFolderId = item.id;
+            state.activeFolderId = item.id;
             await handleUpload(e.dataTransfer.files, false, item.id);
             return;
           }
@@ -1215,7 +918,7 @@ const VoidStudio = (() => {
           e.stopPropagation();
           el.classList.remove("drop-target");
           if (await moveItemToParent(dragged.id, item.id)) {
-            activeFolderId = item.id;
+            state.activeFolderId = item.id;
             log(`Moved ${dragged.name} into /${getItem(item.id)?.path || item.name}`, "ok");
             renderAll();
           }
@@ -1230,15 +933,15 @@ const VoidStudio = (() => {
     if (!host) return;
     const walk = (parentId, depth) => childrenOf(parentId).filter(f => f.type === "folder").map(folder => {
       const kids = walk(folder.id, depth + 1);
-      return `<button class="void-tree-row ${activeFolderId === folder.id ? "active" : ""}" data-folder="${esc(folder.id)}" style="padding-left:${10 + depth * 14}px">${folderSvg()}<span>${esc(folder.name)}</span></button>${kids}`;
+      return `<button class="void-tree-row ${state.activeFolderId === folder.id ? "active" : ""}" data-folder="${esc(folder.id)}" style="padding-left:${10 + depth * 14}px">${folderSvg()}<span>${esc(folder.name)}</span></button>${kids}`;
     }).join("");
     const trashCount = trashedProjectFiles().filter(f => f.trashRoot).length;
     host.innerHTML = `
       <div class="void-tree-section">Favorites</div>
-      <button class="void-tree-row ${activeFolderId === ROOT_ID ? "active" : ""}" data-folder="${ROOT_ID}">${folderSvg()}<span>Virtual OS</span></button>
+      <button class="void-tree-row ${state.activeFolderId === ROOT_ID ? "active" : ""}" data-folder="${ROOT_ID}">${folderSvg()}<span>Virtual OS</span></button>
       ${walk(ROOT_ID, 1)}
       <div class="void-tree-section">System</div>
-      <button class="void-tree-row ${activeFolderId === TRASH_ID ? "active" : ""}" data-folder="${TRASH_ID}">${trashSvg(trashCount > 0)}<span>Trash</span><em>${trashCount || ""}</em></button>
+      <button class="void-tree-row ${state.activeFolderId === TRASH_ID ? "active" : ""}" data-folder="${TRASH_ID}">${trashSvg(trashCount > 0)}<span>Trash</span><em>${trashCount || ""}</em></button>
       <button class="void-tree-row" data-action="settings">${settingsSvg()}<span>Settings</span></button>`;
     host.querySelector("[data-action='settings']")?.addEventListener("click", openVoidSettings);
     host.querySelectorAll("[data-folder]").forEach(btn => {
@@ -1280,7 +983,7 @@ const VoidStudio = (() => {
           e.preventDefault();
           btn.classList.remove("drop-target");
           const targetId = btn.dataset.folder || ROOT_ID;
-          activeFolderId = targetId;
+          state.activeFolderId = targetId;
           await handleUpload(e.dataTransfer.files, false, targetId);
           return;
         }
@@ -1290,7 +993,7 @@ const VoidStudio = (() => {
         btn.classList.remove("drop-target");
         const targetId = btn.dataset.folder || ROOT_ID;
         if (await moveItemToParent(dragged.id, targetId)) {
-          activeFolderId = targetId;
+          state.activeFolderId = targetId;
           log(targetId === ROOT_ID ? `Moved to Virtual OS root` : `Moved ${dragged.name} into /${getItem(targetId)?.path || ""}`, "ok");
           renderAll();
         }
@@ -1301,7 +1004,7 @@ const VoidStudio = (() => {
   function renderFileList() {
     const host = $("voidFileList");
     if (!host) return;
-    const items = childrenOf(activeFolderId);
+    const items = childrenOf(state.activeFolderId);
     host.classList.toggle("grid", finderViewMode === "grid");
     const rows = items.map(item => `
       <button class="void-file-row ${selectedId === item.id ? "active" : ""} ${item.deletedAt ? "trashed" : ""}" data-id="${esc(item.id)}" draggable="true">
@@ -1313,24 +1016,24 @@ const VoidStudio = (() => {
     if (items.length && finderViewMode === "list") {
       host.innerHTML = `<div class="void-file-head"><span>Name</span><span>Date Modified</span><span>Size</span><span>Kind</span></div>${rows}`;
     } else {
-      host.innerHTML = items.length ? rows : `<div class="void-empty-list">${activeFolderId === TRASH_ID ? "Trash is empty." : "This folder is empty."}</div>`;
+      host.innerHTML = items.length ? rows : `<div class="void-empty-list">${state.activeFolderId === TRASH_ID ? "Trash is empty." : "This folder is empty."}</div>`;
     }
-    const folder = activeFolderId !== ROOT_ID && activeFolderId !== TRASH_ID ? getItem(activeFolderId) : null;
-    const readOnlyDrop = activeFolderId === TRASH_ID || !!folder?.deletedAt;
+    const folder = state.activeFolderId !== ROOT_ID && state.activeFolderId !== TRASH_ID ? getItem(state.activeFolderId) : null;
+    const readOnlyDrop = state.activeFolderId === TRASH_ID || !!folder?.deletedAt;
     host.ondragover = readOnlyDrop ? null : e => acceptItemDrop(e);
     host.ondrop = async e => {
       if (readOnlyDrop) return;
       if (e.target?.closest?.(".void-file-row")) return;
       if (e.dataTransfer.files?.length) {
         e.preventDefault();
-        await handleUpload(e.dataTransfer.files, false, activeFolderId);
+        await handleUpload(e.dataTransfer.files, false, state.activeFolderId);
         return;
       }
       const dragged = getDragItem(e);
       if (!dragged) return;
       e.preventDefault();
-      if (await moveItemToParent(dragged.id, activeFolderId)) {
-        log(activeFolderId === ROOT_ID ? `Moved to Virtual OS root` : `Moved ${dragged.name} into /${getItem(activeFolderId)?.path || ""}`, "ok");
+      if (await moveItemToParent(dragged.id, state.activeFolderId)) {
+        log(state.activeFolderId === ROOT_ID ? `Moved to Virtual OS root` : `Moved ${dragged.name} into /${getItem(state.activeFolderId)?.path || ""}`, "ok");
         renderAll();
       }
     };
@@ -1360,7 +1063,7 @@ const VoidStudio = (() => {
           e.preventDefault();
           e.stopPropagation();
           btn.classList.remove("drop-target");
-          activeFolderId = target.id;
+          state.activeFolderId = target.id;
           await handleUpload(e.dataTransfer.files, false, target.id);
           return;
         }
@@ -1370,7 +1073,7 @@ const VoidStudio = (() => {
         e.stopPropagation();
         btn.classList.remove("drop-target");
         if (await moveItemToParent(dragged.id, target.id)) {
-          activeFolderId = target.id;
+          state.activeFolderId = target.id;
           log(`Moved ${dragged.name} into /${target.path}`, "ok");
           renderAll();
         }
@@ -1407,7 +1110,7 @@ const VoidStudio = (() => {
     finderHistory = finderHistory.slice(0, finderHistoryIdx + 1);
     finderHistory.push(newId);
     finderHistoryIdx = finderHistory.length - 1;
-    activeFolderId = newId;
+    state.activeFolderId = newId;
     selectedId = newId === ROOT_ID || newId === TRASH_ID ? "" : newId;
     finderCollapsed = false;
     renderAll();
@@ -1485,13 +1188,13 @@ const VoidStudio = (() => {
   }
 
   async function deleteItemsDirect(rootIds, { permanent = false } = {}) {
-    if (!activeProject) return;
+    if (!state.activeProject) return;
     const rootSet = new Set(rootIds.filter(id => getItem(id)));
     const ids = new Set(rootIds.filter(Boolean));
     let changed = true;
     while (changed) {
       changed = false;
-      for (const f of activeProject.files) {
+      for (const f of state.activeProject.files) {
         if (ids.has(f.parentId) && !ids.has(f.id)) {
           ids.add(f.id);
           changed = true;
@@ -1500,10 +1203,10 @@ const VoidStudio = (() => {
     }
 
     if (permanent) {
-      activeProject.files = activeProject.files.filter(f => !ids.has(f.id));
+      state.activeProject.files = state.activeProject.files.filter(f => !ids.has(f.id));
     } else {
       const deletedAt = nowIso();
-      for (const f of activeProject.files) {
+      for (const f of state.activeProject.files) {
         if (!ids.has(f.id)) continue;
         const isTrashRoot = rootSet.has(f.id);
         if (!f.deletedAt) {
@@ -1520,7 +1223,7 @@ const VoidStudio = (() => {
     }
 
     selectedId = "";
-    if (ids.has(activeFolderId)) activeFolderId = permanent ? ROOT_ID : TRASH_ID;
+    if (ids.has(state.activeFolderId)) state.activeFolderId = permanent ? ROOT_ID : TRASH_ID;
     rebuildPaths();
     await saveProject();
   }
@@ -1530,7 +1233,7 @@ const VoidStudio = (() => {
     if (!item?.deletedAt) return;
     const ids = descendantIds(id);
     const restoredAt = nowIso();
-    for (const f of activeProject.files) {
+    for (const f of state.activeProject.files) {
       if (!ids.has(f.id)) continue;
       delete f.deletedAt;
       delete f.trashParentId;
@@ -1538,7 +1241,7 @@ const VoidStudio = (() => {
       delete f.trashRoot;
       f.updatedAt = restoredAt;
     }
-    for (const f of activeProject.files) {
+    for (const f of state.activeProject.files) {
       if (!ids.has(f.id)) continue;
       const parent = f.parentId && f.parentId !== ROOT_ID ? getItem(f.parentId) : null;
       if (f.parentId !== ROOT_ID && (!parent || parent.deletedAt) && !ids.has(f.parentId)) {
@@ -1548,8 +1251,8 @@ const VoidStudio = (() => {
     }
     rebuildPaths();
     selectedId = item.id;
-    activeFolderId = item.type === "folder" ? item.id : (item.parentId || ROOT_ID);
-    if (activeFolderId !== ROOT_ID && getItem(activeFolderId)?.deletedAt) activeFolderId = ROOT_ID;
+    state.activeFolderId = item.type === "folder" ? item.id : (item.parentId || ROOT_ID);
+    if (state.activeFolderId !== ROOT_ID && getItem(state.activeFolderId)?.deletedAt) state.activeFolderId = ROOT_ID;
     await saveProject();
     log(`Restored ${item.name}`, "ok");
     renderAll();
@@ -1570,9 +1273,9 @@ const VoidStudio = (() => {
       log("Trash is empty.", "warn");
       return;
     }
-    activeProject.files = activeProject.files.filter(f => !f.deletedAt);
+    state.activeProject.files = state.activeProject.files.filter(f => !f.deletedAt);
     selectedId = "";
-    activeFolderId = ROOT_ID;
+    state.activeFolderId = ROOT_ID;
     rebuildPaths();
     await saveProject();
     log(`Emptied Trash (${count} item${count === 1 ? "" : "s"})`, "warn");
@@ -1698,7 +1401,7 @@ const VoidStudio = (() => {
   }
 
   function downloadFolder(folderId) {
-    if (!activeProject || !folderId || folderId === ROOT_ID) return;
+    if (!state.activeProject || !folderId || folderId === ROOT_ID) return;
     const root = getItem(folderId);
     if (!root || root.deletedAt || root.type !== "folder") return;
     rebuildPaths();
@@ -1707,12 +1410,12 @@ const VoidStudio = (() => {
     let changed = true;
     while (changed) {
       changed = false;
-      for (const f of activeProject.files) {
+      for (const f of state.activeProject.files) {
         if (allIds.has(f.parentId) && !allIds.has(f.id)) { allIds.add(f.id); changed = true; }
       }
     }
     const entries = [];
-    for (const f of activeProject.files.filter(item => allIds.has(item.id) && !item.deletedAt)) {
+    for (const f of state.activeProject.files.filter(item => allIds.has(item.id) && !item.deletedAt)) {
       if (f.type === "folder") entries.push({ name: f.path.replace(/\/?$/, "/"), data: "" });
       else entries.push({ name: f.path, data: f.content || "" });
     }
@@ -1727,7 +1430,7 @@ const VoidStudio = (() => {
   }
 
   async function deleteAll() {
-    if (activeFolderId === TRASH_ID || getItem(activeFolderId)?.deletedAt) {
+    if (state.activeFolderId === TRASH_ID || getItem(state.activeFolderId)?.deletedAt) {
       await emptyTrash();
       return;
     }
@@ -1739,13 +1442,13 @@ const VoidStudio = (() => {
     const count = visibleProjectFiles().length;
     await deleteItemsDirect(roots.map(item => item.id));
     selectedId = "";
-    activeFolderId = TRASH_ID;
+    state.activeFolderId = TRASH_ID;
     rebuildPaths();
     log(`Moved ${count} item${count === 1 ? "" : "s"} to Trash.`, "warn");
     renderAll();
   }
 
-  async function handleUpload(files, folderMode = false, targetParentId = activeFolderId) {
+  async function handleUpload(files, folderMode = false, targetParentId = state.activeFolderId) {
     const list = Array.from(files || []);
     if (!list.length) return;
     const parentId = writableFolderId(targetParentId);
@@ -1873,7 +1576,7 @@ FALLBACK (only if Unsplash Source is unsuitable for the context):
           maxFullFiles: 10,
           maxFullBytes: 4500,
           maxPreviewBytes: 450,
-          focusId: selectedId || activeFolderId,
+          focusId: selectedId || state.activeFolderId,
         })
       : "(existing workspace intentionally hidden; this is a new-build prompt, not an edit)";
     return `You are Virtual OS, an AI coding agent with FULL file-system capabilities over a browser-local virtual filesystem.
@@ -2011,7 +1714,7 @@ ${userPrompt}`;
           maxFullFiles: 8,
           maxFullBytes: 3500,
           maxPreviewBytes: 350,
-          focusId: selectedId || activeFolderId,
+          focusId: selectedId || state.activeFolderId,
         })
       : "(existing workspace intentionally hidden; create a new project and do not edit old files)";
     const content = await callWithFailover("god", $("voidGodModelSelect")?.value, [
@@ -2205,10 +1908,10 @@ SPEED — avoid these time-wasting patterns:
     const parts = clean.split("/").filter(Boolean);
     let parentId = ROOT_ID;
     for (const part of parts) {
-      const existing = activeProject.files.find(f => f.parentId === parentId && f.name === safeName(part) && f.type === "folder");
+      const existing = state.activeProject.files.find(f => f.parentId === parentId && f.name === safeName(part) && f.type === "folder");
       if (existing) { parentId = existing.id; continue; }
       const nf = { id: uid("f"), type: "folder", parentId, name: safeName(part), createdAt: nowIso(), updatedAt: nowIso() };
-      activeProject.files.push(nf);
+      state.activeProject.files.push(nf);
       parentId = nf.id;
     }
     rebuildPaths();
@@ -2996,7 +2699,7 @@ ${buildDynamicImageInstruction(prompt)}`
       item => item.type === "folder" && item.name === folderName && item.parentId === ROOT_ID
     );
     if (rootFolderItem) {
-      activeFolderId = rootFolderItem.id;
+      state.activeFolderId = rootFolderItem.id;
       finderCollapsed = false;
     }
 
@@ -3062,7 +2765,7 @@ ${buildDynamicImageInstruction(prompt)}`
 
   function voidChatSystemPrompt() {
     let tree = "(empty — no files yet)";
-    if (activeProject) {
+    if (state.activeProject) {
       const files = visibleProjectFiles();
       const paths = files.map(f => (f.type === "folder" ? "d " : "f ") + f.path);
       tree = paths.slice(0, 80).join("\n");
@@ -3333,7 +3036,7 @@ ${tree}`;
     $("voidFinderClose")?.addEventListener("click", () => setFinderCollapsed(true));
     $("voidEditModeBtn")?.addEventListener("click", () => {
       forceEditMode = !forceEditMode;
-      const target = selectedId ? getItem(selectedId) : (activeFolderId !== ROOT_ID ? getItem(activeFolderId) : null);
+      const target = selectedId ? getItem(selectedId) : (state.activeFolderId !== ROOT_ID ? getItem(state.activeFolderId) : null);
       log(forceEditMode
         ? target
           ? `Edit Mode on. Sending context for /${target.path}.`
@@ -3346,16 +3049,16 @@ ${tree}`;
     $("voidFinderBack")?.addEventListener("click", () => {
       if (finderHistoryIdx > 0) {
         finderHistoryIdx--;
-        activeFolderId = finderHistory[finderHistoryIdx];
-        selectedId = activeFolderId === ROOT_ID || activeFolderId === TRASH_ID ? "" : activeFolderId;
+        state.activeFolderId = finderHistory[finderHistoryIdx];
+        selectedId = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? "" : state.activeFolderId;
         renderAll();
       }
     });
     $("voidFinderFwd")?.addEventListener("click", () => {
       if (finderHistoryIdx < finderHistory.length - 1) {
         finderHistoryIdx++;
-        activeFolderId = finderHistory[finderHistoryIdx];
-        selectedId = activeFolderId === ROOT_ID || activeFolderId === TRASH_ID ? "" : activeFolderId;
+        state.activeFolderId = finderHistory[finderHistoryIdx];
+        selectedId = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? "" : state.activeFolderId;
         renderAll();
       }
     });
@@ -3553,7 +3256,7 @@ ${tree}`;
       const item = getDragItem(e);
       if (!item) return;
       if (await moveItemToParent(item.id, ROOT_ID, desktopPosition)) {
-        activeFolderId = ROOT_ID;
+        state.activeFolderId = ROOT_ID;
         log(`Moved to Virtual OS root`, "ok");
         renderAll();
       }
@@ -3680,7 +3383,7 @@ ${tree}`;
   }
 
   async function exportZip() {
-    if (!activeProject) return;
+    if (!state.activeProject) return;
     rebuildPaths();
     const entries = [];
     for (const folder of visibleProjectFiles().filter(f => f.type === "folder")) entries.push({ name: folder.path.replace(/\/?$/, "/"), data: "" });

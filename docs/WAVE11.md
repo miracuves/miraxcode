@@ -15,13 +15,9 @@
 | `coder-mode.js` | `createCoderMode({ sharedState, modelRef, relativeFromRoot })` → `{ mount, destroy, remount }` |
 | (Wave 10 modules) | `constants`, `dom-utils`, `tool-blocks`, `router`, `legacy-bridge`, `stats-poll`, `register` |
 
-## Wave 12 (planned)
+## Wave 12
 
-- `tabs.js` — tab manager + tab bar
-- `terminal.js` — terminal + ANSI rendering
-- `explorer.js` — file tree + context menu
-- `agent-run.js` — `startRun`, `agentLoop`, multi-agent modes
-- Virtual OS: `storage.js`, `finder.js`, `chat.js`, remove legacy root copies
+See `docs/WAVE12.md` — `tabs.js`, `terminal.js`, `virtual-os/storage.js` landed; explorer, agent-run, void chat in progress., remove legacy root copies
 
 ## Verify
 
