@@ -145,6 +145,7 @@ export function createTabManager(ctx) {
             applied: fc.applied,
             content: typeof fc.content === 'string' ? fc.content.slice(0, 12_000) : fc.content,
             proposedContent: typeof fc.proposedContent === 'string' ? fc.proposedContent.slice(0, 12_000) : fc.proposedContent,
+            previousContent: typeof fc.previousContent === 'string' ? fc.previousContent.slice(0, 12_000) : fc.previousContent,
           })),
         }));
         localStorage.setItem(TABS_KEY, JSON.stringify({ v: 1, tabs, activeId: this.activeId }));

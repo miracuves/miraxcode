@@ -92,6 +92,23 @@ test('forge templates fallbackPlan returns knife nodes', () => {
   assert.ok(plan.nodes.length > 5);
 });
 
+test('CdrFileStage stages delete_file proposals', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { runInNewContext } = await import('node:vm');
+  const { fileURLToPath } = await import('node:url');
+  const path = fileURLToPath(new URL('../src/js/cdr-file-stage.js', import.meta.url));
+  const sandbox = { window: {} };
+  runInNewContext(readFileSync(path, 'utf8'), sandbox);
+  const stage = sandbox.window.CdrFileStage;
+  assert.ok(stage?.isStagedTool('delete_file'));
+  const staged = await stage.computeProposed(
+    { name: 'delete_file', arguments: { path: '/tmp/x.txt' } },
+    async () => 'line1\nline2\n'
+  );
+  assert.equal(staged.kind, 'delete');
+  assert.equal(staged.proposedContent, '');
+});
+
 test('wave 17 factory modules export create*Api', () => {
   assert.equal(typeof createSystemsSpecApi, 'function');
   assert.equal(typeof createSystemsGenerateApi, 'function');

@@ -191,6 +191,23 @@ export function createDomWiringApi(ctx) {
       });
     });
 
+    listenerRefs.onCoderReviewKeys = (e) => {
+      if (!document.body.classList.contains('coder-mode')) return;
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key === 'Enter' && e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        hooks.acceptAllPendingChanges?.();
+        return;
+      }
+      if (e.key.toLowerCase() === 'y' && e.shiftKey && !e.altKey) {
+        const row = document.querySelector('.cdr-change-row.pending');
+        if (!row) return;
+        e.preventDefault();
+        hooks.acceptFirstPendingChange?.();
+      }
+    };
+    document.addEventListener('keydown', listenerRefs.onCoderReviewKeys);
+
     if (taskInput) {
       taskInput.addEventListener('keydown', e => {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); hooks.startRun?.(); }
@@ -246,6 +263,7 @@ export function createDomWiringApi(ctx) {
     initCoderPowerFeatures();
     const msgs = getConversationMsgs();
     if (msgs.length) renderConversation();
+    hooks.flushPendingStaged?.();
     renderTabBar();
     renderFileChangePills();
     syncTerminalPrompt();
@@ -255,6 +273,7 @@ export function createDomWiringApi(ctx) {
   function remount() {
     hooks.populateModelPicker?.();
     hooks.renderSessions?.();
+    hooks.flushPendingStaged?.();
     renderTabBar();
   }
 

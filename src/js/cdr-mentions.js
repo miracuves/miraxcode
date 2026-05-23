@@ -39,6 +39,9 @@
       input.dispatchEvent(new Event('input', { bubbles: true }));
       closeMenu();
       input.focus();
+      if (typeof opts.onPick === 'function') {
+        try { opts.onPick(rel); } catch (e) { console.warn('[CdrMentions] onPick failed:', e); }
+      }
     }
 
     function renderMenu(filter) {

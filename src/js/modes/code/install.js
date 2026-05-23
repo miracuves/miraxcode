@@ -4,7 +4,7 @@ import { registerCodeMode, scheduleCoderBoot, initSharedDom } from './register.j
 import { relativeFromRoot as relFromRoot } from './dom-utils.js';
 
 export function installCodeMode() {
-  const sharedState = { projectRoot: null, activeFile: null, homeDir: null };
+  const sharedState = { projectRoot: null, activeFile: null, homeDir: null, pendingStaged: [] };
   const modelRef = { current: null };
 
   function relativeFromRoot(path) {

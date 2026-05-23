@@ -272,30 +272,27 @@ export function createAgentRunApi(ctx) {
               const t0 = performance.now();
               let resultStr, ok = true;
               try {
-                if ((call.name === 'write_file' || call.name === 'patch_file') && window.CdrFileStage) {
-                  const staged = await window.CdrFileStage.computeProposed(call, (p) => HC().code.readFile(p));
-                  const stored = staged.proposedContent.length > 80_000
-                    ? staged.proposedContent.slice(0, 80_000) + '\n… (stored truncated)'
-                    : staged.proposedContent;
-                  const entry = {
-                    name: baseName(staged.path),
-                    path: staged.path,
-                    kind: staged.kind,
-                    content: stored,
-                    proposedContent: staged.proposedContent,
-                    previousContent: staged.previousContent,
-                    status: 'pending',
-                    applied: false,
-                    tool: staged.tool,
-                  };
+                if (window.CdrFileStage?.isStagedTool?.(call.name)) {
                   const fcRun = activeFileChanges();
                   const changeIdx = fcRun.length;
-                  addChangeEntry(entry.name, entry.path, entry.kind, stored, entry);
-                  resultStr = window.CdrFileStage.stagedResult(staged.path, staged.proposedContent.length);
+                  const stagedOut = await window.CdrFileStage.stageToolCall(
+                    call,
+                    (p) => HC().code.readFile(p),
+                    {
+                      onEntry: (entry) => {
+                        addChangeEntry(entry.name, entry.path, entry.kind, entry.content, entry);
+                      },
+                    }
+                  );
+                  resultStr = stagedOut.resultStr;
                   if (yolo && ok) {
                     const fcEntry = fcRun[changeIdx];
                     try {
-                      await window.CdrFileStage.applyEntry(fcEntry, (p, c, r) => HC().code.writeFile(p, c, r));
+                      await window.CdrFileStage.applyEntry(
+                        fcEntry,
+                        (p, c, r) => HC().code.writeFile(p, c, r),
+                        (p, r) => HC().code.deleteFile(p, r)
+                      );
                       addAIFileToExplorer(fcEntry.path, fcEntry.kind || 'write');
                       const row = contentEl?.querySelector(
                         `.cdr-change-row[data-change-idx="${changeIdx}"]`
@@ -305,7 +302,7 @@ export function createAgentRunApi(ctx) {
                         ok: true,
                         applied: true,
                         path: fcEntry.path,
-                        message: 'YOLO: change written to disk immediately (revert still available).',
+                        message: 'YOLO: change applied to disk immediately (revert still available).',
                       });
                     } catch (applyErr) {
                       ok = false;
@@ -329,11 +326,6 @@ export function createAgentRunApi(ctx) {
                 if (parsed.length) getIdeCtx().reportProblems(parsed);
               }
 
-              if (call.name === 'delete_file') {
-                const fp = call.arguments?.path || '';
-                addChangeEntry(fp.split('/').slice(-1)[0] || fp, fp, 'delete', '(file deleted)');
-                if (ok && fp) addAIFileToExplorer(fp, 'delete');
-              }
               H.appendToolResult(messages, call, resultStr);
             }
           } finally {

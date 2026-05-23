@@ -31,6 +31,19 @@
       };
     }
 
+    if (call.name === 'delete_file') {
+      if (previousContent == null) {
+        throw new Error(`delete_file failed: "${path}" does not exist.`);
+      }
+      return {
+        path,
+        kind: 'delete',
+        previousContent,
+        proposedContent: '',
+        tool: 'delete_file',
+      };
+    }
+
     if (call.name === 'patch_file') {
       const search = call.arguments?.search || '';
       const replace = call.arguments?.replace;
@@ -76,9 +89,51 @@
     throw new Error('Unsupported staged tool: ' + call.name);
   }
 
-  async function applyEntry(entry, writeFile) {
+  const STAGED_TOOLS = new Set(['write_file', 'patch_file', 'delete_file']);
+
+  function isStagedTool(name) {
+    return STAGED_TOOLS.has(name);
+  }
+
+  function buildEntryFromStaged(staged) {
+    const proposed = staged.proposedContent ?? '';
+    const stored = proposed.length > 80_000
+      ? proposed.slice(0, 80_000) + '\n… (stored truncated)'
+      : proposed;
+    const base = staged.path.split('/').pop() || staged.path;
+    return {
+      name: base,
+      path: staged.path,
+      kind: staged.kind,
+      content: staged.kind === 'delete' ? '(file deleted)' : stored,
+      proposedContent: proposed,
+      previousContent: staged.previousContent,
+      status: 'pending',
+      applied: false,
+      tool: staged.tool,
+    };
+  }
+
+  async function stageToolCall(call, readFile, hooks) {
+    const staged = await computeProposed(call, readFile);
+    const entry = buildEntryFromStaged(staged);
+    if (typeof hooks?.onEntry === 'function') {
+      await hooks.onEntry(entry, staged);
+    }
+    const bytes = staged.kind === 'delete'
+      ? (staged.previousContent || '').length
+      : (staged.proposedContent || '').length;
+    return { entry, staged, resultStr: stagedResult(staged.path, bytes) };
+  }
+
+  async function applyEntry(entry, writeFile, deleteFile) {
     if (!entry || entry.applied) return { ok: true, skipped: true };
-    await writeFile(entry.path, entry.proposedContent ?? entry.content, 'User accepted change');
+    if (entry.kind === 'delete') {
+      if (!deleteFile) throw new Error('deleteFile handler required');
+      await deleteFile(entry.path, 'User accepted deletion');
+    } else {
+      await writeFile(entry.path, entry.proposedContent ?? entry.content, 'User accepted change');
+    }
     entry.applied = true;
     return { ok: true };
   }
@@ -134,6 +189,9 @@
 
   window.CdrFileStage = {
     computeProposed,
+    buildEntryFromStaged,
+    stageToolCall,
+    isStagedTool,
     applyEntry,
     revertEntry,
     rejectEntry,

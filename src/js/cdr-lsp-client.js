@@ -199,6 +199,51 @@
       });
     },
 
+    async completion(filePath, line, character) {
+      const sid = this.sessionForPath(filePath);
+      if (!sid) return [];
+      try {
+        const res = await invoke('lsp_request', {
+          session_id: sid,
+          method: 'textDocument/completion',
+          params: {
+            textDocument: { uri: pathToUri(filePath) },
+            position: { line: Math.max(0, line - 1), character: Math.max(0, character - 1) },
+          },
+        });
+        const r = res?.result;
+        const list = Array.isArray(r) ? r : (r?.items || []);
+        return list.filter(Boolean);
+      } catch (_) {
+        return [];
+      }
+    },
+
+    async hover(filePath, line, character) {
+      const sid = this.sessionForPath(filePath);
+      if (!sid) return null;
+      try {
+        const res = await invoke('lsp_request', {
+          session_id: sid,
+          method: 'textDocument/hover',
+          params: {
+            textDocument: { uri: pathToUri(filePath) },
+            position: { line: Math.max(0, line - 1), character: Math.max(0, character - 1) },
+          },
+        });
+        const h = res?.result;
+        if (!h) return null;
+        const contents = h.contents;
+        if (typeof contents === 'string') return contents;
+        if (Array.isArray(contents)) {
+          return contents.map((c) => (typeof c === 'string' ? c : c?.value || '')).join('\n');
+        }
+        return contents?.value || null;
+      } catch (_) {
+        return null;
+      }
+    },
+
     async definition(filePath, line, character) {
       const sid = this.sessionForPath(filePath);
       if (!sid) return null;

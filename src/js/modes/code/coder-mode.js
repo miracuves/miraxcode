@@ -165,6 +165,7 @@ export function createCoderMode(deps) {
     let closeChangeOverlay;
     let enforceThreeWordName;
     let clearAllSessions;
+    let _afterRenderConversation = () => {};
 
     function abortActiveRun(reason) {
       if (!runAbort) return;
@@ -275,6 +276,7 @@ export function createCoderMode(deps) {
           writeFile: (p, c, r) => HC.code.writeFile(p, c, r),
           onSaved: () => refreshGitStatus(),
           onGoToDefinition: (symbol, path) => goToDefinition(symbol, path),
+          onAcceptPendingChange: (path) => acceptPendingChangeForPath(path),
         });
         $('cdrEditorPane')._wired = true;
         _editorPane.syncPendingChanges(_fileChanges);
@@ -351,6 +353,12 @@ export function createCoderMode(deps) {
             await walk(root, 0);
             return out;
           },
+          onPick: (rel) => {
+            const root = sharedState.projectRoot;
+            if (!root || rel.endsWith('/')) return;
+            const abs = `${root.replace(/\/$/, '')}/${rel}`;
+            window.CdrComposerAttachments?.addPaths?.([abs]);
+          },
         });
       }
       if (window.MxCommandPalette) {
@@ -360,7 +368,11 @@ export function createCoderMode(deps) {
           { id: 'cdr-stop', group: 'Coder', label: 'Stop Coder run', run: () => stopRun() },
           { id: 'cdr-open-folder', group: 'Coder', label: 'Open project folder', run: () => openProject() },
           { id: 'cdr-git-refresh', group: 'Coder', label: 'Refresh git status', run: () => refreshGitStatus() },
-          { id: 'cdr-accept-all', group: 'Coder', label: 'Accept all pending file changes', run: () => acceptAllPendingChanges(activeContentEl) },
+          { id: 'cdr-accept-all', group: 'Coder', label: 'Accept all pending file changes (⌘⇧Enter)', run: () => acceptAllPendingChanges(activeContentEl) },
+          { id: 'cdr-accept-first', group: 'Coder', label: 'Accept first pending file change', run: () => {
+            const row = document.querySelector('.cdr-change-row.pending');
+            if (row) setChangeRowState(row, 'accepted');
+          }},
           { id: 'cdr-pending-jump', group: 'Coder', label: 'Jump to pending file changes', run: () => scrollToFirstPendingChange() },
           { id: 'cdr-search', group: 'Coder', label: 'Search in project (⌘⇧F)', run: () => {
             const panel = $('cdrSearchPanel');
@@ -737,6 +749,7 @@ export function createCoderMode(deps) {
       getRunSingleTurn: () => runSingleTurn,
       abortActiveRun,
       incToolCallCounter: () => ++toolCallCounter,
+      onAfterRenderConversation: () => _afterRenderConversation(),
     }));
 
     ({
@@ -1004,6 +1017,92 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
       file: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
     };
 
+    async function acceptPendingChangeForPath(path) {
+      if (!path) return;
+      const rows = [...document.querySelectorAll('.cdr-change-row.pending')];
+      const row = rows.find((r) => {
+        const idx = parseInt(r.dataset.changeIdx, 10);
+        const entry = _fileChanges[idx];
+        return entry?.path === path;
+      });
+      if (row) await setChangeRowState(row, 'accepted');
+    }
+
+    function ingestStagedEntry(entry) {
+      if (!entry || entry.status !== 'pending' || !entry.path) return;
+      if (_fileChanges.some((e) => e.path === entry.path && e.status === 'pending')) return;
+      addChangeEntry(entry.name, entry.path, entry.kind, entry.content, entry);
+      if (entry.path && _editorPane) {
+        _editorPane.syncPendingChanges(_fileChanges);
+      }
+    }
+
+    function flushPendingStagedFromShared() {
+      const pending = sharedState.pendingStaged;
+      if (!Array.isArray(pending) || !pending.length) return;
+      const batch = pending.splice(0, pending.length);
+      for (const entry of batch) {
+        if (entry?.status === 'pending') ingestStagedEntry(entry);
+      }
+      _tabMgr?.save?.();
+    }
+
+    function changeRowStats(entry) {
+      if (entry?.kind === 'delete') {
+        const prev = entry?.previousContent ?? '';
+        const lines = prev ? (String(prev).match(/\n/g) || []).length + 1 : 0;
+        return lines ? `−${lines} lines` : 'delete';
+      }
+      const proposed = entry?.proposedContent ?? entry?.content ?? '';
+      const prev = entry?.previousContent ?? '';
+      if (window.CdrDiffLines?.diffStats) {
+        const rows = window.CdrDiffLines.diffLines(prev, proposed);
+        const { added, removed } = window.CdrDiffLines.diffStats(rows);
+        if (added || removed) return `+${added} −${removed}`;
+      }
+      const lineCount = proposed ? (String(proposed).match(/\n/g) || []).length + 1 : 0;
+      return lineCount ? `+${lineCount} lines` : '';
+    }
+
+    function createChangeRowElement(entry, idx) {
+      const row = document.createElement('div');
+      const state = entry.status || 'pending';
+      row.className = `cdr-change-row ${state}`;
+      row.dataset.changeIdx = String(idx);
+      row.innerHTML = `
+        ${CHANGE_SVG.file}
+        <span class="cdr-change-file">${esc(entry.name || entry.path)}</span>
+        <span class="cdr-change-stats">${esc(changeRowStats(entry))}</span>
+        <div class="cdr-change-actions">
+          <button type="button" class="cdr-change-btn primary cdr-change-accept">${CHANGE_SVG.accept} Accept</button>
+          <button type="button" class="cdr-change-btn danger cdr-change-reject">${CHANGE_SVG.reject} Reject</button>
+          <button type="button" class="cdr-change-btn cdr-change-view">${CHANGE_SVG.view} View</button>
+        </div>`;
+      return row;
+    }
+
+    function rehydrateFileChangeRows() {
+      if (!_fileChanges.length) return;
+      let target = activeContentEl;
+      if (!target) {
+        target = $('cdrMessages')?.querySelector('.cdr-msg.assistant:last-of-type .cdr-msg-content');
+      }
+      if (!target) return;
+      const wrap = getChangesWrap(target);
+      if (!wrap) return;
+      const existing = new Set(
+        [...wrap.querySelectorAll('.cdr-change-row')].map((r) => r.dataset.changeIdx)
+      );
+      for (let idx = 0; idx < _fileChanges.length; idx++) {
+        if (existing.has(String(idx))) continue;
+        const entry = _fileChanges[idx];
+        if (!entry) continue;
+        wrap.appendChild(createChangeRowElement(entry, idx));
+      }
+      updateChangesBatchBar(target);
+    }
+    _afterRenderConversation = rehydrateFileChangeRows;
+
     function getChangesWrap(contentEl) {
       if (!contentEl) return null;
       let wrap = contentEl.querySelector('.cdr-changes-wrap');
@@ -1047,7 +1146,11 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
       if (entry && window.CdrFileStage) {
         if (state === 'accepted' && !entry.applied) {
           try {
-            await window.CdrFileStage.applyEntry(entry, (p, c, r) => HC.code.writeFile(p, c, r));
+            await window.CdrFileStage.applyEntry(
+              entry,
+              (p, c, r) => HC.code.writeFile(p, c, r),
+              (p, r) => HC.code.deleteFile(p, r)
+            );
             addAIFileToExplorer(entry.path, entry.kind || 'write');
             HC?.guard?.notify?.('Change applied to disk', 'ok');
           } catch (e) {
@@ -1131,20 +1234,22 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
         preview = document.createElement('div');
         preview.className = 'cdr-diff-preview';
         preview.style.display = 'none';
-        const lineCount = entry.content ? (entry.content.match(/\n/g) || []).length + 1 : 0;
-        const body = (entry.content || '').length > 24_000
-          ? (entry.content || '').slice(0, 24_000) + '\n\n… (preview truncated)'
-          : (entry.content || '');
+        const before = entry.previousContent ?? '';
+        const after = entry.proposedContent ?? entry.content ?? '';
+        const diffBody = window.CdrDiffLines?.formatDiffHtml
+          ? window.CdrDiffLines.formatDiffHtml(before, after, esc, { maxLines: 240 })
+          : esc(after);
         preview.innerHTML = `
           <div class="cdr-diff-header">
             <span>${esc(entry.name || entry.path)}</span>
-            <span style="color:var(--cdr-text-muted)">${lineCount} lines</span>
+            <span style="color:var(--cdr-text-muted)">${esc(changeRowStats(entry))}</span>
           </div>
-          <div class="cdr-diff-body"><pre><code>${esc(body)}</code></pre></div>`;
+          <div class="cdr-diff-body">${diffBody}</div>`;
         row.after(preview);
       }
       const open = preview.style.display !== 'block';
       preview.style.display = open ? 'block' : 'none';
+      preview.classList.toggle('open', open);
       const viewBtn = row.querySelector('.cdr-change-view');
       if (viewBtn) viewBtn.innerHTML = open ? `${CHANGE_SVG.view} Hide` : `${CHANGE_SVG.view} View`;
     }
@@ -1210,20 +1315,7 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
       if (!target) return;
       const wrap = getChangesWrap(target);
       if (!wrap) return;
-      const lineCount = stored ? (String(stored).match(/\n/g) || []).length + 1 : 0;
-      const stats = stored ? `+${lineCount} lines` : '';
-      const row = document.createElement('div');
-      row.className = 'cdr-change-row pending';
-      row.dataset.changeIdx = String(idx);
-      row.innerHTML = `
-        ${CHANGE_SVG.file}
-        <span class="cdr-change-file">${esc(name)}</span>
-        <span class="cdr-change-stats">${esc(stats)}</span>
-        <div class="cdr-change-actions">
-          <button type="button" class="cdr-change-btn primary cdr-change-accept">${CHANGE_SVG.accept} Accept</button>
-          <button type="button" class="cdr-change-btn danger cdr-change-reject">${CHANGE_SVG.reject} Reject</button>
-          <button type="button" class="cdr-change-btn cdr-change-view">${CHANGE_SVG.view} View</button>
-        </div>`;
+      const row = createChangeRowElement(entry, idx);
       wrap.appendChild(row);
       updateChangesBatchBar(target);
       renderFileChangePills();
@@ -1353,6 +1445,12 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
       cdrTraceReset,
       renderCdrTrace,
       setAgentCount: (n) => { agentCount = n; },
+      acceptAllPendingChanges: () => acceptAllPendingChanges(activeContentEl),
+      acceptFirstPendingChange: () => {
+        const row = document.querySelector('.cdr-change-row.pending');
+        if (row) setChangeRowState(row, 'accepted');
+      },
+      flushPendingStaged: () => flushPendingStagedFromShared(),
     });
 
     const { mount, destroy, remount } = createDomWiringApi({
@@ -1389,6 +1487,6 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
       clearStatsPolling: stopStatsPolling,
     });
 
-    return { mount, destroy, remount };
+    return { mount, destroy, remount, ingestStagedEntry, flushPendingStagedFromShared };
   })();
 }

@@ -25,6 +25,7 @@ export function createChatUiApi(ctx) {
     getRunSingleTurn,
     abortActiveRun,
     incToolCallCounter,
+    onAfterRenderConversation,
   } = ctx;
 
   const MAX_RENDER_MSGS = 80;
@@ -348,6 +349,7 @@ export function createChatUiApi(ctx) {
         return buildAssistantMsgElement('MiraXCode Coder', m.content);
       }, { hiddenCount: hidden });
       scrollMessages(true);
+      onAfterRenderConversation?.();
       return;
     }
     enterChatLiveMode();
@@ -363,6 +365,7 @@ export function createChatUiApi(ctx) {
       else if (m.role === 'assistant') msgs.appendChild(buildAssistantMsgElement('MiraXCode Coder', m.content));
     }
     scrollMessages(true);
+    onAfterRenderConversation?.();
   }
 
   return {

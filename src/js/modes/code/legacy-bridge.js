@@ -1,6 +1,6 @@
 import { callWithRouter } from './router.js';
 
-/** Legacy HC_CODE.run bridge (hashcoder.js). */
+/** Legacy HC_CODE.run bridge (hashcoder.js) — staged writes match Coder agent-run. */
 export function createLegacyBridge(sharedState) {
   function buildMessages() {
     const H = window._H;
@@ -32,6 +32,48 @@ export function createLegacyBridge(sharedState) {
     }));
   }
 
+  function queueStagedEntry(entry) {
+    if (!entry) return;
+    sharedState.pendingStaged = sharedState.pendingStaged || [];
+    const dup = sharedState.pendingStaged.some(
+      (e) => e.path === entry.path && e.status === 'pending'
+    );
+    if (!dup) sharedState.pendingStaged.push(entry);
+    if (document.body.classList.contains('coder-mode') && window.CoderMode?.ingestStagedEntry) {
+      window.CoderMode.ingestStagedEntry(entry);
+    } else {
+      HC?.guard?.notify?.(
+        `Staged ${entry.name || entry.path} — open Coder tab to Accept/Reject`,
+        'info'
+      );
+    }
+  }
+
+  async function runStagedTool(call) {
+    const yolo = HC?.guard?.isYolo?.();
+    const { entry, resultStr } = await window.CdrFileStage.stageToolCall(
+      call,
+      (p) => HC.code.readFile(p),
+      { onEntry: (e) => queueStagedEntry(e) }
+    );
+    if (yolo) {
+      await window.CdrFileStage.applyEntry(
+        entry,
+        (p, c, r) => HC.code.writeFile(p, c, r),
+        (p, r) => HC.code.deleteFile(p, r)
+      );
+      entry.status = 'accepted';
+      entry.applied = true;
+      return JSON.stringify({
+        ok: true,
+        applied: true,
+        path: entry.path,
+        message: 'YOLO: change applied to disk immediately (revert still available).',
+      });
+    }
+    return resultStr;
+  }
+
   async function legacyRun(assistant, { signal, onStatus }) {
     const H = window._H;
     if (!H) throw new Error('_H bridge not ready');
@@ -54,11 +96,15 @@ export function createLegacyBridge(sharedState) {
           const t0 = performance.now();
           let resultStr, ok = true;
           try {
-            const def = (HC?.code?.TOOL_DEFINITIONS || []).find(t => t.name === call.name);
-            if (!def) throw new Error('Unknown tool: ' + call.name);
-            const raw = await def.fn(call.arguments || {});
-            if (raw == null) resultStr = '{"ok":true}';
-            else resultStr = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+            if (window.CdrFileStage?.isStagedTool?.(call.name)) {
+              resultStr = await runStagedTool(call);
+            } else {
+              const def = (HC?.code?.TOOL_DEFINITIONS || []).find(t => t.name === call.name);
+              if (!def) throw new Error('Unknown tool: ' + call.name);
+              const raw = await def.fn(call.arguments || {});
+              if (raw == null) resultStr = '{"ok":true}';
+              else resultStr = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+            }
           } catch (e) { resultStr = JSON.stringify({ error: String(e?.message || e) }); ok = false; }
           const ms = Math.round(performance.now() - t0);
           assistant._toolBlocks.push({ name: call.name, args: call.arguments || {}, result: resultStr, ms, ok });

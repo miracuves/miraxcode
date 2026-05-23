@@ -118,7 +118,10 @@
       this.readFile = opts.readFile;
       this.writeFile = opts.writeFile;
       this.onSaved = opts.onSaved;
+      this.onAcceptPendingChange = opts.onAcceptPendingChange;
       this.openFiles = new Map();
+      this._lspProvidersWired = false;
+      this._inlineCompleteDispose = null;
       this.pendingByPath = new Map();
       this.activePath = null;
       this.secondaryPath = null;
@@ -183,6 +186,98 @@
       return this._monaco.Uri.parse('file://' + safe);
     }
 
+    _pathFromModel(model) {
+      if (!model?.uri) return null;
+      let raw = model.uri.fsPath || model.uri.path || '';
+      if (!raw && model.uri.toString) {
+        raw = decodeURIComponent(model.uri.toString().replace(/^file:\/\//, ''));
+      }
+      if (!raw) return null;
+      const hash = raw.indexOf('#');
+      if (hash >= 0) raw = raw.slice(0, hash);
+      return raw;
+    }
+
+    _wireLspProviders() {
+      if (this._lspProvidersWired || !this._monaco || !window.CdrLspClient) return;
+      this._lspProvidersWired = true;
+      const monaco = this._monaco;
+      const langs = ['typescript', 'javascript', 'python', 'rust', 'plaintext'];
+      const mapKind = (k) => {
+        const n = typeof k === 'number' ? k : 0;
+        const keys = Object.keys(monaco.languages.CompletionItemKind);
+        return monaco.languages.CompletionItemKind[keys[n]] ?? monaco.languages.CompletionItemKind.Text;
+      };
+      for (const lang of langs) {
+        monaco.languages.registerCompletionItemProvider(lang, {
+          triggerCharacters: ['.', '/', '"', "'", '`', '<', ':', '@'],
+          provideCompletionItems: async (model, position) => {
+            const path = this._pathFromModel(model);
+            if (!path || !window.CdrLspClient.completion) return { suggestions: [] };
+            const items = await window.CdrLspClient.completion(
+              path,
+              position.lineNumber,
+              position.column
+            );
+            const word = model.getWordUntilPosition(position);
+            const range = {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: word.startColumn,
+              endColumn: word.endColumn,
+            };
+            const suggestions = (items || []).slice(0, 80).map((item) => {
+              const label = typeof item.label === 'string' ? item.label : (item.label?.label || item.insertText || '');
+              const insertText = item.insertText || (typeof item.textEdit?.newText === 'string' ? item.textEdit.newText : label);
+              return {
+                label,
+                kind: mapKind(item.kind),
+                insertText,
+                detail: item.detail || item.labelDetails?.description || '',
+                range: item.textEdit?.range
+                  ? new monaco.Range(
+                    item.textEdit.range.start.line + 1,
+                    item.textEdit.range.start.character + 1,
+                    item.textEdit.range.end.line + 1,
+                    item.textEdit.range.end.character + 1
+                  )
+                  : range,
+              };
+            });
+            return { suggestions };
+          },
+        });
+        monaco.languages.registerHoverProvider(lang, {
+          provideHover: async (model, position) => {
+            const path = this._pathFromModel(model);
+            if (!path || !window.CdrLspClient.hover) return null;
+            const text = await window.CdrLspClient.hover(path, position.lineNumber, position.column);
+            if (!text) return null;
+            return { contents: [{ value: String(text) }] };
+          },
+        });
+      }
+    }
+
+    _wireDiffAcceptAction(ed) {
+      if (!ed || ed._cdrAcceptWired || !this._monaco) return;
+      ed._cdrAcceptWired = true;
+      const KeyMod = this._monaco.KeyMod;
+      const KeyCode = this._monaco.KeyCode;
+      ed.addAction({
+        id: 'cdr-accept-pending-change',
+        label: 'Accept pending file change',
+        keybindings: [KeyMod.CtrlCmd | KeyCode.Enter],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 0.5,
+        run: () => {
+          if (this.activePath && this.pendingByPath.has(this.activePath)) {
+            this.onAcceptPendingChange?.(this.activePath);
+          }
+        },
+      });
+    }
+
     _hideHosts() {
       if (this.hostEl) this.hostEl.style.display = 'none';
       if (this.hostElB) this.hostElB.style.display = 'none';
@@ -223,7 +318,17 @@
         }
       });
       this._wireGoToDefinition(this.editor);
+      this._wireLspProviders();
+      this._wireInlineCompletions();
       return this.editor;
+    }
+
+    _wireInlineCompletions() {
+      if (this._inlineCompleteDispose || !window.CdrInlineComplete?.attachEditor) return;
+      this._inlineCompleteDispose = window.CdrInlineComplete.attachEditor(this.editor, {
+        getPath: () => this.activePath,
+        isDiffMode: () => this._mode === 'diff',
+      });
     }
 
     _setupMarkerSync() {
@@ -340,6 +445,7 @@
         modModel.setValue(modifiedText);
       }
       ed.setModel({ original: origModel, modified: modModel });
+      this._wireDiffAcceptAction(ed.getModifiedEditor?.());
       this._renderTabs();
     }
 
@@ -537,6 +643,8 @@
     }
 
     dispose() {
+      try { this._inlineCompleteDispose?.(); } catch {}
+      this._inlineCompleteDispose = null;
       try { this.editor?.dispose?.(); } catch {}
       try { this.diffEditor?.dispose?.(); } catch {}
       this.editor = null;

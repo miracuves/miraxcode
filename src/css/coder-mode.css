@@ -1057,7 +1057,12 @@ body.coder-mode #app { display: none; }
 }
 .cdr-diff-body .diff-add  { color: var(--cdr-success); background: rgba(255,255,255,0.08); }
 .cdr-diff-body .diff-del  { color: var(--cdr-error);  background: rgba(217,138,133,0.08); text-decoration: line-through; }
+.cdr-diff-body .diff-same { color: var(--cdr-text-muted); opacity: 0.85; }
 .cdr-diff-body .diff-linenum { color: var(--cdr-text-muted); margin-right: 10px; user-select: none; }
+.cdr-diff-body .diff-prefix { margin-right: 6px; user-select: none; font-weight: 600; }
+.cdr-diff-summary { font-size: 11px; color: var(--cdr-text-muted); margin-bottom: 8px; font-family: var(--font-mono, ui-monospace, monospace); }
+.cdr-diff-truncated { font-size: 11px; color: var(--cdr-text-muted); margin-top: 8px; font-style: italic; }
+.cdr-diff-line { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
 
 /* ── Slim permission strip ──────────────────────────────────── */
 .cdr-perm-strip {
