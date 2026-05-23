@@ -24,19 +24,16 @@ Pre-built specialist agents ready to use. Each agent has a
 custom system prompt and a curated set of tools tuned for its
 job. Included agents:
 
-  • Personal Assistant  — direct, calibrated, senior-engineer
-                          style responses
-  • Quick Assistant     — short and accurate answers, fast
-  • Research Agent      — iterative web search with sourcing
+  • MiraXcode           — personal assistant with memory, web,
+                          Python sandbox, and exports
+  • MiraXcode Lite      — fast lightweight assistant
+  • Researcher          — iterative web search with sourcing
   • Deep Research       — long-form, source-grounded analysis
-  • Senior Engineer     — ship-ready code and product advice
-  • Page Analyzer       — fetches and reads URLs you provide
-  • PubMed Agent        — searches peer-reviewed medical
-                          literature, cites every claim
-  • Drug Interaction    — clinical pharmacology checks with
-                          safety-first framing
-  • ATS CV Auditor      — resume analysis against 2026 ATS
-                          standards and recruiter filters
+  • Coder               — ship-ready engineering agent
+  • URL Reader          — fetches and reads URLs you provide
+  • Published Papers Researcher — PubMed-grounded literature
+  • Medical Lexi-Check  — clinical pharmacology checks
+  • ATS CV Auditor      — resume / ATS analysis
 
 You can also build your own custom agents from the Agent Maker
 tab and run them here.
