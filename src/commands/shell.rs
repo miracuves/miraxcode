@@ -43,6 +43,9 @@ pub fn shell_run(
     cwd:     Option<String>,
 ) -> Result<ShellOutput, String> {
     let full = format!("{} {}", command, args.join(" "));
+    if full.len() > 16_384 {
+        return Err("Command line too long (max 16 KiB)".into());
+    }
     if denylist::is_command_denied(&full) {
         return Err(format!("Command is blocked by the security denylist: {command}"));
     }
@@ -72,6 +75,9 @@ pub fn shell_run_stream(
     on_chunk: Channel<StreamChunk>,
 ) -> Result<(), String> {
     let full = format!("{} {}", command, args.join(" "));
+    if full.len() > 16_384 {
+        return Err("Command line too long (max 16 KiB)".into());
+    }
     if denylist::is_command_denied(&full) {
         return Err(format!("Command is blocked by the security denylist: {command}"));
     }
@@ -95,7 +101,7 @@ pub fn shell_run_stream(
     let tx_out = on_chunk.clone();
     let tx_err = on_chunk.clone();
 
-    thread::spawn(move || {
+    let handle_out = thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             if let Ok(l) = line {
@@ -108,7 +114,7 @@ pub fn shell_run_stream(
         }
     });
 
-    thread::spawn(move || {
+    let handle_err = thread::spawn(move || {
         let reader = BufReader::new(stderr);
         for line in reader.lines() {
             if let Ok(l) = line {
@@ -121,8 +127,9 @@ pub fn shell_run_stream(
         }
     });
 
-    // Wait for process to finish, then send done
     let code = child.wait().map(|s| s.code().unwrap_or(-1)).unwrap_or(-1);
+    let _ = handle_out.join();
+    let _ = handle_err.join();
     let _ = on_chunk.send(StreamChunk {
         kind: "done".into(),
         data: String::new(),

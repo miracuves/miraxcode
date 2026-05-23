@@ -1,0 +1,344 @@
+/* ================================================================
+   NEUTRAL LOCK — zero green/blue UI (Cursor: black · grey · white)
+   Loaded absolutely last. CSS-only.
+   ================================================================ */
+
+:root {
+  --gold: #e5e5e5 !important;
+  --gold-2: #ffffff !important;
+  --gold-bright: #d4d4d4 !important;
+  --gold-deep: #525252 !important;
+  --emerald: #d4d4d4 !important;
+  --accent-glow: rgba(255, 255, 255, 0.06) !important;
+  --hc-accent: #e5e5e5 !important;
+  --hc-cyan: #d4d4d4 !important;
+  --hc-purple: #a3a3a3 !important;
+  --hc-amber: #a3a3a3 !important;
+  --hc-text: #fafafa !important;
+}
+
+/* ── Intro: grey circuits, hide green glows ──────────────────── */
+#intro-screen {
+  --gold: #a3a3a3 !important;
+  --gold-bright: #d4d4d4 !important;
+  --gold-deep: #525252 !important;
+  --ok: #d4d4d4 !important;
+  --line-soft: rgba(255, 255, 255, 0.04) !important;
+  --line-strong: rgba(255, 255, 255, 0.1) !important;
+  background: var(--layer-chrome, #141414) !important;
+}
+
+#intro-screen .circuit-line,
+#intro-screen .circuit-pulse,
+#intro-screen .bracket {
+  stroke: #525252 !important;
+  border-color: #525252 !important;
+  fill: #737373 !important;
+}
+
+#intro-screen .boot-lines .ok,
+#intro-screen .boot-lines .gold {
+  color: #d4d4d4 !important;
+}
+
+#intro-screen .drone svg,
+#intro-screen .drone svg * {
+  stroke: #737373 !important;
+  fill: #737373 !important;
+}
+
+#intro-screen .drone-glow {
+  fill: #a3a3a3 !important;
+}
+
+#intro-screen #intro-loading-fill {
+  background: #fafafa !important;
+  box-shadow: none !important;
+}
+
+#intro-screen .hc-intro-title,
+#intro-screen .miraxcode-title {
+  color: #fafafa !important;
+  text-shadow: none !important;
+}
+
+/* ── Forge — kill teal mint palette ──────────────────────────── */
+#forge-mode-wrap {
+  background: var(--layer-chrome, #141414) !important;
+  color: #fafafa !important;
+}
+
+#forge-mode-wrap .frg-header,
+#forge-mode-wrap .frg-body,
+#forge-mode-wrap .frg-viewport,
+#forge-mode-wrap .frg-chat-panel,
+#forge-mode-wrap .frg-trace-console {
+  background: var(--layer-chrome, #141414) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #d4d4d4 !important;
+}
+
+#forge-mode-wrap .frg-title,
+#forge-mode-wrap .frg-prompt-wrap,
+#forge-mode-wrap .frg-status,
+#forge-mode-wrap .frg-btn,
+#forge-mode-wrap .frg-cad-btn,
+#forge-mode-wrap .frg-icon-btn {
+  color: #d4d4d4 !important;
+}
+
+#forge-mode-wrap .frg-btn.primary {
+  background: #fafafa !important;
+  border-color: #fafafa !important;
+  color: #141414 !important;
+}
+
+#forge-mode-wrap .frg-prompt-wrap svg,
+#forge-mode-wrap .frg-sub,
+#forge-mode-wrap .frg-viewport-hud {
+  color: #a3a3a3 !important;
+}
+
+/* ── Sandbox — kill matrix green / cyan badges ───────────────── */
+#sandbox-wrap,
+#app.sandbox-mode {
+  background: var(--layer-chrome, #141414) !important;
+  color: #d4d4d4 !important;
+}
+
+#sandbox-wrap .sbx-title,
+#sandbox-wrap .sbx-sub,
+#sandbox-wrap .sbx-section-label,
+#sandbox-wrap .sbx-code-input,
+#sandbox-wrap .sbx-log,
+#sandbox-wrap .sbx-history,
+#sandbox-wrap .sbx-scan-btn,
+#sandbox-wrap .sbx-model-select {
+  color: #d4d4d4 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #181818 !important;
+  filter: none !important;
+  text-shadow: none !important;
+}
+
+#sandbox-wrap .sbx-logo,
+#sandbox-wrap .sbx-scan-btn {
+  color: #fafafa !important;
+}
+
+#sandbox-wrap .sbx-scan-btn {
+  background: #fafafa !important;
+  color: #141414 !important;
+}
+
+#sandbox-wrap .sbx-agent-badge,
+#sandbox-wrap .sbx-scan-model-tag,
+#sandbox-wrap .sbx-log-entry,
+#sandbox-wrap .sbx-verdict-badge {
+  color: #a3a3a3 !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── Finance — kill indigo/green brand ───────────────────────── */
+#finance-wrap {
+  --fin-primary: #e5e5e5 !important;
+  --fin-primary-d: rgba(255, 255, 255, 0.08) !important;
+  --fin-accent: #a3a3a3 !important;
+  --fin-accent-d: rgba(255, 255, 255, 0.06) !important;
+  --fin-gold: #a3a3a3 !important;
+  --fin-bg: #141414 !important;
+  --fin-surface: #181818 !important;
+  --fin-surface-2: #1e1e1e !important;
+  --fin-text: #fafafa !important;
+  --fin-sub: #a3a3a3 !important;
+  background: var(--layer-chrome, #141414) !important;
+  color: #fafafa !important;
+}
+
+#finance-wrap .fin-brand-name span,
+#finance-wrap .fin-hdr-btn.primary,
+#finance-wrap .fin-kpi-change.positive {
+  color: #fafafa !important;
+}
+
+#finance-wrap .fin-hdr-btn.primary {
+  background: #fafafa !important;
+  border-color: #fafafa !important;
+  color: #141414 !important;
+}
+
+#finance-wrap .fin-brand-icon,
+#finance-wrap [style*="color:var(--fin-primary)"] {
+  color: #d4d4d4 !important;
+}
+
+/* ── Agent maker — kill blue UI accents ──────────────────────── */
+#agent-maker-wrap {
+  --amk: #d4d4d4 !important;
+  --amk-bright: #fafafa !important;
+  --amk-ui: #a3a3a3 !important;
+  --amk-ui-b: #d4d4d4 !important;
+  --amk-emerald: #d4d4d4 !important;
+  --amk-cyan: #a3a3a3 !important;
+  background: var(--layer-chrome, #141414) !important;
+}
+
+#agent-maker-wrap .amk-btn.primary {
+  background: #fafafa !important;
+  border-color: #fafafa !important;
+  color: #141414 !important;
+}
+
+#agent-maker-wrap .amk-blueprint-card.active,
+#agent-maker-wrap .amk-role-svg-btn.active {
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ── System maker ────────────────────────────────────────────── */
+#system-maker-wrap,
+.system-maker-wrap {
+  --sys-primary: #e5e5e5 !important;
+  --sys-accent: #a3a3a3 !important;
+  background: var(--layer-chrome, #141414) !important;
+}
+
+#system-maker-wrap .sys-btn.primary {
+  background: #fafafa !important;
+  color: #141414 !important;
+}
+
+.sys-badge--green {
+  color: #d4d4d4 !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── Virtual OS ──────────────────────────────────────────────── */
+#virtual-os-wrap {
+  --void-accent: #e5e5e5 !important;
+  --void-primary: #fafafa !important;
+  background: var(--layer-chrome, #141414) !important;
+}
+
+#virtual-os-wrap .void-btn.primary {
+  background: #fafafa !important;
+  color: #141414 !important;
+}
+
+/* ── Legacy inline modes (code/forge in #app) ────────────────── */
+.app.code-mode,
+.app.forge-mode,
+.app.split-mode {
+  background: var(--layer-chrome, #141414) !important;
+}
+
+.app.code-mode .messages .bubble,
+.app.forge-mode .messages .bubble {
+  color: #d4d4d4 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  background: #181818 !important;
+}
+
+.app.code-mode .role-user .bubble,
+.app.forge-mode .role-user .bubble {
+  border-left-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ── Coder — diff/status greens → grey ───────────────────────── */
+#coder-mode-wrap .cdr-diff-body .diff-add,
+#coder-mode-wrap .cdr-tool-row.ok,
+#coder-mode-wrap .cdr-change-row.accepted,
+#coder-mode-wrap .cdr-perm-btn.session,
+#coder-mode-wrap .cdr-trace-stage.ok {
+  color: #d4d4d4 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+#coder-mode-wrap .cdr-msg.user,
+#coder-mode-wrap .cdr-msg.assistant {
+  border-left-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+#coder-mode-wrap .cdr-run-btn,
+#coder-mode-wrap .cdr-terminal-lights .green {
+  background: #525252 !important;
+}
+
+#coder-mode-wrap pre,
+#coder-mode-wrap code {
+  color: #d4d4d4 !important;
+  background: #181818 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* ── Settings / modals cyan labels ───────────────────────────── */
+.settings-pane label[style*="cyan"],
+.settings-pane [style*="--cyan"] {
+  color: #a3a3a3 !important;
+}
+
+/* ── Mermaid / highlight — keep readable, no neon borders ────── */
+.mermaid svg .node rect,
+.mermaid svg .edgePath path {
+  stroke: #525252 !important;
+}
+
+/* ── Crisp Inter everywhere ──────────────────────────────────── */
+html,
+body,
+button,
+input,
+textarea,
+select,
+.tab,
+.cdr-title,
+.frg-title,
+.sbx-title,
+.fin-brand-name,
+.amk-panel-title,
+.void-title {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+pre,
+code,
+.cdr-terminal-body,
+.cdr-msg-body pre,
+.bubble pre,
+.bubble code,
+.fin-trace-time,
+.sbx-section-label {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, monospace !important;
+}
+
+/* Agent maker / system maker residual purple-blue gradients */
+#agent-maker-wrap .amk-god-generate-btn,
+#agent-maker-wrap [class*="gradient"],
+.amk-preview-vp-btn.active {
+  background: #fafafa !important;
+  background-image: none !important;
+  color: #141414 !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+#system-maker-wrap {
+  --sys-primary: #e5e5e5 !important;
+}
+
+#system-maker-wrap .sys-kpi-tile,
+#system-maker-wrap .sys-stat-card {
+  border-top-color: rgba(255, 255, 255, 0.12) !important;
+  background-image: none !important;
+}
+
+/* API key validated dot — explicit green (tested connection + prompt) */
+.api-key-dot.ok {
+  background: #22c55e !important;
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.45) !important;
+}

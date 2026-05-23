@@ -4,14 +4,19 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta name="referrer" content="no-referrer"/>
-  <title>HashCortx</title>
+  <title>MiraXcode</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png"/>
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
   <style id="critical-launch-bg">
     html, body {
       margin: 0;
       min-height: 100%;
       overflow: hidden;
-      background: #06070a;
-      color: #dfffe9;
+      background: #141414;
+      color: #ffffff;
     }
   </style>
 
@@ -37,7 +42,7 @@
   <script src="/js/vendor/mermaid.min.js"></script>
   <script src="/js/vendor/purify.min.js"></script>
 
-  <!-- ── App CSS (Hash_UI design system, HashCortx green) ── -->
+  <!-- ── App CSS (Hash_UI design system, MiraXcode green) ── -->
   <link rel="stylesheet" href="/css/vars.css"/>
   <link rel="stylesheet" href="/css/base.css"/>
   <link rel="stylesheet" href="/css/sidebar.css"/>
@@ -55,8 +60,20 @@
   <link rel="stylesheet" href="/css/coder-mode.css"/>
   <link rel="stylesheet" href="/js/vendor/highlight-github-dark.min.css"/>
 
-  <!-- ── HashCortx brand + intro overrides (loaded last) ── -->
+  <!-- ── MiraXcode brand + intro overrides ── -->
   <link rel="stylesheet" href="/styles.css"/>
+  <!-- ── Design system v2 — typography, tokens, all screens ── -->
+  <link rel="stylesheet" href="/css/design-system.css"/>
+  <!-- ── Coder Mode v2 UI (after design-system so it wins) ── -->
+  <link rel="stylesheet" href="/css/coder-mode-ui.css"/>
+  <link rel="stylesheet" href="/js/vendor/monaco/vs/editor/editor.main.css"/>
+  <!-- ── UI v3 — full-app buttons, backgrounds, every mode ── -->
+  <link rel="stylesheet" href="/css/ui-v3.css"/>
+  <!-- ── Neutral lock — no green/blue ── -->
+  <link rel="stylesheet" href="/css/neutral-lock.css"/>
+  <!-- ── Aura IDE stealth theme (last) ── -->
+  <link rel="stylesheet" href="/css/aura-theme.css"/>
+  <link rel="stylesheet" href="/css/cursor-layers.css"/>
 
 </head>
 <body>
@@ -84,10 +101,10 @@
     <div class="hc-toolbar-center" data-tauri-drag-region>
       <img src="/assets/logo-mark.png"
            class="hc-toolbar-logo"
-           alt="HashCortx"
+           alt="MiraXcode"
            draggable="false"
            data-tauri-drag-region/>
-      <span class="hc-toolbar-name" data-tauri-drag-region>HashCortx</span>
+      <span class="hc-toolbar-name" data-tauri-drag-region>MiraXcode</span>
       <span class="hc-toolbar-badge" data-tauri-drag-region>v2.0</span>
     </div>
 
@@ -130,21 +147,21 @@
 
       <!-- Boot lines — top left -->
       <div class="boot-lines">
-        <div class="row"><span class="dim">&gt;</span><span class="ok">[ ok ]</span> runtime · hashcortx-core.rs</div>
+        <div class="row"><span class="dim">&gt;</span><span class="ok">[ ok ]</span> runtime · miraxcode-core.rs</div>
         <div class="row"><span class="dim">&gt;</span><span class="gold" id="intro-stat-ollama">[ • ]</span> <span id="intro-txt-ollama">model routing · initializing</span></div>
         <div class="row"><span class="dim">&gt;</span><span class="gold" id="intro-stat-drone">[ • ]</span> <span id="intro-txt-drone">interface core · waiting</span></div>
         <div class="row"><span class="dim">&gt;</span><span class="gold" id="intro-stat-agents">[ • ]</span> <span id="intro-txt-agents">agents · waiting for runtime</span></div>
         <div class="row"><span class="dim">&gt;</span><span class="ok">[ ok ]</span> csp · hardened</div>
-        <div class="row"><span class="dim">&gt;</span><span class="gold" id="intro-stat-warm">[ • ]</span> <span id="intro-txt-warm">warming HashCortx…</span></div>
+        <div class="row"><span class="dim">&gt;</span><span class="gold" id="intro-stat-warm">[ • ]</span> <span id="intro-txt-warm">warming MiraXcode…</span></div>
         <div class="row"><span class="dim">&gt;</span><span class="ok">[ ✓ ]</span> ready · awaiting operator</div>
         <div class="cta">press enter or click to begin</div>
       </div>
 
       <!-- Bottom decoration -->
       <div class="timestamp" id="intro-timestamp">— · —</div>
-      <div class="patch-badge">HashCortx v2.0 · Batch 2.0 · May 2026</div>
+      <div class="patch-badge">MiraXcode v2.0 · Batch 2.0 · May 2026</div>
       <div class="perfection-quote">Massive UI · Isolated Intelligence · Agentic</div>
-      <div class="signature">Designed By DR Seif Hashish</div>
+      <div class="signature">Powered by Miracuves</div>
       <div class="status-badge initializing" id="intro-badge">
         <span class="dot" id="intro-dot"></span>
         <span id="intro-badge-text">Initializing...</span>
@@ -163,13 +180,13 @@
 
         <!-- 3 drone orbits (green stroke) -->
         <div class="drone-orbit intro-drone-a" style="width:100%;height:100%;animation:ispin 42s linear infinite;animation-delay:0s;">
-          <div class="drone"><svg viewBox="0 0 40 40"><g stroke="#39ff81" stroke-width="1.2" fill="none"><line x1="9" y1="9" x2="31" y2="31"/><line x1="31" y1="9" x2="9" y2="31"/><circle cx="9" cy="9" r="3" fill="#39ff81"/><circle cx="31" cy="9" r="3" fill="#39ff81"/><circle cx="9" cy="31" r="3" fill="#39ff81"/><circle cx="31" cy="31" r="3" fill="#39ff81"/><rect x="16" y="16" width="8" height="8" rx="1" fill="rgba(4,7,4,0.97)"/><circle cx="20" cy="20" r="1.2" class="drone-glow"/></g></svg></div>
+          <div class="drone"><svg viewBox="0 0 40 40"><g stroke="#a3a3a3" stroke-width="1.2" fill="none"><line x1="9" y1="9" x2="31" y2="31"/><line x1="31" y1="9" x2="9" y2="31"/><circle cx="9" cy="9" r="3" fill="#a3a3a3"/><circle cx="31" cy="9" r="3" fill="#a3a3a3"/><circle cx="9" cy="31" r="3" fill="#a3a3a3"/><circle cx="31" cy="31" r="3" fill="#a3a3a3"/><rect x="16" y="16" width="8" height="8" rx="1" fill="rgba(4,7,4,0.97)"/><circle cx="20" cy="20" r="1.2" class="drone-glow"/></g></svg></div>
         </div>
         <div class="drone-orbit intro-drone-b" style="width:100%;height:100%;animation:ispin 42s linear infinite;animation-delay:-14s;">
-          <div class="drone"><svg viewBox="0 0 40 40"><g stroke="#39ff81" stroke-width="1.2" fill="none"><line x1="9" y1="9" x2="31" y2="31"/><line x1="31" y1="9" x2="9" y2="31"/><circle cx="9" cy="9" r="3" fill="#39ff81"/><circle cx="31" cy="9" r="3" fill="#39ff81"/><circle cx="9" cy="31" r="3" fill="#39ff81"/><circle cx="31" cy="31" r="3" fill="#39ff81"/><rect x="16" y="16" width="8" height="8" rx="1" fill="rgba(4,7,4,0.97)"/><circle cx="20" cy="20" r="1.2" class="drone-glow"/></g></svg></div>
+          <div class="drone"><svg viewBox="0 0 40 40"><g stroke="#a3a3a3" stroke-width="1.2" fill="none"><line x1="9" y1="9" x2="31" y2="31"/><line x1="31" y1="9" x2="9" y2="31"/><circle cx="9" cy="9" r="3" fill="#a3a3a3"/><circle cx="31" cy="9" r="3" fill="#a3a3a3"/><circle cx="9" cy="31" r="3" fill="#a3a3a3"/><circle cx="31" cy="31" r="3" fill="#a3a3a3"/><rect x="16" y="16" width="8" height="8" rx="1" fill="rgba(4,7,4,0.97)"/><circle cx="20" cy="20" r="1.2" class="drone-glow"/></g></svg></div>
         </div>
         <div class="drone-orbit intro-drone-c" style="width:100%;height:100%;animation:ispin 42s linear infinite;animation-delay:-28s;">
-          <div class="drone"><svg viewBox="0 0 40 40"><g stroke="#39ff81" stroke-width="1.2" fill="none"><line x1="9" y1="9" x2="31" y2="31"/><line x1="31" y1="9" x2="9" y2="31"/><circle cx="9" cy="9" r="3" fill="#39ff81"/><circle cx="31" cy="9" r="3" fill="#39ff81"/><circle cx="9" cy="31" r="3" fill="#39ff81"/><circle cx="31" cy="31" r="3" fill="#39ff81"/><rect x="16" y="16" width="8" height="8" rx="1" fill="rgba(4,7,4,0.97)"/><circle cx="20" cy="20" r="1.2" class="drone-glow"/></g></svg></div>
+          <div class="drone"><svg viewBox="0 0 40 40"><g stroke="#a3a3a3" stroke-width="1.2" fill="none"><line x1="9" y1="9" x2="31" y2="31"/><line x1="31" y1="9" x2="9" y2="31"/><circle cx="9" cy="9" r="3" fill="#a3a3a3"/><circle cx="31" cy="9" r="3" fill="#a3a3a3"/><circle cx="9" cy="31" r="3" fill="#a3a3a3"/><circle cx="31" cy="31" r="3" fill="#a3a3a3"/><rect x="16" y="16" width="8" height="8" rx="1" fill="rgba(4,7,4,0.97)"/><circle cx="20" cy="20" r="1.2" class="drone-glow"/></g></svg></div>
         </div>
 
         <div class="security-rings"></div>
@@ -177,12 +194,12 @@
         <div class="security-rings r3"></div>
         <div id="intro-sonar" style="position:absolute;inset:0;pointer-events:none;"></div>
 
-        <!-- Full logo PNG (mark + HashCortx name) — replaces the "H" monogram -->
+        <!-- Full logo PNG (mark + MiraXcode name) — replaces the "H" monogram -->
         <div class="logo-wrap">
           <div class="logo-glow"></div>
           <img class="hc-logo-full"
                src="/assets/logo-full.png"
-               alt="HashCortx"
+               alt="MiraXcode"
                draggable="false"/>
         </div>
       </div><!-- /.emblem-stage -->
@@ -208,68 +225,15 @@
     <div class="app" id="app">
       <aside>
         <div class="brand">
-          <img src="/assets/logo-mark.png" class="brand-logo-img" draggable="false" alt="HashCortx"/>
+          <img src="/assets/logo-mark.png" class="brand-logo-img" draggable="false" alt="MiraXcode"/>
           <div class="name">
-            <div class="title">HashCortx</div>
+            <div class="title">MiraXcode</div>
             <div class="sub" aria-label="Massive UI Isolated Intellegence Agentic">
               <span>Massive UI</span>
               <span>Isolated Intellegence</span>
               <span>Agentic</span>
             </div>
           </div>
-          <span class="brand-drone"><svg viewBox="-10 -10 220 140" width="78" height="47" overflow="visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="dg-brand" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0" stop-color="#b0ffe0"/>
-                  <stop offset="0.4" stop-color="#6fffaa"/>
-                  <stop offset="0.8" stop-color="#39ff81"/>
-                  <stop offset="1" stop-color="#1a7a40"/>
-                </linearGradient>
-                <radialGradient id="dr-brand" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0" stop-color="rgba(57,255,129,0.60)"/>
-                  <stop offset="0.6" stop-color="rgba(57,255,129,0.28)"/>
-                  <stop offset="1" stop-color="rgba(57,255,129,0)"/>
-                </radialGradient>
-                <filter id="flt-brand" x="-60%" y="-60%" width="220%" height="220%">
-                  <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
-                  <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-                </filter>
-              </defs>
-              <!-- Arms -->
-              <line x1="40" y1="40" x2="160" y2="80" stroke="url(#dg-brand)" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
-              <line x1="160" y1="40" x2="40" y2="80" stroke="url(#dg-brand)" stroke-width="3.5" stroke-linecap="round" opacity="0.9"/>
-              <!-- Rotor halos -->
-              <circle cx="40" cy="40" r="24" fill="url(#dr-brand)"/>
-              <circle cx="160" cy="40" r="24" fill="url(#dr-brand)"/>
-              <circle cx="40" cy="80" r="24" fill="url(#dr-brand)"/>
-              <circle cx="160" cy="80" r="24" fill="url(#dr-brand)"/>
-              <!-- Rotor guard rings -->
-              <circle cx="40" cy="40" r="19" fill="none" stroke="url(#dg-brand)" stroke-width="1" opacity="0.55"/>
-              <circle cx="160" cy="40" r="19" fill="none" stroke="url(#dg-brand)" stroke-width="1" opacity="0.55"/>
-              <circle cx="40" cy="80" r="19" fill="none" stroke="url(#dg-brand)" stroke-width="1" opacity="0.55"/>
-              <circle cx="160" cy="80" r="19" fill="none" stroke="url(#dg-brand)" stroke-width="1" opacity="0.55"/>
-              <!-- Spinning blades with glow -->
-              <g><ellipse cx="40" cy="40" rx="15" ry="2.2" fill="url(#dg-brand)"/><ellipse cx="40" cy="40" rx="2.2" ry="15" fill="url(#dg-brand)"/><circle cx="40" cy="40" r="2.8" fill="#b0ffe0"/><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="0.92s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="40" rx="15" ry="2.2" fill="url(#dg-brand)"/><ellipse cx="160" cy="40" rx="2.2" ry="15" fill="url(#dg-brand)"/><circle cx="160" cy="40" r="2.8" fill="#b0ffe0"/><animateTransform attributeName="transform" type="rotate" from="0 160 40" to="-360 160 40" dur="0.86s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="40" cy="80" rx="15" ry="2.2" fill="url(#dg-brand)"/><ellipse cx="40" cy="80" rx="2.2" ry="15" fill="url(#dg-brand)"/><circle cx="40" cy="80" r="2.8" fill="#b0ffe0"/><animateTransform attributeName="transform" type="rotate" from="0 40 80" to="-360 40 80" dur="0.98s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="80" rx="15" ry="2.2" fill="url(#dg-brand)"/><ellipse cx="160" cy="80" rx="2.2" ry="15" fill="url(#dg-brand)"/><circle cx="160" cy="80" r="2.8" fill="#b0ffe0"/><animateTransform attributeName="transform" type="rotate" from="0 160 80" to="360 160 80" dur="0.88s" repeatCount="indefinite"/></g>
-              <!-- Body -->
-              <rect x="72" y="46" width="56" height="28" rx="8" fill="rgba(6,8,16,0.97)" stroke="url(#dg-brand)" stroke-width="1.8"/>
-              <!-- Screen panel -->
-              <rect x="78" y="52" width="16" height="10" rx="2.5" fill="rgba(57,255,129,0.12)" stroke="url(#dg-brand)" stroke-width="0.9"/>
-              <rect x="81" y="55" width="9" height="6" rx="1.5" fill="rgba(57,255,129,0.38)"/>
-              <!-- Camera lens -->
-              <circle cx="118" cy="60" r="5" fill="rgba(57,255,129,0.10)" stroke="url(#dg-brand)" stroke-width="1"/>
-              <circle cx="118" cy="60" r="3" fill="rgba(57,255,129,0.30)" stroke="url(#dg-brand)" stroke-width="0.7"/>
-              <circle cx="118" cy="60" r="1.4" fill="#6fffaa"/>
-              <!-- Landing gear -->
-              <line x1="80" y1="74" x2="74" y2="96" stroke="url(#dg-brand)" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
-              <line x1="120" y1="74" x2="126" y2="96" stroke="url(#dg-brand)" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
-              <line x1="74" y1="96" x2="126" y2="96" stroke="url(#dg-brand)" stroke-width="2" stroke-linecap="round" opacity="0.8"/>
-              <!-- Status LED -->
-              <circle cx="100" cy="60" r="1.8" fill="#6fffaa"><animate attributeName="opacity" values="0.15;1;0.15" dur="1.6s" repeatCount="indefinite"/></circle>
-              <circle cx="100" cy="60" r="3.5" fill="rgba(255,230,100,0.22)"><animate attributeName="opacity" values="0;0.6;0" dur="1.6s" repeatCount="indefinite"/></circle>
-            </svg></span>
         </div>
     
         <div class="tabs">
@@ -281,7 +245,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.5-4.8 2.5.9-5.4L4.2 7.7l5.4-.8z"/></svg>
             Agents
           </button>
-          <button class="tab" data-tab="code" id="tabCode" title="HashCortX Coder — god agent that codes, edits, and tells you what changed">
+          <button class="tab" data-tab="code" id="tabCode" title="MiraXCode Coder — god agent that codes, edits, and tells you what changed">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
             Coder
           </button>
@@ -297,7 +261,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
             Finance
           </button>
-          <button class="tab" data-tab="sandbox" id="tabSandbox" title="HashCortx Sandbox — swarm security scanner for malware, trojans &amp; injections">
+          <button class="tab" data-tab="sandbox" id="tabSandbox" title="MiraXcode Sandbox — swarm security scanner for malware, trojans &amp; injections">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
             Sandbox
           </button>
@@ -305,11 +269,11 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 4v16"/><path d="M3 9h18"/><path d="M12 13h5"/><path d="M12 17h3"/></svg>
             ERP
           </button>
-          <button class="tab" data-tab="agent-maker" id="tabAgentMaker" title="HashCortx Swarm — design, build and run multi-agent swarms">
+          <button class="tab" data-tab="agent-maker" id="tabAgentMaker" title="MiraXcode Swarm — design, build and run multi-agent swarms">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><circle cx="8" cy="19" r="2"/><circle cx="16" cy="19" r="2"/><path d="M12 7v3"/><path d="M7 12h2"/><path d="M15 12h2"/><path d="M9.5 17.5l2-2"/><path d="M14.5 17.5l-2-2"/></svg>
             Agent Swarm
           </button>
-          <button class="tab" data-tab="virtual-os" id="tabVirtualOS" title="HashCortx Virtual OS — virtual project desktop and AI file builder">
+          <button class="tab" data-tab="virtual-os" id="tabVirtualOS" title="MiraXcode Virtual OS — virtual project desktop and AI file builder">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 8h4"/><path d="M7 11h7"/><path d="M16.5 8.5h.01"/></svg>
             Virtual OS
           </button>
@@ -371,101 +335,15 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
             </button>
           </div>
-          <div class="designed-by">Designed by HashCortx</div>
+          <div class="designed-by">Powered by Miracuves</div>
         </div>
       </aside>
     
       <main>
         <!-- Chat + composer column -->
         <div class="hc-chat-col">
-        <div class="drone-bg" aria-hidden="true">
-          <div class="drone-a">
-            <svg viewBox="0 0 200 120" width="190" height="114" overflow="visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="dg-a" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0" stop-color="#6fffaa"/>
-                  <stop offset="0.5" stop-color="#39ff81"/>
-                  <stop offset="1" stop-color="#1a7a40"/>
-                </linearGradient>
-                <radialGradient id="dr-a" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0" stop-color="rgba(57,255,129,0.45)"/>
-                  <stop offset="1" stop-color="rgba(57,255,129,0)"/>
-                </radialGradient>
-              </defs>
-              <line x1="40" y1="40" x2="160" y2="80" stroke="url(#dg-a)" stroke-width="3" stroke-linecap="round"/>
-              <line x1="160" y1="40" x2="40" y2="80" stroke="url(#dg-a)" stroke-width="3" stroke-linecap="round"/>
-              <circle cx="40" cy="40" r="22" fill="url(#dr-a)"/><circle cx="160" cy="40" r="22" fill="url(#dr-a)"/><circle cx="40" cy="80" r="22" fill="url(#dr-a)"/><circle cx="160" cy="80" r="22" fill="url(#dr-a)"/>
-              <g><ellipse cx="40" cy="40" rx="16" ry="2" fill="url(#dg-a)" opacity="0.85"/><ellipse cx="40" cy="40" rx="2" ry="16" fill="url(#dg-a)" opacity="0.85"/><circle cx="40" cy="40" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="0.82s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="40" rx="16" ry="2" fill="url(#dg-a)" opacity="0.85"/><ellipse cx="160" cy="40" rx="2" ry="16" fill="url(#dg-a)" opacity="0.85"/><circle cx="160" cy="40" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 160 40" to="-360 160 40" dur="0.76s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="40" cy="80" rx="16" ry="2" fill="url(#dg-a)" opacity="0.85"/><ellipse cx="40" cy="80" rx="2" ry="16" fill="url(#dg-a)" opacity="0.85"/><circle cx="40" cy="80" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 40 80" to="-360 40 80" dur="0.88s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="80" rx="16" ry="2" fill="url(#dg-a)" opacity="0.85"/><ellipse cx="160" cy="80" rx="2" ry="16" fill="url(#dg-a)" opacity="0.85"/><circle cx="160" cy="80" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 160 80" to="360 160 80" dur="0.72s" repeatCount="indefinite"/></g>
-              <rect x="72" y="46" width="56" height="28" rx="8" fill="rgba(8,10,18,0.95)" stroke="url(#dg-a)" stroke-width="1.6"/>
-              <rect x="78" y="52" width="16" height="10" rx="2" fill="url(#dg-a)" opacity="0.85"/>
-              <circle cx="118" cy="60" r="3" fill="#6fffaa"/><circle cx="118" cy="60" r="1.2" fill="#0a0a0a"/>
-              <line x1="80" y1="74" x2="74" y2="96" stroke="url(#dg-a)" stroke-width="1.6" stroke-linecap="round"/>
-              <line x1="120" y1="74" x2="126" y2="96" stroke="url(#dg-a)" stroke-width="1.6" stroke-linecap="round"/>
-              <line x1="74" y1="96" x2="126" y2="96" stroke="url(#dg-a)" stroke-width="1.8" stroke-linecap="round"/>
-              <circle cx="100" cy="60" r="1.8" fill="#6fffaa"><animate attributeName="opacity" values="0.2;1;0.2" dur="1.4s" repeatCount="indefinite"/></circle>
-            </svg>
-          </div>
-          <div class="drone-b">
-            <svg viewBox="0 0 200 120" width="150" height="90" overflow="visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="dg-b" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0" stop-color="#6fffaa"/>
-                  <stop offset="0.5" stop-color="#39ff81"/>
-                  <stop offset="1" stop-color="#1a7a40"/>
-                </linearGradient>
-                <radialGradient id="dr-b" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0" stop-color="rgba(57,255,129,0.40)"/>
-                  <stop offset="1" stop-color="rgba(57,255,129,0)"/>
-                </radialGradient>
-              </defs>
-              <line x1="40" y1="40" x2="160" y2="80" stroke="url(#dg-b)" stroke-width="3" stroke-linecap="round"/>
-              <line x1="160" y1="40" x2="40" y2="80" stroke="url(#dg-b)" stroke-width="3" stroke-linecap="round"/>
-              <circle cx="40" cy="40" r="22" fill="url(#dr-b)"/><circle cx="160" cy="40" r="22" fill="url(#dr-b)"/><circle cx="40" cy="80" r="22" fill="url(#dr-b)"/><circle cx="160" cy="80" r="22" fill="url(#dr-b)"/>
-              <g><ellipse cx="40" cy="40" rx="16" ry="2" fill="url(#dg-b)" opacity="0.85"/><ellipse cx="40" cy="40" rx="2" ry="16" fill="url(#dg-b)" opacity="0.85"/><circle cx="40" cy="40" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="-360 40 40" dur="0.78s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="40" rx="16" ry="2" fill="url(#dg-b)" opacity="0.85"/><ellipse cx="160" cy="40" rx="2" ry="16" fill="url(#dg-b)" opacity="0.85"/><circle cx="160" cy="40" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 160 40" to="360 160 40" dur="0.86s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="40" cy="80" rx="16" ry="2" fill="url(#dg-b)" opacity="0.85"/><ellipse cx="40" cy="80" rx="2" ry="16" fill="url(#dg-b)" opacity="0.85"/><circle cx="40" cy="80" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 40 80" to="360 40 80" dur="0.92s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="80" rx="16" ry="2" fill="url(#dg-b)" opacity="0.85"/><ellipse cx="160" cy="80" rx="2" ry="16" fill="url(#dg-b)" opacity="0.85"/><circle cx="160" cy="80" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 160 80" to="-360 160 80" dur="0.80s" repeatCount="indefinite"/></g>
-              <rect x="72" y="46" width="56" height="28" rx="8" fill="rgba(8,10,18,0.95)" stroke="url(#dg-b)" stroke-width="1.6"/>
-              <rect x="78" y="52" width="16" height="10" rx="2" fill="url(#dg-b)" opacity="0.85"/>
-              <circle cx="118" cy="60" r="3" fill="#6fffaa"/><circle cx="118" cy="60" r="1.2" fill="#0a0a0a"/>
-              <line x1="80" y1="74" x2="74" y2="96" stroke="url(#dg-b)" stroke-width="1.6" stroke-linecap="round"/>
-              <line x1="120" y1="74" x2="126" y2="96" stroke="url(#dg-b)" stroke-width="1.6" stroke-linecap="round"/>
-              <line x1="74" y1="96" x2="126" y2="96" stroke="url(#dg-b)" stroke-width="1.8" stroke-linecap="round"/>
-              <circle cx="100" cy="60" r="1.8" fill="#6fffaa"><animate attributeName="opacity" values="0.2;1;0.2" dur="1.9s" begin="0.6s" repeatCount="indefinite"/></circle>
-            </svg>
-          </div>
-          <div class="drone-c">
-            <svg viewBox="0 0 200 120" width="115" height="69" overflow="visible" xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <linearGradient id="dg-c" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0" stop-color="#6fffaa"/>
-                  <stop offset="0.5" stop-color="#39ff81"/>
-                  <stop offset="1" stop-color="#1a7a40"/>
-                </linearGradient>
-                <radialGradient id="dr-c" cx="0.5" cy="0.5" r="0.5">
-                  <stop offset="0" stop-color="rgba(57,255,129,0.35)"/>
-                  <stop offset="1" stop-color="rgba(57,255,129,0)"/>
-                </radialGradient>
-              </defs>
-              <line x1="40" y1="40" x2="160" y2="80" stroke="url(#dg-c)" stroke-width="3" stroke-linecap="round"/>
-              <line x1="160" y1="40" x2="40" y2="80" stroke="url(#dg-c)" stroke-width="3" stroke-linecap="round"/>
-              <circle cx="40" cy="40" r="22" fill="url(#dr-c)"/><circle cx="160" cy="40" r="22" fill="url(#dr-c)"/><circle cx="40" cy="80" r="22" fill="url(#dr-c)"/><circle cx="160" cy="80" r="22" fill="url(#dr-c)"/>
-              <g><ellipse cx="40" cy="40" rx="16" ry="2" fill="url(#dg-c)" opacity="0.85"/><ellipse cx="40" cy="40" rx="2" ry="16" fill="url(#dg-c)" opacity="0.85"/><circle cx="40" cy="40" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 40 40" to="360 40 40" dur="0.74s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="40" rx="16" ry="2" fill="url(#dg-c)" opacity="0.85"/><ellipse cx="160" cy="40" rx="2" ry="16" fill="url(#dg-c)" opacity="0.85"/><circle cx="160" cy="40" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 160 40" to="-360 160 40" dur="0.84s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="40" cy="80" rx="16" ry="2" fill="url(#dg-c)" opacity="0.85"/><ellipse cx="40" cy="80" rx="2" ry="16" fill="url(#dg-c)" opacity="0.85"/><circle cx="40" cy="80" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 40 80" to="-360 40 80" dur="0.80s" repeatCount="indefinite"/></g>
-              <g><ellipse cx="160" cy="80" rx="16" ry="2" fill="url(#dg-c)" opacity="0.85"/><ellipse cx="160" cy="80" rx="2" ry="16" fill="url(#dg-c)" opacity="0.85"/><circle cx="160" cy="80" r="3" fill="#6fffaa"/><animateTransform attributeName="transform" type="rotate" from="0 160 80" to="360 160 80" dur="0.90s" repeatCount="indefinite"/></g>
-              <rect x="72" y="46" width="56" height="28" rx="8" fill="rgba(8,10,18,0.95)" stroke="url(#dg-c)" stroke-width="1.6"/>
-              <rect x="78" y="52" width="16" height="10" rx="2" fill="url(#dg-c)" opacity="0.85"/>
-              <circle cx="118" cy="60" r="3" fill="#6fffaa"/><circle cx="118" cy="60" r="1.2" fill="#0a0a0a"/>
-              <line x1="80" y1="74" x2="74" y2="96" stroke="url(#dg-c)" stroke-width="1.6" stroke-linecap="round"/>
-              <line x1="120" y1="74" x2="126" y2="96" stroke="url(#dg-c)" stroke-width="1.6" stroke-linecap="round"/>
-              <line x1="74" y1="96" x2="126" y2="96" stroke="url(#dg-c)" stroke-width="1.8" stroke-linecap="round"/>
-              <circle cx="100" cy="60" r="1.8" fill="#6fffaa"><animate attributeName="opacity" values="0.2;1;0.2" dur="2.2s" begin="1.1s" repeatCount="indefinite"/></circle>
-            </svg>
-          </div>
+        <div class="brand-watermark" aria-hidden="true">
+          <img src="/assets/logo-mark.png" alt="" draggable="false"/>
         </div>
         <header class="topbar">
           <button class="toggle-side" id="toggleSide" type="button" title="Hide sidebar" aria-label="Toggle sidebar" aria-expanded="true">
@@ -501,6 +379,7 @@
             <span class="topbar-privacy-text">Local</span>
           </label>
           <div class="actions">
+            <span id="cloudUsageChip" title="Cloud API usage for the selected model provider"></span>
             <button class="ping-btn tps-btn" id="tpsBtn" title="Tokens per second — last response generation speed">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
@@ -541,7 +420,7 @@
     
         <div class="composer-wrap">
           <div class="composer-chips" id="composerChips" role="toolbar" aria-label="Suggested prompts">
-            <button data-preset="hashAi" title="Prime HashCortx system rules"><svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" aria-hidden="true" style="vertical-align:-1px"><path d="M8 1.5l1.6 4.9L15 8l-5.4 1.6L8 14.5l-1.6-4.9L1 8l5.4-1.6z"/></svg> HashCortx</button>
+            <button data-preset="hashAi" title="Prime MiraXcode system rules"><svg viewBox="0 0 16 16" width="11" height="11" fill="currentColor" aria-hidden="true" style="vertical-align:-1px"><path d="M8 1.5l1.6 4.9L15 8l-5.4 1.6L8 14.5l-1.6-4.9L1 8l5.4-1.6z"/></svg> MiraXcode</button>
             <button data-preset="fullstack" title="Pro 2026 full-stack website brief">Full Stack</button>
             <button data-preset="mobile" title="Pro 2026 mobile app brief">Mobile App</button>
             <button data-preset="freeRam" class="accent" title="Unload every model on Local PC to free RAM and enable speed mode"><svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" style="vertical-align:-1px"><polyline points="10,2 6,8.5 9.5,8.5 6,14"/></svg> Free RAM</button>
@@ -625,7 +504,7 @@
       <div class="sbx-header">
         <div class="sbx-header-left">
           <span class="sbx-logo">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg>
+            <img src="/assets/logo-mark.png" alt="" width="20" height="20" draggable="false"/>
           </span>
           <span class="sbx-title">SANDBOX SCANNER</span>
           <span class="sbx-sub">// malware · trojans · injections · exfiltration</span>
@@ -771,6 +650,7 @@
         <div class="modal-tabs">
           <button class="modal-tab active" id="stab-settings">Settings</button>
           <button class="modal-tab" id="stab-apis">APIs</button>
+          <button class="modal-tab" id="stab-mcp">MCP</button>
           <button class="modal-tab" id="stab-memory">Memory</button>
           <button class="modal-tab" id="stab-about">About</button>
         </div>
@@ -838,6 +718,8 @@
               <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="12" height="9" rx="2"/><path d="M8 2v3"/><circle cx="8" cy="10" r="1.5"/></svg>
               LLM Providers
             </label>
+            <p class="api-usage-intro">Usage updates in real time as you chat. OpenRouter syncs from the API; MiniMax, GLM, and NVIDIA track request windows locally plus rate-limit headers when returned.</p>
+            <button type="button" class="api-usage-refresh-all" id="apiUsageRefreshAll">Refresh all usage</button>
           </div>
           <div class="field">
             <label for="groqKey">Groq API key <span style="color:var(--muted);font-weight:400">— free at <b>console.groq.com</b></span></label>
@@ -879,9 +761,43 @@
             <label for="openRouterKey">OpenRouter key <span style="color:var(--muted);font-weight:400">— free models at <b>openrouter.ai</b></span></label>
             <input class="control" id="openRouterKey" type="password" placeholder="sk-or-v1-…" spellcheck="false" autocomplete="off" />
           </div>
-    
+          <div class="field">
+            <label>MiniMax API key <span style="color:var(--muted);font-weight:400">— <b>platform.minimax.io</b> · M2.7, M2.1, Text-01</span></label>
+            <input class="control" id="minimaxKey" type="password" placeholder="…" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>GLM (Z.AI) Coding Plan API key <span style="color:var(--muted);font-weight:400">— <b>z.ai</b> · GLM-5.1, GLM-4.7, GLM-4.5-air</span></label>
+            <input class="control" id="glmKey" type="password" placeholder="…" spellcheck="false" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>NVIDIA NIM API key <span style="color:var(--muted);font-weight:400">— free big models at build.nvidia.com</span></label>
+            <input class="control" id="nvidiaKey" type="password" placeholder="nvapi-…" spellcheck="false" autocomplete="off" />
+          </div>
+
+          <div style="margin-top:12px">
+            <button type="button" id="fallbackToggleBtn" style="background:none;border:1px solid rgba(239,68,68,0.18);color:var(--hc-accent);cursor:pointer;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;letter-spacing:.05em;width:100%;text-align:left;display:flex;align-items:center;gap:8px">
+              <span id="fallbackToggleIcon" style="transition:transform .15s">&#9654;</span> Model Fallbacks — toggle which models appear in the dropdown
+            </button>
+            <div id="fallbackPanel" style="display:none;margin-top:8px;max-height:420px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid rgba(239,68,68,0.08)">
+            </div>
+          </div>
+
           <div class="divider"></div>
-    
+
+          <div class="field compaction-settings-field">
+            <label for="compactionModelSelect" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:600;display:flex;align-items:center;gap:7px">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 4h12v8H2z"/><path d="M5 7h6M5 10h4"/></svg>
+              Context compaction
+            </label>
+            <p class="api-usage-intro" style="margin:6px 0 10px">Summarizes long Coder and agent sessions when context fills up. Uses a small model — never your main chat model. <b>Auto</b> picks the best option from keys below (Groq → Gemini → MiniMax / GLM if keyed).</p>
+            <select class="control" id="compactionModelSelect" aria-label="Compaction model">
+              <option value="auto">Auto (recommended)</option>
+            </select>
+            <p class="compaction-resolved-hint" id="compactionResolvedHint" style="margin:8px 0 0;font-size:12px;color:var(--muted)"></p>
+          </div>
+
+          <div class="divider"></div>
+
           <div class="field">
             <label style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan);font-weight:600;display:flex;align-items:center;gap:7px">
               <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7" cy="7" r="5"/><path d="m14 14-3.2-3.2"/></svg>
@@ -909,19 +825,20 @@
     
         <!-- About pane (hidden by default) -->
         <div id="aboutPane" style="display:none" class="modal-body settings-pane about-pane" hidden>
-          <img src="/assets/logo-mark.png" class="about-logo-img" alt="HashCortx" draggable="false"/>
-          <div class="about-name">Seif Hashish</div>
-          <div class="about-role">Application Creator and Developer</div>
+          <img src="/assets/logo-mark.png" class="about-logo-img" alt="MiraXcode" draggable="false"/>
+          <div class="about-name">Miracuves solutions</div>
+          <div class="about-role">Developed by Miracuves Team</div>
+          <a class="about-website" href="https://www.miracuves.com" target="_blank" rel="noopener noreferrer">www.miracuves.com</a>
           <div class="about-divider"></div>
           <div class="about-desc">
             Massive UI · Isolated Intelligence · Agentic
           </div>
           <div class="about-badge">
             <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v4l3 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
-            HashCortx · v2.0 · May 2026
+            MiraXcode · v2.0 · May 2026
           </div>
           <div style="margin-top:10px">
-            <button class="hc-audit-btn" id="hcAuditBtn" title="View the HashCortX Coder permission audit log">
+            <button class="hc-audit-btn" id="hcAuditBtn" title="View the MiraXCode Coder permission audit log">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h8"/><path d="M8 17h6"/></svg>
               View Audit Log
             </button>
@@ -950,7 +867,28 @@
             <div id="memList" class="mem-list"></div>
           </div>
         </div>
-    
+
+        <!-- MCP pane (hidden by default) -->
+        <div id="mcpPane" style="display:none" class="modal-body settings-pane" hidden>
+          <div class="field">
+            <label style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--hc-accent);font-weight:600;display:flex;align-items:center;gap:7px">
+              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 5h12M5 2v12M2 11h12"/></svg>
+              MCP Servers — Model Context Protocol
+            </label>
+            <div style="font-size:11.5px;color:var(--text-dim);margin:-4px 0 8px;line-height:1.5">
+              Auto-detected from Claude Desktop, Cursor, VS Code, and Claude CLI configs. Enable servers to expose their tools to the AI agent. Connected servers' tools are available in every chat.
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:10px">
+              <button class="ghost" type="button" id="mcpRescanBtn" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:0 12px">Rescan</button>
+              <button class="ghost" type="button" id="mcpConnectAllBtn" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:0 12px">Connect All</button>
+              <button class="ghost" type="button" id="mcpDisconnectAllBtn" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:0 12px;color:var(--rose);border-color:rgba(217,138,133,0.35)">Disable All</button>
+            </div>
+            <div id="mcpPanel" style="max-height:420px;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.2);border-radius:6px;border:1px solid rgba(239,68,68,0.08)">
+              <div style="font-size:12px;color:var(--muted);padding:4px 0">Scanning for MCP servers…</div>
+            </div>
+          </div>
+        </div>
+
         <div class="modal-footer">
           <button class="ghost" id="closeSettingsFooter">Close</button>
         </div>
@@ -978,14 +916,14 @@
           <svg id="memMapSvg" width="100%" height="100%" style="display:block;width:100%;height:100%" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid meet">
             <defs>
               <radialGradient id="mmCenterHalo" cx="50%" cy="50%" r="50%">
-                <stop offset="0%"  stop-color="rgba(57,255,129,0.55)"/>
-                <stop offset="60%" stop-color="rgba(57,255,129,0.15)"/>
-                <stop offset="100%" stop-color="rgba(57,255,129,0)"/>
+                <stop offset="0%"  stop-color="rgba(163,163,163,0.55)"/>
+                <stop offset="60%" stop-color="rgba(163,163,163,0.15)"/>
+                <stop offset="100%" stop-color="rgba(163,163,163,0)"/>
               </radialGradient>
               <radialGradient id="mmCenterCore" cx="35%" cy="30%" r="80%">
-                <stop offset="0%"  stop-color="#b0ffe0"/>
-                <stop offset="55%" stop-color="#39ff81"/>
-                <stop offset="100%" stop-color="#1a7a40"/>
+                <stop offset="0%"  stop-color="#d4d4d4"/>
+                <stop offset="55%" stop-color="#a3a3a3"/>
+                <stop offset="100%" stop-color="#525252"/>
               </radialGradient>
               <pattern id="mmGridPattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
                 <path class="mm-grid" d="M 40 0 L 0 0 0 40"/>
@@ -1112,7 +1050,7 @@
 
       <!-- Left: logo + project info -->
       <div class="frg-header-left">
-        <img src="/assets/logo-mark.png" class="frg-logo mode-logo-img" draggable="false" alt="HashCortx"/>
+        <img src="/assets/logo-mark.png" class="frg-logo mode-logo-img" draggable="false" alt="MiraXcode"/>
         <div>
           <div class="frg-title">Forge Studio</div>
           <span class="frg-sub" id="frgPlanName">No project loaded</span>
@@ -1161,6 +1099,7 @@
       <div class="frg-header-right">
         <span class="frg-status" id="frgStatus">Idle</span>
         <span id="frgParticleCount" style="font-family:var(--mono);font-size:9px;color:rgba(223,251,245,0.42);letter-spacing:.08em;"></span>
+        <button class="frg-btn" id="frgBtnCode" title="Toggle code editor (Monaco)">Code</button>
         <button class="frg-btn" id="frgMockBtn">Mock</button>
         <button class="frg-btn" id="frgAutoRouteBtn">Auto</button>
         <button class="frg-btn" id="frgSaveProjectBtn">Save</button>
@@ -1178,6 +1117,8 @@
 
       <!-- 3D canvas viewport -->
       <div class="frg-viewport">
+        <div class="frg-viewport-stack">
+        <div class="frg-viewport-canvas">
         <div id="frgCanvasMount"></div>
 
         <!-- HUD: node count badge -->
@@ -1216,6 +1157,11 @@
 
         <!-- Keyboard hint -->
         <div class="frg-help">Click to select &middot; W/R/S transform &middot; A select-all &middot; D duplicate &middot; Del remove</div>
+        </div><!-- /.frg-viewport-canvas -->
+        <div id="frgCodePanel" class="frg-code-panel" hidden>
+          <div id="frgCodeEditorHost" class="frg-code-editor-host"></div>
+        </div>
+        </div><!-- /.frg-viewport-stack -->
       </div><!-- /.frg-viewport -->
 
       <!-- Right side panel -->
@@ -1305,7 +1251,7 @@
     <div class="amk-header">
 
       <div class="amk-header-left">
-        <img src="/assets/logo-full.png" class="amk-logo mode-logo-img" draggable="false" alt="HashCortx" style="height:38px;"/>
+        <img src="/assets/logo-mark.png" class="amk-logo mode-logo-img" draggable="false" alt="MiraXcode" style="height:38px;"/>
       </div>
 
       <div class="amk-header-center">
@@ -1398,7 +1344,7 @@
 
         <!-- Empty state -->
         <div class="amk-empty-dag" id="amkEmptyDag">
-          <img src="/assets/logo-full.png" class="amk-empty-logo" draggable="false" alt="HashCortx" style="height:140px;opacity:0.55;margin-bottom:24px;filter:drop-shadow(0 0 18px rgba(59,130,246,0.25));"/>
+          <img src="/assets/logo-mark.png" class="amk-empty-logo" draggable="false" alt="MiraXcode" style="height:140px;opacity:0.55;margin-bottom:24px;"/>
           <span class="empty-title">No agents yet</span>
           <span class="empty-sub">Create a blueprint and add agents to design your swarm topology.</span>
         </div>
@@ -1517,7 +1463,7 @@
     <div class="sys-header">
 
       <div class="sys-header-left">
-        <img src="/assets/logo-mark.png" class="sys-logo mode-logo-img" draggable="false" alt="HashCortx"/>
+        <img src="/assets/logo-mark.png" class="sys-logo mode-logo-img" draggable="false" alt="MiraXcode"/>
         <div>
           <div class="sys-title">System Maker</div>
           <div class="sys-sub">Business App Builder</div>
@@ -1695,7 +1641,7 @@
     <!-- Header -->
     <div class="void-header">
       <div class="void-header-left">
-        <img src="/assets/logo-mark.png" class="void-logo mode-logo-img" draggable="false" alt="HashCortx"/>
+        <img src="/assets/logo-mark.png" class="void-logo mode-logo-img" draggable="false" alt="MiraXcode"/>
         <div>
           <div class="void-title">Virtual OS</div>
           <div class="void-sub" id="voidBreadcrumbSub" style="font-size:10px;color:rgba(134,239,172,.52);"></div>
@@ -1721,7 +1667,7 @@
         <!-- Chat area: header (model select + stop) -->
         <div class="void-chat-header">
           <select class="void-select" id="voidChatModelSelect" title="Pick Virtual OS agent model" aria-label="Pick Virtual OS agent model"></select>
-          <button class="void-stop-btn" id="voidChatStopBtn" style="background:transparent;border:1px solid rgba(57,255,129,.15);color:rgba(178,245,200,.36);font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:2px;cursor:pointer;display:flex;align-items:center;gap:4px;opacity:.32;" disabled></button>
+          <button class="void-stop-btn" id="voidChatStopBtn" style="background:transparent;border:1px solid rgba(163,163,163,.15);color:rgba(178,245,200,.36);font-family:var(--mono);font-size:9px;letter-spacing:.1em;text-transform:uppercase;padding:3px 7px;border-radius:2px;cursor:pointer;display:flex;align-items:center;gap:4px;opacity:.32;" disabled></button>
         </div>
 
         <!-- Chat messages -->
@@ -1970,19 +1916,37 @@
 
   <!-- ── Platform layer — must load before app.js ─────────── -->
   <script src="/platform/index.js"></script>
+  <script src="/js/hc-health.js"></script>
+  <script src="/js/hc-storage.js"></script>
   <script src="/platform/tauri/keychain.js"></script>
   <script src="/platform/tauri/guard.js"></script>
+  <script src="/js/coder-skills.js"></script>
+  <script src="/js/context-compactor.js"></script>
+  <script src="/js/coder-memory.js"></script>
+  <script src="/js/coder-graphify.js"></script>
   <script src="/platform/tauri/hashcoder.js"></script>
+  <script src="/js/provider-usage.js"></script>
+  <script src="/js/mode-loader.js"></script>
+  <script src="/js/cdr-chat-virtual.js"></script>
+  <script src="/js/cdr-markdown-worker.js"></script>
+  <script src="/js/cdr-staged-read.js"></script>
+  <script src="/js/cdr-file-stage.js"></script>
+  <script src="/js/cdr-ide-features.js"></script>
+  <script src="/js/cdr-mentions.js"></script>
+  <script src="/js/cdr-composer-attachments.js"></script>
+  <script src="/js/cdr-command-palette.js"></script>
+  <script src="/js/cdr-editor-pane.js"></script>
 
   <!-- ── Mode JS files — loaded after DOM ready ──────────── -->
-  <script src="/js/app.js"></script>
-  <script src="/js/finance-mode.js"></script>
-  <script src="/js/sandbox.js"></script>
+  <script src="/js/cdr-agent-stream.js"></script>
+  <script src="/js/cdr-diagnostics.js"></script>
+  <script src="/js/cdr-goto.js"></script>
+  <script src="/js/cdr-lsp-client.js"></script>
+  <script src="/js/cdr-project-rag.js"></script>
+  <script src="/js/forge-editor.js"></script>
+  <script src="/js/cdr-project-lint.js"></script>
+  <script src="/js/app.bundle.js"></script>
   <script src="/js/code-mode.js"></script>
-  <script src="/js/swarm-maker.js"></script>
-  <script src="/js/system-maker.js"></script>
-  <script src="/js/forge-mode.js"></script>
-  <script src="/js/virtual-os.js"></script>
 
   <!-- Boot controller — loaded last so all DOM is ready (no defer/module needed) -->
   <script src="/main.js"></script>
@@ -1991,7 +1955,7 @@
   <div id="hcAuditModal" role="dialog" aria-modal="true" aria-labelledby="hcAuditTitle">
     <div class="hc-audit-box">
       <div class="hc-audit-head">
-        <h3 id="hcAuditTitle">HashCortX Coder Audit Log</h3>
+        <h3 id="hcAuditTitle">MiraXCode Coder Audit Log</h3>
         <button class="hc-audit-close" id="hcAuditClose" title="Close">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -2007,7 +1971,7 @@
     <div class="hc-perm-card">
       <div class="hc-perm-header">
         <span class="hc-perm-icon">⚡</span>
-        <span id="hc-perm-title" class="hc-perm-title">HashCortX Coder wants to:</span>
+        <span id="hc-perm-title" class="hc-perm-title">MiraXCode Coder wants to:</span>
       </div>
       <div class="hc-perm-body">
         <div class="hc-perm-row">
@@ -2026,7 +1990,7 @@
   <div id="hc-guard-banner" class="hc-guard-banner" aria-live="assertive"></div>
 
   <!-- ══════════════════════════════════════════════════════════════
-       CODER MODE — Full-screen HashCortX Coder
+       CODER MODE — Full-screen MiraXCode Coder
        Shown when body.coder-mode is active
        ══════════════════════════════════════════════════════════════ -->
   <div id="coder-mode-wrap">
@@ -2034,9 +1998,9 @@
     <!-- Header -->
     <div class="cdr-header">
       <div class="cdr-header-left">
-        <img src="/assets/logo-mark.png" class="cdr-logo mode-logo-img" draggable="false" alt="HashCortx"/>
+        <img src="/assets/logo-mark.png" class="cdr-logo mode-logo-img" draggable="false" alt="MiraXcode"/>
         <div>
-          <div class="cdr-title">HashCortX Coder</div>
+          <div class="cdr-title">MiraXCode Coder</div>
           <div class="cdr-sub" id="cdrProjectSub">No project open</div>
         </div>
       </div>
@@ -2046,11 +2010,20 @@
           <span class="cdr-status-dot" id="cdrStatusDot"></span>
           <span id="cdrStatusText">Ready</span>
         </div>
+        <span class="cdr-trust-chip" id="cdrTrustChip" hidden title="Trusted workspace">Trusted</span>
+        <span class="cdr-ctx-chip" id="cdrCtxChip" title="Estimated prompt usage for active model">Ctx —</span>
+        <button type="button" class="cdr-pending-chip" id="cdrPendingChip" hidden title="Pending file changes to review">0 pending</button>
         <span id="cdrRouterChip" class="cdr-router-chip"></span>
         <span id="cdrRouterLabel" style="display:none"></span>
+        <div id="cdrStatsWidget" class="cdr-stats-widget">
+          <span id="cdrStatCpu" title="CPU usage">CPU --</span>
+          <span id="cdrStatRam" title="RAM usage">RAM --</span>
+          <span id="cdrStatGpu" title="GPU" style="display:none">GPU --</span>
+        </div>
       </div>
 
       <div class="cdr-header-right">
+        <div class="cdr-header-actions">
         <button class="cdr-btn" id="cdrAuditBtn" title="View audit log">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
           Audit
@@ -2080,7 +2053,16 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           Back
         </button>
+        </div>
       </div>
+    </div>
+
+    <!-- Session Tab Bar -->
+    <div class="cdr-tab-bar" id="cdrTabBar">
+      <div class="cdr-tabs-scroll" id="cdrTabsScroll"></div>
+      <button class="cdr-tab-add" id="cdrTabAdd" title="New session (Ctrl+T)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
     </div>
 
     <!-- Body -->
@@ -2104,21 +2086,76 @@
         </div>
         <div class="cdr-sidebar-body" id="cdrSidebarBody">
           <div class="cdr-tree-root" id="cdrExplorerRoot">No project open</div>
+          <div class="cdr-search-panel" id="cdrSearchPanel" hidden>
+            <div class="cdr-search-hd">
+              <span>Search</span>
+              <button type="button" class="cdr-git-refresh" id="cdrSearchToggle" title="Close (⌘⇧F)">×</button>
+            </div>
+            <input type="text" class="cdr-search-input" id="cdrSearchInput" placeholder="Search in project…" spellcheck="false"/>
+            <div class="cdr-search-results" id="cdrSearchResults"></div>
+          </div>
           <div class="cdr-explorer-body" id="cdrExplorerBody">
             <div class="cdr-tree-empty">Open a project or file to start.</div>
+          </div>
+          <div class="cdr-problems-section" id="cdrProblemsSection">
+            <div class="cdr-git-hd">
+              <span>Problems</span>
+              <button type="button" class="cdr-git-refresh" id="cdrProblemsRunBtn" title="Run tsc / cargo check">Check</button>
+            </div>
+            <div class="cdr-problems-list" id="cdrProblemsList">
+              <div class="cdr-git-empty">Build/test errors appear here</div>
+            </div>
+          </div>
+          <div class="cdr-git-section" id="cdrGitSection">
+            <div class="cdr-git-hd">
+              <span>Source Control</span>
+              <button type="button" class="cdr-git-refresh" id="cdrGitRefresh" title="Refresh git status">↻</button>
+            </div>
+            <div class="cdr-git-list" id="cdrGitList">
+              <div class="cdr-git-empty">Open a git repo to see changes</div>
+            </div>
+            <div class="cdr-git-commit">
+              <input type="text" class="cdr-git-commit-msg" id="cdrGitCommitMsg" placeholder="Commit message…" spellcheck="false"/>
+              <button type="button" class="cdr-btn" id="cdrGitCommitBtn">Commit</button>
+            </div>
           </div>
         </div>
       </div><!-- /.cdr-sidebar -->
 
-      <!-- CENTER: Chat area -->
+      <!-- CENTER: Editor + Chat -->
+      <div class="cdr-center" id="cdrCenter">
+      <div class="cdr-editor-pane" id="cdrEditorPane" hidden>
+        <div class="cdr-editor-hd">
+          <div class="cdr-editor-tabs-wrap">
+            <div class="cdr-editor-tabs" id="cdrEditorTabs" title="Primary editor tabs"></div>
+            <div class="cdr-editor-tabs secondary" id="cdrEditorTabsB" hidden title="Secondary pane tabs (split mode)"></div>
+          </div>
+          <span class="cdr-editor-path" id="cdrEditorPath"></span>
+          <div class="cdr-editor-actions">
+            <button type="button" class="cdr-btn" id="cdrEditorSplitBtn" title="Toggle split editor">Split</button>
+            <button type="button" class="cdr-btn" data-cdr-editor-save title="Save file (⌘S)">Save</button>
+            <button type="button" class="cdr-btn" data-cdr-editor-close title="Close tab">Close</button>
+          </div>
+        </div>
+        <div class="cdr-editor-body">
+          <div class="cdr-editor-monaco" id="cdrEditorMonaco"></div>
+          <div class="cdr-editor-monaco secondary" id="cdrEditorMonacoB"></div>
+          <div class="cdr-editor-diff" id="cdrEditorDiff"></div>
+        </div>
+        <span class="cdr-editor-diff-badge" id="cdrEditorDiffBadge" hidden>Diff</span>
+      </div>
       <div class="cdr-chat-area">
 
         <!-- Chat messages -->
         <div class="cdr-messages" id="cdrMessages">
           <div class="cdr-welcome">
-            <img src="/assets/hashcortx-logo.png" class="cdr-welcome-logo" draggable="false" alt="HashCortx"/>
-            <div class="cdr-welcome-title">Coder Mode</div>
-            <div class="cdr-welcome-sub">Surgical AI tasks &middot; auto-routed &middot; local-first</div>
+            <div class="cdr-welcome-hero">
+              <img src="/assets/logo-mark.png" class="cdr-welcome-mark" draggable="false" alt=""/>
+              <div class="cdr-welcome-copy">
+                <h1 class="cdr-welcome-title">Coder Mode</h1>
+                <p class="cdr-welcome-sub">Surgical AI tasks · auto-routed · local-first</p>
+              </div>
+            </div>
             <div class="cdr-welcome-chips">
               <span class="cdr-welcome-chip" data-prompt="List all files in the project and give me a quick overview of the codebase structure">Explore codebase</span>
               <span class="cdr-welcome-chip" data-prompt="Find all TODO and FIXME comments in the project">Find TODOs</span>
@@ -2147,21 +2184,70 @@
 
         <!-- Composer -->
         <div class="cdr-composer">
-          <div class="cdr-composer-meta">
-            <select class="cdr-model-picker" id="cdrModelPicker" title="Model for HashCortx Coder"></select>
-            <div class="cdr-composer-right">
-              <span class="cdr-agents-label">Agents</span>
-              <div class="cdr-agents-toggle">
-                <button class="cdr-agent-btn active" data-agents="1">1</button>
-                <button class="cdr-agent-btn" data-agents="2">+2</button>
-                <button class="cdr-agent-btn" data-agents="3">+3</button>
-              </div>
-              <button class="cdr-new-chat-btn" id="cdrClearChatBtn" title="Start new conversation">New chat</button>
+          <div class="cdr-change-pills-bar" id="cdrChangePills" aria-label="File changes"></div>
+          <div class="cdr-composer-toolbar">
+            <div class="cdr-model-row" title="Model for this Coder session">
+              <select class="cdr-model-picker" id="cdrModelPicker" aria-label="Coder model"></select>
+            </div>
+            <div class="cdr-composer-toolbar-end">
+              <label class="cdr-mode-toggle" title="YOLO: auto-run agent loop with permission bypass">
+                <input type="checkbox" id="cdrYoloMode"/>
+                <span>YOLO</span>
+              </label>
+              <label class="cdr-mode-toggle" title="Bypass permission prompts for tools and shell">
+                <input type="checkbox" id="cdrBypassPerms"/>
+                <span>Bypass perms</span>
+              </label>
+              <label class="cdr-mode-toggle" title="Plan only — no tool calls this run">
+                <input type="checkbox" id="cdrPlanOnly"/>
+                <span>Plan</span>
+              </label>
+              <label class="cdr-mode-toggle" title="Auto-open inline diff when agent edits a file">
+                <input type="checkbox" id="cdrAutoOpenDiff" checked/>
+                <span>Auto diff</span>
+              </label>
+              <button type="button" class="cdr-new-chat-btn" id="cdrSearchOpenBtn" title="Search project (⌘⇧F)">Search</button>
+              <span class="cdr-skills-chip" id="cdrSkillsChip" title="Installed agent skills">Skills …</span>
+              <span class="cdr-skills-chip cdr-graph-chip" id="cdrGraphChip" title="Graphify knowledge graph for this project">Graph …</span>
+              <select class="cdr-swarm-select" id="cdrSwarmMode" title="Swarm strategy">
+                <option value="boss">Boss</option>
+                <option value="vote">All Vote</option>
+                <option value="chain">Chain</option>
+              </select>
+              <button type="button" class="cdr-new-chat-btn" id="cdrClearChatBtn" title="Start new conversation">New chat</button>
             </div>
           </div>
-          <div class="cdr-input-wrap">
+          <div class="cdr-agents-bar">
+            <span class="cdr-agents-label">Agents</span>
+            <div class="cdr-agents-scroll">
+              <div class="cdr-agents-toggle">
+                <button type="button" class="cdr-agent-btn active" data-agents="1" title="Single agent">1</button>
+                <button type="button" class="cdr-agent-btn" data-agents="2" title="2 agents">2</button>
+                <button type="button" class="cdr-agent-btn" data-agents="3" title="3 agents">3</button>
+                <button type="button" class="cdr-agent-btn" data-agents="4" title="4 agents">4</button>
+                <button type="button" class="cdr-agent-btn" data-agents="5" title="5 agents">5</button>
+                <button type="button" class="cdr-agent-btn" data-agents="6" title="6 agents">6</button>
+                <button type="button" class="cdr-agent-btn" data-agents="8" title="8 agents">8</button>
+                <button type="button" class="cdr-agent-btn" data-agents="10" title="10 agents">10</button>
+                <button type="button" class="cdr-agent-btn" data-agents="12" title="12 agents">12</button>
+                <button type="button" class="cdr-agent-btn" data-agents="16" title="16 agents">16</button>
+              </div>
+            </div>
+          </div>
+          <div class="cdr-attach-pending" id="cdrAttachPending" hidden aria-label="Attachments"></div>
+          <div class="cdr-input-wrap" id="cdrInputWrap">
+            <div class="cdr-attach-actions">
+              <button type="button" class="cdr-attach-btn" id="cdrAttachImgBtn" title="Attach image (PNG, JPEG, GIF, WebP)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+              </button>
+              <button type="button" class="cdr-attach-btn" id="cdrAttachFileBtn" title="Attach file (PDF, MD, code, docs…)">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </button>
+              <input type="file" id="cdrAttachImgInput" accept="image/*" multiple hidden/>
+              <input type="file" id="cdrAttachFileInput" accept=".pdf,.md,.markdown,.txt,.json,.csv,.doc,.docx,image/*,text/*" multiple hidden/>
+            </div>
             <textarea id="cdrTaskInput" class="cdr-task-input" rows="1"
-              placeholder="Message HashCortx Coder...  (Enter / Shift+Enter for newline)"></textarea>
+              placeholder="Message MiraXcode Coder… drop files here or from the Files panel"></textarea>
             <button class="cdr-run-btn" id="cdrRunBtn" title="Run task">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="8 6 14 12 8 18"/><line x1="15" y1="18" x2="20" y2="18"/></svg>
             </button>
@@ -2170,6 +2256,7 @@
         </div>
 
       </div><!-- /.cdr-chat-area -->
+      </div><!-- /.cdr-center -->
 
       <!-- BOTTOM: Terminal panel -->
       <div class="cdr-terminal-panel" id="cdrTerminalPanel">

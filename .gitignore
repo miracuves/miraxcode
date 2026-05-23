@@ -1,0 +1,20 @@
+node_modules/
+target/
+src/js/app.bundle.js
+src/js/app.bundle.js.map
+
+# Secrets and local runtime data (never commit API keys)
+.env
+.env.*
+data/
+**/secrets.json
+**/api-bearer.txt
+
+# OS / editor noise
+.DS_Store
+*.swp
+*.swo
+
+# Generated / scratch (not source)
+gen/
+graphify-out/

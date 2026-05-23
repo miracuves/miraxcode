@@ -1,7 +1,7 @@
 // ==============================================================
-// HashCortx — Intro screen controller
+// MiraXcode — Intro screen controller
 // Adapted from Hash_UI 5.0 intro JS — same logic, green theme,
-// HashCortx branding. Uses EXACT same IDs as Hash_UI so the
+// MiraXcode branding. Uses EXACT same IDs as Hash_UI so the
 // copied modals.css CSS works without any changes.
 // ==============================================================
 (function () {
@@ -215,7 +215,7 @@
       if (waitMs < 80) waitMs += PING_DUR;
       setTimeout(() => {
         const dot = document.createElement('div');
-        dot.style.cssText = `position:absolute;left:${x}%;top:${y}%;width:5px;height:5px;transform:translate(-50%,-50%);border-radius:50%;background:#22d3ee;box-shadow:0 0 8px 3px rgba(34,211,238,.8);opacity:0;animation:dot-appear 3.2s ease-out forwards;`;
+        dot.style.cssText = `position:absolute;left:${x}%;top:${y}%;width:5px;height:5px;transform:translate(-50%,-50%);border-radius:50%;background:#ef4444;box-shadow:0 0 8px 3px rgba(239,68,68,.8);opacity:0;animation:dot-appear 3.2s ease-out forwards;`;
         container.appendChild(dot);
         setTimeout(() => dot.remove(), 3400);
       }, waitMs);
@@ -269,7 +269,7 @@
       setOk(statAgents, '[ ok ]');
       if (txtAgents) txtAgents.textContent = 'agents · runtime ready';
       setOk(statWarm, '[ ok ]');
-      if (txtWarm) txtWarm.textContent = 'HashCortx ready · awaiting operator';
+      if (txtWarm) txtWarm.textContent = 'MiraXcode ready · awaiting operator';
     };
 
     setGold(statOllama, '[ • ]');
@@ -279,7 +279,7 @@
     setGold(statAgents, '[ • ]');
     if (txtAgents) txtAgents.textContent = 'agents · preparing runtime';
     setGold(statWarm, '[ • ]');
-    if (txtWarm) txtWarm.textContent = 'warming HashCortx…';
+    if (txtWarm) txtWarm.textContent = 'warming MiraXcode…';
 
     if (loadingBar) loadingBar.classList.remove('done');
     setProgress(0);
@@ -370,7 +370,7 @@
   document.addEventListener('contextmenu', (e) => {
     const t = e.target;
     if (!t) { e.preventDefault(); return; }
-    const ok = t.closest('input, textarea, [contenteditable="true"], .messages .msg .bubble, pre, code, .selectable');
+    const ok = t.closest('input, textarea, [contenteditable="true"], .messages .msg .bubble, pre, code, .selectable, .cdr-explorer-body, .cdr-tree-entry, .cdr-ctx-menu');
     if (!ok) e.preventDefault();
   });
 

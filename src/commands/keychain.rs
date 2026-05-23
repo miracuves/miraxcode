@@ -13,7 +13,7 @@
 //   invoke("keychain_delete",   { provider })
 // ==============================================================
 
-const SERVICE: &str = "com.hashcortx.app";
+const SERVICE: &str = "com.miraxcode.app";
 const BUNDLE_ACCOUNT: &str = "__api_bundle__";
 
 // ── macOS implementation ──────────────────────────────────────

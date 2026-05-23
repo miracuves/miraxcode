@@ -1,48 +1,70 @@
 // ==============================================================
-// platform/tauri/keychain.js
+// platform/tauri/keychain.js — Production API key storage
 //
-// API keys are stored in localStorage.
+// Primary: macOS Keychain (Rust keychain_store_bundle) — OS-encrypted.
+// Cache:   localStorage hc_api_bundle_v2 — fast reads, survives rebuilds.
 //
-// Why not macOS Keychain: keychain items have an application ACL
-// tied to the binary's code signature. Each new DMG build has a
-// different signature, so macOS prompts for every key on every build.
-//
-// In Tauri, localStorage is written to the app's WebKit data dir:
-//   ~/Library/Application Support/com.hashcortx.app/WebKit/...
-// That directory is keyed by the bundle identifier, NOT the binary,
-// so it survives every rebuild with zero password prompts.
-//
-// One-time migration: on first run, silently tries to pull any keys
-// from the old keychain bundle (one macOS prompt if it exists), copies
-// them here, then deletes the bundle so it never prompts again.
-//
-// Usage (unchanged from callers):
-//   await HC.keychain.store("groqKey", "gsk-...")
-//   const key = await HC.keychain.retrieve("groqKey")
-//   await HC.keychain.loadAll([...providers...])
+// README "Keychain" claim matches runtime: secrets are written to the OS
+// vault on every store(); localStorage is a non-authoritative cache only.
 // ==============================================================
 
 (function () {
   'use strict';
 
-  const LS_BUNDLE_KEY  = 'hc_api_bundle_v2';
-  const LS_MIGRATED    = 'hc_migrated_v2';
+  const LS_BUNDLE_KEY = 'hc_api_bundle_v2';
+  const LS_MIGRATED   = 'hc_migrated_v2';
+  let _warnedKeychainWrite = false;
 
   function lsGet(k)    { try { return localStorage.getItem(k); }     catch { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); }         catch {} }
 
-  function getBundle() {
+  function parseBundle(raw) {
     try {
-      const raw = lsGet(LS_BUNDLE_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
+      const parsed = raw ? JSON.parse(raw) : {};
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
   }
 
-  function saveBundle(data) {
+  function getBundleLocal() {
+    return parseBundle(lsGet(LS_BUNDLE_KEY));
+  }
+
+  function saveBundleLocal(data) {
     lsSet(LS_BUNDLE_KEY, JSON.stringify(data));
   }
 
-  // ── One-time migration from old macOS Keychain bundle ───────
+  async function persistToOs(data) {
+    if (!HC.isTauri) return true;
+    try {
+      await HC.invoke('keychain_store_bundle', { bundle: JSON.stringify(data) });
+      return true;
+    } catch (e) {
+      if (!_warnedKeychainWrite) {
+        _warnedKeychainWrite = true;
+        console.warn('[keychain] OS Keychain store failed; using local cache only:', e);
+        window.HcHealth?.capture?.('keychain', 'OS store failed', e?.message || String(e));
+      }
+      return false;
+    }
+  }
+
+  async function loadFromOs() {
+    if (!HC.isTauri) return null;
+    try {
+      const json = await HC.invoke('keychain_retrieve_bundle');
+      if (!json) return null;
+      const parsed = parseBundle(json);
+      if (Object.keys(parsed).length) {
+        saveBundleLocal(parsed);
+        return parsed;
+      }
+    } catch { /* no bundle */ }
+    return null;
+  }
+
+  // ── One-time migration from legacy keychain-only bundle ───────
   let _migrationDone = !!lsGet(LS_MIGRATED);
   let _migrationPromise = null;
 
@@ -50,21 +72,16 @@
     if (_migrationDone) return;
     if (_migrationPromise) return _migrationPromise;
     _migrationPromise = (async () => {
-      if (HC.isTauri) {
-        try {
-          const json = await HC.invoke('keychain_retrieve_bundle');
-          if (json) {
-            const parsed = JSON.parse(json);
-            if (parsed && typeof parsed === 'object') {
-              // Merge keychain data into localStorage (don't overwrite newer local values)
-              const local = getBundle();
-              const merged = Object.assign({}, parsed, local);
-              saveBundle(merged);
-            }
-            // Delete the old keychain bundle so it can never prompt again
-            HC.invoke('keychain_delete', { provider: '__api_bundle__' }).catch(() => {});
-          }
-        } catch { /* no bundle or already deleted — that's fine */ }
+      const os = await loadFromOs();
+      const local = getBundleLocal();
+      if (os && Object.keys(local).length) {
+        const merged = Object.assign({}, os, local);
+        saveBundleLocal(merged);
+        await persistToOs(merged);
+      } else if (!Object.keys(local).length && os) {
+        saveBundleLocal(os);
+      } else if (Object.keys(local).length && !os) {
+        await persistToOs(local);
       }
       lsSet(LS_MIGRATED, '1');
       _migrationDone = true;
@@ -72,20 +89,28 @@
     return _migrationPromise;
   }
 
+  async function getBundle() {
+    await ensureMigrated();
+    const os = await loadFromOs();
+    if (os) return os;
+    return getBundleLocal();
+  }
+
   // ── Public API ──────────────────────────────────────────────
 
   HC.keychain = {
     async store(provider, secret) {
       await ensureMigrated();
-      const data = getBundle();
+      const data = getBundleLocal();
       if (secret) data[provider] = secret;
       else delete data[provider];
-      saveBundle(data);
+      saveBundleLocal(data);
+      await persistToOs(data);
     },
 
     async retrieve(provider) {
-      await ensureMigrated();
-      return getBundle()[provider] || null;
+      const data = await getBundle();
+      return data[provider] || null;
     },
 
     async delete(provider) {
@@ -93,8 +118,7 @@
     },
 
     async loadAll(providers) {
-      await ensureMigrated();
-      const data = getBundle();
+      const data = await getBundle();
       const result = {};
       for (const p of providers) result[p] = data[p] || '';
       return result;

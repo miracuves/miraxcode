@@ -1,5 +1,5 @@
 // ==============================================================
-// HashCortx — desktop binary entry point
+// MiraXcode — desktop binary entry point
 //
 // This file is intentionally tiny. All real logic lives in
 // lib.rs so it can be tested independently and reused by the
@@ -19,5 +19,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    hashcortx_lib::run()
+    miraxcode_lib::run()
 }

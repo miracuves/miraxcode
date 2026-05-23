@@ -21,6 +21,27 @@
   // Session permission memory: "action::target" → "allow" | "deny"
   const _session = new Map();
 
+  const PREFS_KEY = 'hc_coder_guard_prefs';
+
+  function loadGuardPrefs() {
+    try {
+      const raw = localStorage.getItem(PREFS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function saveGuardPrefs(prefs) {
+    try {
+      localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+    } catch {}
+  }
+
+  let _prefs = loadGuardPrefs();
+  let _yoloMode = !!_prefs.yoloMode;
+  let _bypassPermissions = !!_prefs.bypassPermissions;
+
   // Project root — paths inside are auto-approved for read/list/search/write/patch
   let _projectRoot = null;
 
@@ -169,7 +190,30 @@
   // Write/patch/delete/shell still require approval outside the project root
   const AUTO_APPROVE_IN_ROOT = new Set(['read', 'list', 'search', 'write', 'patch']);
 
+  function shouldAutoApprove(action, target) {
+    if (!_yoloMode && !_bypassPermissions) return false;
+    if (isHardBlocked(action, target)) return false;
+    return true;
+  }
+
   HC.guard = {
+    isYolo() { return _yoloMode; },
+    isBypassPermissions() { return _bypassPermissions; },
+    getPrefs() { return { yoloMode: _yoloMode, bypassPermissions: _bypassPermissions }; },
+
+    setYoloMode(on) {
+      _yoloMode = !!on;
+      if (_yoloMode) _bypassPermissions = true;
+      saveGuardPrefs({ yoloMode: _yoloMode, bypassPermissions: _bypassPermissions });
+      HC.guard.notify(_yoloMode ? 'YOLO mode on — tools run automatically' : 'YOLO mode off', 'info');
+    },
+
+    setBypassPermissions(on) {
+      _bypassPermissions = !!on;
+      saveGuardPrefs({ yoloMode: _yoloMode, bypassPermissions: _bypassPermissions });
+      HC.guard.notify(_bypassPermissions ? 'Bypass permissions on' : 'Bypass permissions off', 'info');
+    },
+
     // Set the current project root — all paths inside are auto-approved for safe actions
     setProjectRoot(path) {
       _projectRoot = path || null;
@@ -190,6 +234,11 @@
         auditLog('deny-hard', action, target);
         HC.guard.notify(`Blocked: ${action} on protected path`, 'danger');
         return false;
+      }
+
+      if (shouldAutoApprove(action, target)) {
+        auditLog(_yoloMode ? 'allow-yolo' : 'allow-bypass', action, target);
+        return true;
       }
 
       // Read-only actions (list, read, search) are always auto-approved — no data is modified

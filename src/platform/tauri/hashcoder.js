@@ -12,6 +12,10 @@
     async readFile(path) {
       const ok = await HC.guard.request('read', path, 'Reading file');
       if (!ok) throw new Error(`Permission denied: read ${path}`);
+      const staged = window.CdrStagedRead?.get?.(path);
+      if (staged != null) {
+        return staged + '\n\n[Note: staged pending change — not yet on disk until accepted]';
+      }
       return HC.invoke('fs_read_file', { path });
     },
 
@@ -246,30 +250,93 @@
         key:   { type: 'string', description: 'Short label for the fact (e.g. "preferred_framework", "project_stack", "lint_rules")' },
         value: { type: 'string', description: 'The fact itself, in natural language.' },
       },
-      fn: (p) => { if (window._H?.memAdd) return window._H.memAdd(p.key, p.value); return { ok: false, error: 'Memory not available' }; },
+      fn: (p) => {
+        const root = HC.code?.getProjectRoot?.() || null;
+        if (root && HC.coderMemory?.add) HC.coderMemory.add(root, p.key, p.value, { source: 'tool' });
+        if (window._H?.memAdd) return window._H.memAdd(p.key, p.value);
+        return { ok: false, error: 'Memory not available' };
+      },
     },
     {
       name: 'recall_facts',
-      description: 'Search long-term memory. Call before saying "unknown" if the topic might be saved. Pass keywords, not the full question.',
+      description: 'Search coder + global memory and Graphify graph context. Call before saying "unknown" or blindly grepping the repo for architecture.',
       parameters: {
-        query: { type: 'string', description: 'Keywords to search memory for. Empty string returns most recent facts.' },
+        query: { type: 'string', description: 'Keywords to search memory / graph for. Empty string returns most recent facts.' },
       },
-      fn: (p) => {
-        if (window._H?.memRecall) {
-          const facts = window._H.memRecall(p.query || '', 8);
-          return { facts: facts.map(f => ({ key: f.key, value: f.value, saved_at: new Date(f.ts).toISOString() })) };
+      fn: async (p) => {
+        const root = HC.code?.getProjectRoot?.() || null;
+        const q = p.query || '';
+        const out = { facts: [], graphify: null };
+        if (root && HC.coderMemory?.recall) {
+          const coderFacts = HC.coderMemory.recall(root, q, 12);
+          out.facts.push(...coderFacts.map(f => ({
+            key: f.key,
+            value: f.value,
+            scope: 'coder',
+            saved_at: new Date(f.ts).toISOString(),
+          })));
         }
-        return { ok: false, error: 'Memory not available' };
+        if (window._H?.memRecall) {
+          const global = window._H.memRecall(q, 8);
+          out.facts.push(...global.map(f => ({
+            key: f.key,
+            value: f.value,
+            scope: 'global',
+            saved_at: new Date(f.ts).toISOString(),
+          })));
+        }
+        if (root && HC.coderGraphify?.queryGraph && (await HC.coderGraphify.hasGraph(root))) {
+          const gq = await HC.coderGraphify.queryGraph(root, q || 'architecture overview', 1200);
+          if (gq.ok) out.graphify = gq.text;
+        }
+        if (!out.facts.length && !out.graphify) {
+          return { ok: true, facts: [], note: 'No memory or graph hits. Try graphify_query or list_dir.' };
+        }
+        return out;
+      },
+    },
+    {
+      name: 'graphify_query',
+      description: 'Query the project Graphify knowledge graph (graphify-out/graph.json). Use for architecture, module relationships, and where code lives.',
+      parameters: {
+        question: { type: 'string', description: 'Natural-language question about the codebase structure.' },
+      },
+      fn: async (p) => {
+        const root = HC.code?.getProjectRoot?.() || null;
+        if (!root) return { error: 'Open a project folder first.' };
+        await HC.coderGraphify?.ensureGraph?.(root);
+        const r = await HC.coderGraphify?.queryGraph?.(root, p.question || '');
+        return r?.ok ? { answer: r.text } : { error: r?.error || 'Graphify query failed' };
+      },
+    },
+    {
+      name: 'graphify_report',
+      description: 'Read Graphify GRAPH_REPORT.md (god nodes, communities, surprising links). Call at session start or before large refactors.',
+      parameters: {
+        refresh: { type: 'boolean', description: 'If true, rebuild AST graph with graphify update before reading.' },
+      },
+      fn: async (p) => {
+        const root = HC.code?.getProjectRoot?.() || null;
+        if (!root) return { error: 'Open a project folder first.' };
+        if (p.refresh) await HC.coderGraphify?.buildGraph?.(root);
+        else await HC.coderGraphify?.ensureGraph?.(root);
+        const report = await HC.coderGraphify?.loadReportExcerpt?.(root);
+        const has = await HC.coderGraphify?.hasGraph?.(root);
+        return {
+          ok: !!report || has,
+          path: HC.coderGraphify?.reportPath?.(root),
+          report: report || '(no GRAPH_REPORT.md — run graphify update)',
+        };
       },
     },
   ];
 
   // ── System prompt ───────────────────────────────────────────
 
-  HC.code.SYSTEM_PROMPT = `You are HashCortX Coder — a precision coding agent with real filesystem and shell access on the user's machine.
+  HC.code.SYSTEM_PROMPT = `You are MiraXCode Coder — a precision coding agent with real filesystem and shell access on the user's machine.
 
 WORKFLOW (follow this order every time):
-① ORIENT — locate files first. Use fuzzy_find by name, grep_code by content, list_dir to explore. NEVER guess or invent paths.
+① ORIENT — if graphify-out/ exists, call graphify_report or graphify_query BEFORE fuzzy_find/grep. Use recall_facts for memory + graph. Then fuzzy_find, grep_code, list_dir. NEVER guess paths.
 ② READ — always read_file before editing. Understand exact current content before changing anything.
 ③ ACT — patch_file for targeted edits (<50% of file); write_file for new files or full rewrites only.
 ④ VERIFY — shell_run tests/build/lint after significant changes when it adds value.
@@ -320,8 +387,10 @@ DESIGN RESEARCH (for every website / UI / app task):
 ④ THEN build — applying what you found. Never produce generic hero→features→CTA cookie-cutter templates.
 The search is your creative brief. Use it.
 
-MEMORY:
-• remember_fact / recall_facts — save and retrieve user preferences, coding style, project context, and tech stack choices across sessions. Use silently; never recite memory unless asked.
+MEMORY & GRAPHIFY (https://graphify.net/):
+• graphify_report / graphify_query — project knowledge graph in graphify-out/ (god nodes, communities, cross-file links).
+• remember_fact / recall_facts — coder session memory + global facts. recall_facts includes Graphify when available.
+• Save decisions with remember_fact; prefer graphify over blind repo search for structure questions.
 
 REASONING:
 • Complex tasks → decompose, announce the plan, execute step by step.

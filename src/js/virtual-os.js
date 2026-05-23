@@ -910,7 +910,7 @@ const VoidStudio = (() => {
     add(/8b|9b|12b|20b|flash|instant|lite|nano|small/i, -12);
     add(/embedding|rerank|moderation|vision|image|tts|whisper/i, -1000);
     if (opt.value.startsWith("cloud:")) score += role === "god" ? 18 : 10;
-    if (/gemini.*pro|openrouter|samba|cerebras|groq|nvidia/i.test(text)) score += 12;
+    if (/gemini.*pro|openrouter|samba|cerebras|groq|minimax|glm|nvidia/i.test(text)) score += 12;
     return score;
   }
 
@@ -3082,7 +3082,7 @@ ${buildDynamicImageInstruction(prompt)}`
       tree = paths.slice(0, 80).join("\n");
       if (paths.length > 80) tree += `\n… +${paths.length - 80} more`;
     }
-    return `You are HashCortX Coder — a fast, silent, action-first coding agent inside Virtual OS.
+    return `You are MiraXCode Coder — a fast, silent, action-first coding agent inside Virtual OS.
 
 CARDINAL RULES (never break):
 - No preamble. Never say "I'll help", "Sure!", "Let me", "Of course". Just act.
@@ -3254,7 +3254,7 @@ ${tree}`;
 
       if (tagName === "worker_task") {
         appendChatBubble("assistant", tagContent, "worker");
-        log(`HashCortX Coder → worker: ${tagContent.slice(0, 80)}`, "run");
+        log(`MiraXCode Coder → worker: ${tagContent.slice(0, 80)}`, "run");
         try { await generate(false, tagContent); } catch (e) { log(`Worker error: ${e.message}`, "error"); }
         appendChatBubble("assistant", "Done.");
       } else if (tagName === "tool_call") {

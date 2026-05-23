@@ -1,0 +1,477 @@
+/* ================================================================
+   CURSOR LAYERS — IDE grey depth (sidebar → editor → wells)
+   Loaded last. Maps VS Code / Cursor panel elevation for usability.
+   ================================================================ */
+
+:root {
+  /* Elevation scale (darkest → lightest) */
+  --layer-chrome: #141414;
+  --layer-sidebar: #181818;
+  --layer-tabbar: #181818;
+  --layer-editor: #1e1e1e;
+  --layer-panel: #252526;
+  --layer-well: #2d2d30;
+  --layer-hover: #2a2d2e;
+  --layer-active: #37373d;
+
+  --layer-border-subtle: #2b2b2b;
+  --layer-border: #333333;
+  --layer-border-strong: #3c3c3c;
+
+  /* Bridge legacy + aura tokens */
+  --bg-0: var(--layer-chrome) !important;
+  --bg-1: var(--layer-sidebar) !important;
+  --bg-2: var(--layer-panel) !important;
+  --bg-3: var(--layer-editor) !important;
+  --panel: var(--layer-sidebar) !important;
+  --panel-solid: var(--layer-sidebar) !important;
+  --line: var(--layer-border-subtle) !important;
+  --line-strong: var(--layer-border) !important;
+  --glass-bg: var(--layer-well) !important;
+
+  --aura-bg: var(--layer-chrome) !important;
+  --aura-panel: var(--layer-sidebar) !important;
+  --aura-panel-2: var(--layer-panel) !important;
+  --aura-elevated: var(--layer-editor) !important;
+  --aura-border: var(--layer-border) !important;
+  --aura-border-subtle: var(--layer-border-subtle) !important;
+
+  --ui-bg-0: var(--layer-chrome) !important;
+  --ui-bg-1: var(--layer-sidebar) !important;
+  --ui-bg-2: var(--layer-panel) !important;
+  --ui-bg-3: var(--layer-well) !important;
+  --ui-bg-elevated: var(--layer-editor) !important;
+  --ui-line: var(--layer-border-subtle) !important;
+  --ui-line-strong: var(--layer-border) !important;
+
+  --hc-bg: var(--layer-chrome) !important;
+  --hc-bg-2: var(--layer-sidebar) !important;
+  --hc-bg-3: var(--layer-panel) !important;
+  --hc-bg-4: var(--layer-editor) !important;
+  --hc-border: var(--layer-border-subtle) !important;
+  --hc-border-strong: var(--layer-border) !important;
+}
+
+/* ── App chrome (outer frame) ─────────────────────────────────── */
+html,
+body {
+  background: var(--layer-chrome) !important;
+}
+
+body::before {
+  background-color: var(--layer-editor) !important;
+  background-image: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.035) 0.55px,
+    transparent 0.55px
+  ) !important;
+  background-size: 22px 22px !important;
+  opacity: 0.85 !important;
+}
+
+#mainApp,
+#mainApp .app {
+  background: var(--layer-chrome) !important;
+}
+
+.hc-toolbar {
+  background: var(--layer-tabbar) !important;
+  border-bottom: 1px solid var(--layer-border) !important;
+}
+
+/* ── Sidebar (darkest anchor) ─────────────────────────────────── */
+aside {
+  background: var(--layer-sidebar) !important;
+  border-right: 1px solid var(--layer-border) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+aside::before {
+  opacity: 0.12 !important;
+  mix-blend-mode: normal !important;
+}
+
+.brand,
+.sidebar-brand {
+  background: var(--layer-sidebar) !important;
+  border-bottom: 1px solid var(--layer-border-subtle) !important;
+}
+
+.tabs {
+  background: var(--layer-sidebar) !important;
+  border: 1px solid var(--layer-border-subtle) !important;
+  border-radius: 6px !important;
+  padding: 4px !important;
+}
+
+.tab {
+  background: transparent !important;
+  border-radius: 4px !important;
+}
+
+.tab:hover {
+  background: var(--layer-hover) !important;
+}
+
+.tab.active {
+  background: var(--layer-active) !important;
+  color: var(--text, #fff) !important;
+}
+
+.tab.active::before,
+.tab.active::after {
+  display: none !important;
+}
+
+.chat-item:hover,
+.agent-card:hover {
+  background: var(--layer-hover) !important;
+}
+
+.chat-item.active,
+.agent-card.active {
+  background: var(--layer-active) !important;
+  border-color: var(--layer-border) !important;
+}
+
+.search-wrap input,
+.side-model-row select,
+.memory-row input[type="range"] {
+  background: var(--layer-well) !important;
+  border: 1px solid var(--layer-border) !important;
+}
+
+.kb-card,
+.side-privacy-row {
+  background: var(--layer-panel) !important;
+  border: 1px solid var(--layer-border-subtle) !important;
+}
+
+.side-footer {
+  border-top: 1px solid var(--layer-border-subtle) !important;
+}
+
+/* ── Main editor column (mid grey — focus zone) ───────────────── */
+main,
+.hc-chat-col {
+  background: var(--layer-editor) !important;
+}
+
+header.topbar {
+  background: var(--layer-tabbar) !important;
+  border-bottom: 1px solid var(--layer-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  min-height: 44px !important;
+  padding: 10px 16px !important;
+}
+
+.messages,
+#messages,
+.messages-wrap {
+  background: var(--layer-editor) !important;
+}
+
+.msg .bubble {
+  background: var(--layer-panel) !important;
+  border: 1px solid var(--layer-border-subtle) !important;
+}
+
+.msg.user .bubble {
+  background: var(--layer-well) !important;
+  border-color: var(--layer-border) !important;
+}
+
+.topbar .badge,
+.crumbs .badge,
+.topbar-badge {
+  background: var(--layer-panel) !important;
+  border: 1px solid var(--layer-border-subtle) !important;
+}
+
+.toggle-side,
+.ping-btn,
+.topbar-project-action {
+  background: var(--layer-panel) !important;
+  border: 1px solid var(--layer-border) !important;
+}
+
+.toggle-side:hover,
+.ping-btn:hover {
+  background: var(--layer-hover) !important;
+  border-color: var(--layer-border-strong) !important;
+}
+
+/* ── Composer well (elevated footer) ──────────────────────────── */
+.composer-wrap {
+  background: var(--layer-panel) !important;
+  border-top: 1px solid var(--layer-border) !important;
+}
+
+.composer,
+.composer-chips {
+  background: transparent !important;
+}
+
+.composer-chips button {
+  background: var(--layer-well) !important;
+  border: 1px solid var(--layer-border) !important;
+}
+
+.composer-chips button:hover {
+  background: var(--layer-hover) !important;
+  border-color: var(--layer-border-strong) !important;
+}
+
+#input,
+.composer textarea,
+.cdr-task-input,
+.field input,
+.field textarea,
+.field select,
+.modal-body input,
+.modal-body textarea,
+.modal-body select,
+.settings-pane input,
+.settings-pane textarea,
+.settings-pane select {
+  background: var(--layer-well) !important;
+  border: 1px solid var(--layer-border) !important;
+  border-radius: 6px !important;
+  color: var(--text, #e5e5e5) !important;
+}
+
+#input:focus,
+.composer textarea:focus,
+.field input:focus,
+.field textarea:focus,
+.modal-body input:focus {
+  border-color: var(--layer-border-strong) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* ── Settings modal (Cursor settings layout) ──────────────────── */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.55) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.settings-modal.modal,
+.modal.settings-modal {
+  max-width: 720px !important;
+  background: var(--layer-sidebar) !important;
+  border: 1px solid var(--layer-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: none !important;
+}
+
+.settings-modal .modal-header {
+  background: var(--layer-tabbar) !important;
+  border-bottom: 1px solid var(--layer-border) !important;
+}
+
+.settings-modal .modal-tabs {
+  background: var(--layer-tabbar) !important;
+  border-bottom: 1px solid var(--layer-border) !important;
+  padding: 0 12px !important;
+  gap: 0 !important;
+}
+
+.settings-modal .modal-tab {
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  color: var(--text-dim, #a1a1a1) !important;
+  margin-bottom: -1px !important;
+}
+
+.settings-modal .modal-tab:hover {
+  color: var(--text, #fff) !important;
+  background: var(--layer-hover) !important;
+}
+
+.settings-modal .modal-tab.active {
+  background: var(--layer-editor) !important;
+  color: var(--text, #fff) !important;
+  border-bottom-color: transparent !important;
+  box-shadow: inset 0 1px 0 var(--layer-editor) !important;
+}
+
+.settings-modal .modal-body,
+.settings-modal .settings-pane {
+  background: var(--layer-editor) !important;
+}
+
+.settings-modal .field {
+  border-bottom: 1px solid var(--layer-border-subtle) !important;
+}
+
+.api-key-row {
+  background: var(--layer-panel) !important;
+  border: 1px solid var(--layer-border-subtle) !important;
+  border-radius: 6px !important;
+  padding: 6px 8px !important;
+}
+
+.api-usage-panel {
+  background: var(--layer-panel) !important;
+  border: 1px solid var(--layer-border-subtle) !important;
+}
+
+/* ── Coder / Forge / other mode shells ────────────────────────── */
+#coder-mode-wrap,
+#forge-mode-wrap,
+#finance-wrap,
+#sandbox-wrap,
+#virtual-os-wrap,
+#agent-maker-wrap,
+.system-maker-wrap,
+#app.sandbox-mode,
+#app.system-maker-mode {
+  background: var(--layer-chrome) !important;
+}
+
+.cdr-header,
+.cdr-tab-bar,
+.frg-header,
+.fin-header,
+.sbx-header {
+  background: var(--layer-tabbar) !important;
+  border-color: var(--layer-border) !important;
+}
+
+.cdr-sidebar,
+.cdr-right,
+.frg-sidebar,
+.frg-inspector {
+  background: var(--layer-sidebar) !important;
+  border-color: var(--layer-border) !important;
+}
+
+.cdr-chat-area,
+.frg-chat-panel,
+.frg-canvas-wrap {
+  background: var(--layer-editor) !important;
+  background-image: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.035) 0.55px,
+    transparent 0.55px
+  ) !important;
+  background-size: 22px 22px !important;
+}
+
+.cdr-composer,
+.cdr-composer-toolbar,
+.cdr-input-wrap,
+.frg-composer {
+  background: var(--layer-panel) !important;
+  border-color: var(--layer-border) !important;
+}
+
+.cdr-tab.active {
+  background: var(--layer-editor) !important;
+  border-bottom-color: var(--text, #fff) !important;
+}
+
+.cdr-tab {
+  background: transparent !important;
+}
+
+.cdr-welcome-chip {
+  background: var(--layer-panel) !important;
+  border-color: var(--layer-border) !important;
+}
+
+.cdr-agent-btn.active {
+  background: var(--layer-active) !important;
+  border-color: var(--layer-border-strong) !important;
+}
+
+/* ── Scrollbars ───────────────────────────────────────────────── */
+::-webkit-scrollbar-track {
+  background: var(--layer-sidebar) !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--layer-border-strong) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a !important;
+}
+
+/* ================================================================
+   NO PURE BLACK — grey-only UI (Cursor screenshot reference)
+   Deepest surface is --layer-chrome (#141414), never #000 / #0a0a0a
+   ================================================================ */
+
+/* Force minimum grey on any element still using near-black hex */
+[style*="background:#000"],
+[style*="background: #000"],
+[style*="background:#000000"],
+[style*="background: #000000"],
+[style*="background:#0a0a0a"],
+[style*="background: #0a0a0a"] {
+  background: var(--layer-chrome) !important;
+}
+
+#coder-mode-wrap,
+#coder-mode-wrap .cdr-chat-area,
+#coder-mode-wrap .cdr-header,
+#coder-mode-wrap .cdr-tab-bar {
+  --cdr-bg: var(--layer-chrome) !important;
+  --cdr-bg-panel: var(--layer-sidebar) !important;
+  --cdr-bg-chat: var(--layer-editor) !important;
+  --cdr-bg-input: var(--layer-well) !important;
+}
+
+/* Modal / intro vignettes — grey fade, not black */
+.about-pane::before,
+.about-pane::after,
+#intro-screen .intro-vignette {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 35%,
+    rgba(30, 30, 30, 0.75) 75%,
+    #141414 100%
+  ) !important;
+}
+
+/* Primary buttons: dark grey text on white, not pure black */
+#send,
+#send:hover,
+.cdr-run-btn,
+.cdr-btn.primary,
+.frg-btn.primary,
+.sbx-scan-btn,
+.amk-btn.primary,
+.sys-btn.primary,
+.void-btn.primary,
+#finSend,
+.fin-hdr-btn.primary,
+button.primary,
+.modal-actions button.primary {
+  color: #141414 !important;
+}
+
+/* Overlays use translucent grey, not opaque black */
+.modal-overlay {
+  background: rgba(20, 20, 20, 0.72) !important;
+}
+
+/* Scrollbar track stays in grey family */
+::-webkit-scrollbar-track {
+  background: var(--layer-sidebar) !important;
+}
+
+/* Status bar strip */
+.side-footer,
+.designed-by {
+  background: transparent !important;
+}

@@ -1,0 +1,517 @@
+/* ================================================================
+   UI v3 — Cursor-style (black / grey / white) · all pages
+   Loaded last. CSS-only — preserves all JS hooks.
+   ================================================================ */
+
+:root {
+  --ui-accent: #e5e5e5;
+  --ui-accent-2: #ffffff;
+  --ui-accent-soft: rgba(255, 255, 255, 0.08);
+  --ui-accent-border: rgba(255, 255, 255, 0.16);
+  --ui-bg-0: #141414;
+  --ui-bg-1: #181818;
+  --ui-bg-2: #252526;
+  --ui-bg-3: #2d2d30;
+  --ui-bg-elevated: #1e1e1e;
+  --ui-line: rgba(255, 255, 255, 0.08);
+  --ui-line-strong: rgba(255, 255, 255, 0.12);
+  --ui-text: #fafafa;
+  --ui-text-dim: #a3a3a3;
+  --ui-text-muted: #737373;
+  --ui-danger: #f87171;
+  --ui-radius-sm: 6px;
+  --ui-radius-md: 8px;
+  --ui-radius-lg: 10px;
+}
+
+/* ── Kill decorative backgrounds everywhere ─────────────────── */
+body::before {
+  background-color: #1e1e1e !important;
+}
+
+.pcb-traces,
+.circuit-spot {
+  display: none !important;
+  opacity: 0 !important;
+}
+
+body.pulse-traces .pcb-traces,
+body.pulse-traces .circuit-spot {
+  display: none !important;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+
+/* ── Global typography ───────────────────────────────────────── */
+html,
+body,
+#coder-mode-wrap,
+#forge-mode-wrap,
+#finance-wrap,
+#sandbox-wrap,
+.system-maker-wrap,
+#virtual-os-wrap,
+#agent-maker-wrap {
+  color: var(--ui-text) !important;
+}
+
+/* ── All mode shells ───────────────────────────────────────────── */
+#coder-mode-wrap,
+#forge-mode-wrap,
+#finance-wrap,
+#sandbox-wrap,
+#app.sandbox-mode,
+.system-maker-wrap,
+#app.system-maker-mode,
+#virtual-os-wrap,
+#agent-maker-wrap,
+#app,
+#intro-screen,
+#settingsOverlay,
+.modal-overlay {
+  background: var(--ui-bg-0) !important;
+}
+
+#coder-mode-wrap {
+  --cdr-cyan: #e5e5e5 !important;
+  --cdr-success: #d4d4d4 !important;
+  --cdr-gold: #a3a3a3 !important;
+  --cdr-border: var(--ui-line) !important;
+  --cdr-border-hover: var(--ui-accent-border) !important;
+  --cdr-bg: #141414 !important;
+  --cdr-bg-panel: #181818 !important;
+  --cdr-bg-chat: #1e1e1e !important;
+  --cdr-bg-input: #2d2d30 !important;
+}
+
+.cdr-chat-area,
+.cdr-messages,
+.cdr-sidebar,
+.cdr-right,
+.cdr-terminal-panel,
+.cdr-composer,
+.cdr-agents-bar,
+.cdr-input-wrap {
+  background: var(--ui-bg-0) !important;
+}
+
+.cdr-chat-area::before,
+.cdr-chat-area::after {
+  display: none !important;
+}
+
+.cdr-welcome-title {
+  background: none !important;
+  -webkit-text-fill-color: #fafafa !important;
+  color: #fafafa !important;
+  text-shadow: none !important;
+}
+
+.cdr-welcome-sub,
+.cdr-welcome-chip {
+  color: var(--ui-text-dim) !important;
+}
+
+.cdr-welcome-chip {
+  background: var(--ui-bg-2) !important;
+  border: 1px solid var(--ui-line) !important;
+}
+
+.cdr-welcome-chip:hover {
+  color: var(--ui-text) !important;
+  border-color: var(--ui-accent-border) !important;
+  background: var(--ui-bg-3) !important;
+  box-shadow: none !important;
+}
+
+.cdr-welcome-mark,
+.mode-logo-img,
+.hc-toolbar-logo,
+.brand-logo-img {
+  filter: none !important;
+  opacity: 0.92 !important;
+}
+
+/* Terminal — grey not neon green */
+.cdr-terminal-body,
+.cdr-terminal-input,
+.cdr-terminal-title,
+#cdrTerminalOutput {
+  color: var(--ui-text-dim) !important;
+}
+
+.cdr-terminal-body,
+.cdr-terminal-input input {
+  color: #d4d4d4 !important;
+}
+
+/* ── Unified buttons (neutral) ─────────────────────────────── */
+.cdr-btn,
+.cdr-back-btn,
+.cdr-run-btn,
+.cdr-stop-btn,
+.cdr-new-chat-btn,
+.cdr-agent-btn,
+.cdr-perm-btn,
+.cdr-sidebar-iconbtn,
+.cdr-tab-add,
+.frg-btn,
+.frg-icon-btn,
+.frg-cad-btn,
+.fin-hdr-btn,
+.fin-btn,
+.fin-export-btn,
+.fin-empty-chip,
+.sbx-scan-btn,
+.sbx-back-btn,
+.sbx-stop-btn,
+.sbx-swarm-config-btn,
+.sbx-swarm-ctrl-btn,
+.amk-btn,
+.sys-btn,
+.void-btn,
+.hc-toolbar-btn,
+.hc-safe-exit-mode,
+#send,
+#finSend,
+.chips button,
+.modal-actions button,
+.settings-tab,
+.stb-btn {
+  font-family: var(--sans) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: var(--ui-radius-md) !important;
+  border: 1px solid var(--ui-line-strong) !important;
+  background: var(--ui-bg-2) !important;
+  color: var(--ui-text-dim) !important;
+  box-shadow: none !important;
+}
+
+.cdr-btn:hover,
+.cdr-back-btn:hover,
+.frg-btn:hover,
+.fin-hdr-btn:hover,
+.sbx-scan-btn:hover,
+.amk-btn:hover,
+.sys-btn:hover,
+.void-btn:hover,
+.hc-toolbar-btn:hover,
+#send:hover,
+#finSend:hover,
+.chips button:hover,
+.tab:hover {
+  background: var(--ui-bg-3) !important;
+  border-color: var(--ui-accent-border) !important;
+  color: var(--ui-text) !important;
+}
+
+.cdr-run-btn,
+#send,
+#finSend,
+.sbx-scan-btn,
+.frg-btn.primary,
+.amk-btn.primary,
+.sys-btn.primary,
+.void-btn.primary {
+  background: #fafafa !important;
+  border-color: #fafafa !important;
+  color: #141414 !important;
+}
+
+.cdr-run-btn:hover,
+#send:hover,
+#finSend:hover,
+.sbx-scan-btn:hover {
+  background: #e5e5e5 !important;
+  border-color: #e5e5e5 !important;
+  color: #141414 !important;
+}
+
+.cdr-btn--danger,
+.cdr-back-btn,
+.sbx-stop-btn {
+  color: var(--ui-text-dim) !important;
+  border-color: var(--ui-line-strong) !important;
+  background: var(--ui-bg-2) !important;
+}
+
+.cdr-btn--danger:hover {
+  color: var(--ui-danger) !important;
+  border-color: rgba(248, 113, 113, 0.35) !important;
+  background: rgba(248, 113, 113, 0.08) !important;
+}
+
+.cdr-agent-btn.active,
+.tab.active,
+.cdr-tab.active,
+.void-btn.active {
+  background: var(--ui-bg-3) !important;
+  border-color: var(--ui-accent-border) !important;
+  color: var(--ui-text) !important;
+  box-shadow: none !important;
+}
+
+/* ── Inputs ──────────────────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]),
+textarea,
+select,
+.cdr-model-picker,
+.cdr-task-input,
+.cdr-sessions-search,
+#input,
+#model,
+.composer textarea,
+.fin-input,
+#finInput,
+.sbx-code-input,
+.amk-task-input,
+#amkTaskInput {
+  background: var(--ui-bg-2) !important;
+  border: 1px solid var(--ui-line-strong) !important;
+  color: var(--ui-text) !important;
+  border-radius: var(--ui-radius-md) !important;
+  box-shadow: none !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────── */
+.hc-toolbar {
+  background: var(--ui-bg-0, #141414) !important;
+  border-bottom: 1px solid var(--ui-line) !important;
+  backdrop-filter: none !important;
+}
+
+.hc-toolbar-title {
+  color: var(--ui-text) !important;
+}
+
+/* ── Intro ───────────────────────────────────────────────────── */
+#intro-screen {
+  background: var(--ui-bg-0, #141414) !important;
+}
+
+#intro-screen .logo-glow {
+  display: none !important;
+}
+
+#intro-loading-fill {
+  background: #fafafa !important;
+  box-shadow: none !important;
+}
+
+#intro-badge {
+  border-color: var(--ui-line-strong) !important;
+  background: var(--ui-bg-2) !important;
+  color: var(--ui-text-dim) !important;
+}
+
+/* ── Sidebar & tabs ──────────────────────────────────────────── */
+aside {
+  background: var(--ui-bg-1) !important;
+  border-right: 1px solid var(--ui-line) !important;
+}
+
+.tabs {
+  background: var(--ui-bg-0) !important;
+  border: 1px solid var(--ui-line) !important;
+}
+
+.tab {
+  background: transparent !important;
+  color: var(--ui-text-muted) !important;
+  border: 1px solid transparent !important;
+}
+
+.tab.active {
+  background: var(--ui-bg-2) !important;
+  color: var(--ui-text) !important;
+  border-color: var(--ui-line-strong) !important;
+}
+
+.tab.active::before {
+  background: #fafafa !important;
+  box-shadow: none !important;
+}
+
+.chat-item.active {
+  background: var(--ui-bg-2) !important;
+  border-color: var(--ui-line) !important;
+}
+
+/* ── Main chat ───────────────────────────────────────────────── */
+.topbar {
+  background: var(--ui-bg-1) !important;
+  border-bottom: 1px solid var(--ui-line) !important;
+}
+
+.msg .bubble {
+  background: var(--ui-bg-2) !important;
+  border: 1px solid var(--ui-line) !important;
+  color: var(--ui-text) !important;
+}
+
+.msg.user .bubble {
+  background: var(--ui-bg-3) !important;
+  border-color: var(--ui-line-strong) !important;
+}
+
+.composer-wrap,
+.composer {
+  background: var(--ui-bg-1) !important;
+  border-top: 1px solid var(--ui-line) !important;
+}
+
+/* ── Mode headers (all) ────────────────────────────────────── */
+.cdr-header,
+.frg-header,
+.fin-header,
+.sbx-header,
+.amk-header,
+.sys-header,
+.void-header {
+  background: var(--ui-bg-1) !important;
+  border-bottom: 1px solid var(--ui-line) !important;
+  backdrop-filter: none !important;
+}
+
+.cdr-title,
+.frg-title,
+.fin-title,
+.sbx-title,
+.amk-title,
+.sys-title,
+.void-title {
+  color: var(--ui-text) !important;
+}
+
+.cdr-sub,
+.frg-sub,
+.fin-sub,
+.sbx-sub {
+  color: var(--ui-text-muted) !important;
+}
+
+.cdr-status-dot.ok,
+.cdr-status-dot.run {
+  background: #d4d4d4 !important;
+}
+
+/* ── Coder panels & tabs ─────────────────────────────────────── */
+.cdr-sidebar,
+.cdr-right {
+  border-color: var(--ui-line) !important;
+  box-shadow: none !important;
+}
+
+.cdr-tab-bar {
+  background: var(--ui-bg-1) !important;
+  border-bottom: 1px solid var(--ui-line) !important;
+}
+
+.cdr-header {
+  background: var(--ui-bg-1) !important;
+}
+
+.cdr-composer-toolbar,
+.cdr-agents-bar,
+.cdr-input-wrap {
+  border-color: var(--ui-line) !important;
+}
+
+/* ── Forge / Finance / Sandbox / Makers / Void ───────────────── */
+.frg-viewport {
+  background: var(--ui-bg-0, #141414) !important;
+}
+
+.fin-kpi-card,
+.fin-panel,
+.sbx-code-input,
+.sbx-log,
+.sbx-history,
+.amk-header,
+.amk-inspector,
+.sys-library-panel,
+.sys-preview-shell,
+.void-desktop,
+.void-window {
+  background: var(--ui-bg-1) !important;
+  border-color: var(--ui-line) !important;
+}
+
+/* ── Modals ──────────────────────────────────────────────────── */
+.modal,
+.settings-modal,
+#settingsOverlay .settings-inner,
+.agent-modal-inner,
+#hcAuditModal .hc-audit-panel {
+  background: var(--ui-bg-2) !important;
+  border: 1px solid var(--ui-line-strong) !important;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6) !important;
+}
+
+.settings-tab.active {
+  color: var(--ui-text) !important;
+  border-color: var(--ui-line-strong) !important;
+  background: var(--ui-bg-3) !important;
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────── */
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14) !important;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22) !important;
+}
+
+/* ── Neutralize legacy green/teal in coder terminal & tools ──── */
+.cdr-msg-hd .role-user,
+.cdr-msg-hd .role-agent,
+.cdr-tree-entry.active,
+#cdrTerminalOutput,
+.cdr-terminal-body *,
+[style*="color: #39ff"],
+[style*="color:#39ff"] {
+  color: var(--ui-text-dim) !important;
+}
+
+.caret-color-fix {
+  caret-color: #fafafa;
+}
+
+#coder-mode-wrap .cdr-task-input {
+  caret-color: #fafafa !important;
+}
+
+#coder-mode-wrap [style*="39ff81"],
+#coder-mode-wrap .cdr-terminal-input input {
+  color: #d4d4d4 !important;
+  caret-color: #fafafa !important;
+}
+
+/* Force terminal green overrides from coder-mode.css */
+.cdr-terminal-hd,
+.cdr-terminal-body,
+.cdr-terminal-input,
+.cdr-terminal-input input,
+.cdr-terminal-body pre,
+.cdr-terminal-body code {
+  color: #a3a3a3 !important;
+}
+
+.drone-wrap,
+.drone-hud,
+.pcb-traces {
+  display: none !important;
+}

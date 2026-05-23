@@ -411,14 +411,14 @@ const SwarmMaker = (() => {
 
   // Provider priority per agent role — best fit first
   const ROLE_PROVIDER_PRIORITY = {
-    researcher:  ["groq","openrouter","gemini","samba","cerebras"],
-    analyst:     ["groq","samba","openrouter","gemini","cerebras"],
-    coder:       ["openrouter","samba","groq","gemini","cerebras"],
-    writer:      ["gemini","openrouter","samba","groq","cerebras"],
-    critic:      ["openrouter","samba","gemini","groq","cerebras"],
-    validator:   ["cerebras","groq","openrouter","gemini","samba"],
-    supervisor:  ["samba","gemini","openrouter","groq","cerebras"],
-    custom:      ["groq","gemini","openrouter","samba","cerebras"],
+    researcher:  ["groq","openrouter","gemini","samba","cerebras","minimax","glm","nvidia"],
+    analyst:     ["groq","samba","openrouter","gemini","cerebras","minimax","glm","nvidia"],
+    coder:       ["openrouter","samba","groq","gemini","cerebras","glm","minimax","nvidia"],
+    writer:      ["gemini","openrouter","samba","groq","cerebras","minimax","glm","nvidia"],
+    critic:      ["openrouter","samba","gemini","groq","cerebras","minimax","glm","nvidia"],
+    validator:   ["cerebras","groq","openrouter","gemini","samba","minimax","glm","nvidia"],
+    supervisor:  ["samba","gemini","openrouter","groq","cerebras","minimax","glm","nvidia"],
+    custom:      ["groq","gemini","openrouter","samba","cerebras","minimax","glm","nvidia"],
   };
 
   // Build a role-prioritised list of fallback models, one per untried provider.

@@ -3,7 +3,7 @@
 //
 // Every agent action (file read/write, shell exec, permission
 // decision) is logged here. The log lives at:
-//   ~/.hashcortx/audit.log
+//   ~/.miraxcode/audit.log
 //
 // Format (one line per entry):
 //   2026-05-11 14:23:01 [allow-once]    read   /home/user/project/auth.js
@@ -18,7 +18,7 @@ use std::path::PathBuf;
 
 fn log_path() -> PathBuf {
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    home.join(".hashcortx").join("audit.log")
+    home.join(".miraxcode").join("audit.log")
 }
 
 #[tauri::command]

@@ -1,6 +1,6 @@
 /* ============================================================
    AGENT MAKER MODE — Swarm architect studio
-   Accent: terminal green  (#4ade80 / #86efac)
+   Accent: crimson  (#a70d2a / #c4263e)
    ============================================================ */
 
 /* ── Show/hide toggle (mirrors canvas.css / sandbox.css pattern) ── */
@@ -23,22 +23,22 @@ body.agent-maker-mode #app { display: none; }
 
 /* ── CSS tokens scoped to this mode ── */
 #agent-maker-wrap {
-  --amk:        #4ade80;           /* terminal green  — TEXT only   */
-  --amk-bright: #86efac;           /* light green     — TEXT only   */
-  --amk-ui:     #3b82f6;           /* blue            — UI accents  */
-  --amk-ui-b:   #60a5fa;           /* light blue      — UI hover    */
+  --amk:        #d4d4d4;
+  --amk-bright: #fafafa;
+  --amk-ui:     #a3a3a3;
+  --amk-ui-b:   #d4d4d4;
   --amk-dim:    rgba(59,130,246,0.11);
   --amk-glow:   rgba(59,130,246,0.26);
   --amk-line:   rgba(59,130,246,0.22);
-  --amk-gold:   #22d3ee;
-  --amk-emerald:#4ade80;
+  --amk-gold:   #ef4444;
+  --amk-emerald:#a70d2a;
   --amk-rose:   #f87171;
   --amk-amber:  #fbbf24;
-  --amk-cyan:   #22d3ee;
+  --amk-cyan:   #ef4444;
   --amk-bg:     rgba(0, 4, 12, 0.97);
 }
 /* Dialog also needs these tokens */
-.amk-dialog { --amk: #4ade80; --amk-bright: #86efac; --amk-ui: #3b82f6; --amk-dim: rgba(59,130,246,0.11); --amk-line: rgba(59,130,246,0.22); --amk-rose: #f87171; }
+.amk-dialog { --amk: #d4d4d4; --amk-bright: #fafafa; --amk-ui: #a3a3a3; --amk-dim: rgba(255,255,255,0.08); --amk-line: rgba(255,255,255,0.12); --amk-rose: #f87171; }
 
 /* ══════════════════════════════════════════════════════════════
    HEADER BAR
@@ -80,7 +80,7 @@ body.agent-maker-mode #app { display: none; }
 
 .amk-sub {
   font-size: 10px;
-  color: rgba(74,222,128,0.42);
+  color: rgba(167,13,42,0.42);
   letter-spacing: 0.10em;
   white-space: nowrap;
 }
@@ -599,8 +599,8 @@ img.amk-empty-logo {
 .role-researcher { background: rgba(78,205,196,0.15); color: var(--amk-cyan); }
 .role-writer     { background: rgba(59,130,246,0.12); color: var(--amk-bright); }
 .role-critic     { background: rgba(217,138,133,0.15); color: var(--amk-rose); }
-.role-coder      { background: rgba(34,211,238,0.15);  color: var(--amk-emerald); }
-.role-analyst    { background: rgba(34,211,238,0.15); color: var(--amk-gold); }
+.role-coder      { background: rgba(239,68,68,0.15);  color: var(--amk-emerald); }
+.role-analyst    { background: rgba(239,68,68,0.15); color: var(--amk-gold); }
 .role-validator  { background: rgba(232,169,74,0.15);  color: var(--amk-amber); }
 .role-supervisor { background: rgba(59,130,246,0.18); color: #fff; }
 .role-custom     { background: rgba(255,255,255,0.08); color: var(--text-dim); }
@@ -695,7 +695,7 @@ img.amk-empty-logo {
   display: flex; align-items: baseline; gap: 8px;
   font-family: var(--mono); font-size: 10.5px; line-height: 1.5;
 }
-.trace-time  { color: rgba(74,222,128,0.5); flex-shrink: 0; }
+.trace-time  { color: rgba(167,13,42,0.5); flex-shrink: 0; }
 .trace-agent { font-weight: 700; flex-shrink: 0; min-width: 90px; }
 .trace-icon  {
   width: 13px; height: 13px; flex: 0 0 13px;
@@ -823,7 +823,7 @@ img.amk-empty-logo {
 .amk-dialog.open { display: flex; }
 
 .amk-dialog-inner {
-  background: #020812;
+  background: #141414;
   border: 1px solid var(--amk-line);
   border-radius: 13px;
   padding: 26px 28px 20px;
@@ -1045,8 +1045,8 @@ img.amk-empty-logo {
 }
 .amk-peek-code-btn:hover { background: rgba(255,255,255,0.07); color: var(--text); border-color: rgba(255,255,255,0.15); }
 .amk-peek-code-btn.preview {
-  color: #fff; background: var(--amk-ui,#3b82f6);
-  border-color: var(--amk-ui,#3b82f6); font-weight: 600;
+  color: #fff; background: var(--amk-ui,#a3a3a3);
+  border-color: var(--amk-ui,#a3a3a3); font-weight: 600;
 }
 .amk-peek-code-btn.preview:hover { background: var(--amk-ui-b,#60a5fa); border-color: var(--amk-ui-b,#60a5fa); }
 .amk-peek-pre {
@@ -1065,7 +1065,7 @@ img.amk-empty-logo {
   display: inline-flex; align-items: center; gap: 6px;
   font-size: 11px; font-weight: 700; letter-spacing: 0.04em;
   padding: 5px 13px; border-radius: 7px;
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  background: linear-gradient(135deg, #a3a3a3, #525252);
   color: #fff; border: none; cursor: pointer;
   transition: opacity 0.15s, transform 0.12s;
   flex-shrink: 0;
@@ -1196,7 +1196,7 @@ img.amk-empty-logo {
   transition: background 0.13s, color 0.13s;
 }
 .amk-preview-vp-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
-.amk-preview-vp-btn.active { background: var(--amk-ui,#3b82f6); color: #fff; }
+.amk-preview-vp-btn.active { background: var(--amk-ui,#a3a3a3); color: #fff; }
 
 .amk-preview-toolbar-btn {
   font-size: 10.5px; font-weight: 600; padding: 5px 11px;
@@ -1248,7 +1248,7 @@ img.amk-empty-logo {
 .amk-polish-btn {
   display: flex; align-items: center; gap: 6px;
   padding: 5px 13px; border-radius: 7px; cursor: pointer; white-space: nowrap;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  background: linear-gradient(135deg, #737373 0%, #525252 100%);
   border: 1px solid rgba(139,92,246,0.5);
   color: #fff; font-size: 11.5px; font-weight: 700;
   transition: opacity 0.15s, transform 0.1s;
@@ -1262,6 +1262,6 @@ img.amk-empty-logo {
   transition: color 0.2s;
 }
 .amk-polisher-status.running { color: #60a5fa; }
-.amk-polisher-status.done    { color: #34d399; }
+.amk-polisher-status.done    { color: #c4263e; }
 .amk-polisher-status.error   { color: #f87171; font-size: 10.5px; max-width: 200px;
   overflow: hidden; text-overflow: ellipsis; }

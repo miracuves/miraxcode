@@ -4,16 +4,23 @@
   "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "tauri": "tauri"
+    "build:js": "node esbuild.config.mjs",
+    "watch:js": "node esbuild.config.mjs --watch",
+    "tauri": "npm run build:js && tauri",
+    "icons": "tauri icon src/assets/icon-master.png",
+    "pretest": "npm run build:js",
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "esbuild": "^0.28.0"
   },
   "dependencies": {
     "@tauri-apps/plugin-dialog": "^2.7.1",
     "@tauri-apps/plugin-fs": "^2.5.1",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-shell": "^2.3.5",
-    "@tauri-apps/plugin-store": "^2.4.3"
+    "@tauri-apps/plugin-store": "^2.4.3",
+    "monaco-editor": "^0.52.2"
   }
 }

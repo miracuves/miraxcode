@@ -105,7 +105,7 @@ const SystemMaker = (() => {
 
   const FALLBACK_SCREENS = ["kanban","split","cards","report","timeline","list","feed","calendar","metric","list"];
 
-  const ACCENT_PALETTE = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316","#06b6d4","#84cc16"];
+  const ACCENT_PALETTE = ["#6366f1","#a70d2a","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316","#06b6d4","#84cc16"];
 
   const FINANCE_ENTITY_IDS = {
     accounts: "chart_accounts",
@@ -640,7 +640,7 @@ const SystemMaker = (() => {
     spec.theme = {
       mode: spec.theme?.mode === "dark" ? "dark" : "light",
       primary: spec.theme?.primary || "#2563eb",
-      accent: spec.theme?.accent || "#10b981",
+      accent: spec.theme?.accent || "#a70d2a",
       density: ["compact","comfortable","spacious"].includes(spec.theme?.density) ? spec.theme.density : "comfortable",
       radius: Number(spec.theme?.radius || 10),
     };
@@ -1020,7 +1020,7 @@ const SystemMaker = (() => {
     },
     fitness: {
       name: "Fitness Center Management",
-      theme: { mode:"dark", primary:"#7c3aed", accent:"#4ade80" },
+      theme: { mode:"dark", primary:"#7c3aed", accent:"#a70d2a" },
       modules: [
         { name:"Members",   screen:"split",  entity:"members" },
         { name:"Classes",   screen:"kanban", entity:"classes" },
@@ -1035,7 +1035,7 @@ const SystemMaker = (() => {
     },
     realestate: {
       name: "Real Estate Management",
-      theme: { mode:"light", primary:"#047857", accent:"#10b981" },
+      theme: { mode:"light", primary:"#047857", accent:"#a70d2a" },
       modules: [
         { name:"Properties", screen:"split",  entity:"properties" },
         { name:"Leads",      screen:"kanban", entity:"leads" },
@@ -1142,7 +1142,7 @@ const SystemMaker = (() => {
     },
     generic: {
       name: "Business Operating System",
-      theme: { mode:"light", primary:"#2563eb", accent:"#10b981" },
+      theme: { mode:"light", primary:"#2563eb", accent:"#a70d2a" },
       modules: [
         { name:"Dashboard",  screen:"dashboard", entity:"records" },
         { name:"Records",    screen:"list",      entity:"records" },
@@ -1236,8 +1236,8 @@ THEME (industry-appropriate colors — never use default blue for all domains):
 • Hotel/Hospitality   → primary "#1e3a5f", accent "#60a5fa",  mode "light"  (deep navy + sky)
 • Healthcare          → primary "#0e7490", accent "#06b6d4",  mode "light"  (clinical teal/cyan)
 • Education           → primary "#3730a3", accent "#818cf8",  mode "light"  (rich indigo)
-• Fitness/Gym         → primary "#7c3aed", accent "#4ade80",  mode "dark"   (electric purple + neon green)
-• Real Estate         → primary "#047857", accent "#10b981",  mode "light"  (forest green)
+• Fitness/Gym         → primary "#7c3aed", accent "#a70d2a",  mode "dark"   (electric purple + neon green)
+• Real Estate         → primary "#047857", accent "#a70d2a",  mode "light"  (forest green)
 • Retail/E-commerce   → primary "#be185d", accent "#f472b6",  mode "light"  (hot pink/magenta)
 • Logistics/Supply    → primary "#0369a1", accent "#38bdf8",  mode "dark"   (steel blue + cyan)
 • Manufacturing       → primary "#1d4ed8", accent "#fb923c",  mode "dark"   (industrial blue + orange)
@@ -1370,7 +1370,7 @@ Rules:
   "dock" → logistics, manufacturing, dense ops; "cards-nav" → restaurant, retail, hotel, fitness;
   "command" → healthcare, legal, hr, CRM
 - Theme: industry-specific, non-generic. Vary accent dramatically from primary (complementary, not analogous).
-  restaurant→ "#92400e"/"#f59e0b" light; fitness→ "#7c3aed"/"#4ade80" dark; logistics→ "#0369a1"/"#38bdf8" dark;
+  restaurant→ "#92400e"/"#f59e0b" light; fitness→ "#7c3aed"/"#a70d2a" dark; logistics→ "#0369a1"/"#38bdf8" dark;
   legal→ "#1c1917"/"#d97706" light; saas→ "#0f172a"/"#38bdf8" dark; retail→ "#be185d"/"#f472b6" light
 - modules[].color: REQUIRED on every module — give each a distinct hex accent, making the nav a multi-color spectrum
 - Include at least one finance/accounting module and the financial entities needed for revenue, expenses, cash, AR/AP, and margin
@@ -2602,7 +2602,7 @@ Repair requirements:
   function themeVars(spec) {
     const dark = spec.theme.mode === "dark";
     const primary = spec.theme.primary || "#2563eb";
-    const accent  = spec.theme.accent  || "#10b981";
+    const accent  = spec.theme.accent  || "#a70d2a";
     const radius  = Number(spec.theme.radius || 10);
     const domain  = spec.domain || detectDomain(spec.description || "");
     const dbg     = (DOMAIN_BG[domain] || DOMAIN_BG.generic)[dark ? "dark" : "light"];
@@ -2821,7 +2821,7 @@ Repair requirements:
     const numField = entity?.fields?.find(f => f.type === "number");
     const chartRows = records.slice(0, 6);
     const max = Math.max(...chartRows.map(r => Number(r[numField?.id]) || 1), 1);
-    const barColors = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899","#14b8a6"];
+    const barColors = ["#6366f1","#a70d2a","#f59e0b","#3b82f6","#ec4899","#14b8a6"];
     return `<div class="sys-side-col">
       <div class="sys-widget">
         <div class="sys-widget-head">
@@ -2906,7 +2906,7 @@ Repair requirements:
     const statusField = entity?.fields?.find(f => f.id === "status" || f.type === "select");
     const nameField = entity?.fields?.find(f => f.type === "text") || entity?.fields?.[0];
     const numField = entity?.fields?.find(f => f.type === "number");
-    const colColors = ["#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6"];
+    const colColors = ["#6366f1","#f59e0b","#a70d2a","#3b82f6","#ec4899","#8b5cf6"];
 
     const columns = statusField?.options?.length
       ? statusField.options
@@ -2952,7 +2952,7 @@ Repair requirements:
     const fields = entity?.fields || [];
     const numField = fields.find(f => f.type === "number");
     const statusField = fields.find(f => f.id === "status" || f.type === "select");
-    const barColors = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316"];
+    const barColors = ["#6366f1","#a70d2a","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316"];
 
     const chartRows = records.slice(0, 8);
     const max = Math.max(...chartRows.map(r => Number(r[numField?.id]) || 1), 1);
@@ -3067,7 +3067,7 @@ Repair requirements:
     const numField = fields.find(f => f.type === "number");
     const dateField = fields.find(f => f.type === "date");
     const secondaryFields = fields.filter(f => f !== nameField && f !== statusField && f !== numField && f !== dateField).slice(0, 3);
-    const palette = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316","#06b6d4","#84cc16"];
+    const palette = ["#6366f1","#a70d2a","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316","#06b6d4","#84cc16"];
 
     const initials = (val) => {
       const w = String(val || "?").trim().split(/\s+/);
@@ -3122,7 +3122,7 @@ Repair requirements:
     const statusField = fields.find(f => f.id === "status" || f.type === "select");
     const descField = fields.find(f => f.type === "textarea" || /note|comment|description|detail/i.test(f.id));
     const extraFields = fields.filter(f => f !== nameField && f !== dateField && f !== statusField && f !== descField).slice(0, 3);
-    const statusColors = { active:"#10b981", completed:"#6366f1", done:"#6366f1", paid:"#10b981", closed:"#94a3b8", pending:"#f59e0b", preparing:"#f97316", cancelled:"#ef4444", "in progress":"#3b82f6", approved:"#10b981", rejected:"#ef4444" };
+    const statusColors = { active:"#a70d2a", completed:"#6366f1", done:"#6366f1", paid:"#a70d2a", closed:"#94a3b8", pending:"#f59e0b", preparing:"#f97316", cancelled:"#ef4444", "in progress":"#3b82f6", approved:"#a70d2a", rejected:"#ef4444" };
     const getStatusColor = (s) => statusColors[String(s || "").toLowerCase()] || "#6366f1";
 
     const sorted = [...records].sort((a, b) => String(b[dateField?.id] || "").localeCompare(String(a[dateField?.id] || "")));
@@ -3177,7 +3177,7 @@ Repair requirements:
     const dateField = fields.find(f => f.type === "date");
     const nameField = fields.find(f => f.type === "text") || fields[0];
     const statusField = fields.find(f => f.id === "status" || f.type === "select");
-    const statusColors = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316"];
+    const statusColors = ["#6366f1","#a70d2a","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316"];
 
     // find most populated month from data, fallback to current month
     const allDates = records.map(r => String(r[dateField?.id] || "")).filter(d => /^\d{4}-\d{2}/.test(d));
@@ -3244,7 +3244,7 @@ Repair requirements:
     const fields = entity?.fields || [];
     const numFields = fields.filter(f => f.type === "number").slice(0, 4);
     const statusField = fields.find(f => f.id === "status" || f.type === "select");
-    const accent = spec?.theme?.accent || "#10b981";
+    const accent = spec?.theme?.accent || "#a70d2a";
     const primary = spec?.theme?.primary || "#2563eb";
     const tileColors = [primary, accent, "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6"];
 
@@ -3332,7 +3332,7 @@ Repair requirements:
     const dateField = fields.find(f => f.type === "date");
     const bodyField = fields.find(f => f.type === "textarea" || /note|body|desc|message|detail|comment/i.test(f.id));
     const metaFields = fields.filter(f => f !== nameField && f !== statusField && f !== dateField && f !== bodyField).slice(0, 2);
-    const avatarColors = ["#6366f1","#10b981","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316","#06b6d4","#84cc16"];
+    const avatarColors = ["#6366f1","#a70d2a","#f59e0b","#3b82f6","#ec4899","#14b8a6","#8b5cf6","#f97316","#06b6d4","#84cc16"];
 
     const sorted = [...records].sort((a,b) => String(b[dateField?.id] || "").localeCompare(String(a[dateField?.id] || "")));
 

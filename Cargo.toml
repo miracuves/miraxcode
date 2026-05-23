@@ -1,8 +1,8 @@
 # ==============================================================
-# HashCortx — Rust package manifest
+# MiraXcode — Rust package manifest
 #
 # This file defines the Rust crate that powers the native side
-# of HashCortx. Tauri apps have two halves:
+# of MiraXcode. Tauri apps have two halves:
 #   • src/          → JavaScript/HTML frontend (UI layer)
 #   • src-tauri/    → Rust backend (OS access, security, plugins)
 #
@@ -11,19 +11,19 @@
 #   For major version bumps, check the Tauri migration guide first:
 #   https://tauri.app/start/migrate/
 
-# Make sure you're running the build from inside the HashCortX folder, not src-tauri. The correct steps are:
+# Make sure you're running the build from inside the MiraXCode folder, not src-tauri. The correct steps are:
 
-# cd HashCortX
+# cd MiraXCode
 # npm install
 # npm run tauri build
 # Don't run cargo build directly — let npm run tauri build handle everything automatically.
 # ==============================================================
 
 [package]
-name        = "hashcortx"
+name        = "miraxcode"
 version     = "2.0.0"
-description = "HashCortx — Local-first AI coding agents"
-authors     = ["HashCortx"]
+description = "MiraXcode — Local-first AI coding agents"
+authors     = ["MiraXcode"]
 edition     = "2021"   # Use Rust 2021 edition (latest stable feature set)
 
 # Minimum Rust version — guards against ancient toolchains that
@@ -31,13 +31,13 @@ edition     = "2021"   # Use Rust 2021 edition (latest stable feature set)
 rust-version = "1.77.2"
 
 # ── Library target ─────────────────────────────────────────────
-# We expose a library crate (hashcortx_lib) so tests and the
+# We expose a library crate (miraxcode_lib) so tests and the
 # mobile entry point can call run() directly.
 #   staticlib  → used by iOS (static linking)
 #   cdylib     → used by Android (dynamic linking)
 #   rlib       → used by the Rust test harness
 [lib]
-name       = "hashcortx_lib"
+name       = "miraxcode_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 # ── Build dependencies ─────────────────────────────────────────
@@ -141,3 +141,13 @@ chrono      = { version = "0.4", features = ["serde"] }
 # shellexpand: expands ~ in paths for the denylist checker.
 dirs        = "5"
 shellexpand = "3"
+
+# ── reqwest ──────────────────────────────────────────────────
+# HTTP client for MCP server connections (SSE transport).
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "stream"], default-features = false }
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+
+# ── sysinfo ──────────────────────────────────────────────────
+# System stats (CPU, RAM, GPU) for the live stats panel.
+sysinfo = "0.33"
+once_cell = "1"

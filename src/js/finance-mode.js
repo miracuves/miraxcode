@@ -6,8 +6,8 @@ const FinanceMode = (() => {
   "use strict";
 
   /* ── constants ─────────────────────────────────────────────────── */
-  const STORAGE_KEY = "hashcortx_finance_sessions_v1";
-  const COLORS = ["#10b981","#6366f1","#f59e0b","#f43f5e","#06b6d4","#a78bfa","#fb923c","#34d399"];
+  const STORAGE_KEY = "miraxcode_finance_sessions_v1";
+  const COLORS = ["#a70d2a","#6366f1","#f59e0b","#f43f5e","#06b6d4","#a78bfa","#fb923c","#c4263e"];
   const MAX_FILE_TEXT_CHARS = 240_000;
   const MAX_FILE_CONTEXT_CHARS = 80_000;
   const READY_PROMPTS = [
@@ -183,7 +183,7 @@ const FinanceMode = (() => {
 
   /* ── system prompt ──────────────────────────────────────────────── */
   function systemPrompt() {
-    return `You are FinanceAI, an elite financial analyst operating as an intelligent agent inside HashCortX.
+    return `You are FinanceAI, an elite financial analyst operating as an intelligent agent inside MiraXCode.
 
 AGENT PHILOSOPHY:
 You think before responding. You assess what data is actually present, calculate only what you can prove, and choose the right response mode. You NEVER invent, estimate, or hallucinate financial numbers to fill a schema.
@@ -1906,7 +1906,7 @@ If and only if the user explicitly asks for "example data", "sample data", "dumm
     orders:  `<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>`,
     debt:    `<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>`,
   };
-  const KPI_COLORS = ["#10b981","#6366f1","#f59e0b","#f43f5e","#06b6d4","#a78bfa"];
+  const KPI_COLORS = ["#a70d2a","#6366f1","#f59e0b","#f43f5e","#06b6d4","#a78bfa"];
 
   function renderKpi(k, i = 0) {
     const ki  = Object.keys(KPI_ICONS).indexOf(k.icon || "revenue");
@@ -2578,7 +2578,7 @@ If and only if the user explicitly asks for "example data", "sample data", "dumm
       sc(C.border, 0.2); doc.line(0, PH - FOOTER_H, PW, PH - FOOTER_H);
       sf(6.5, "normal", C.sub);
       doc.text(
-        "HashCortX FinanceAI  ·  For informational purposes only  ·  Not financial advice",
+        "MiraXCode FinanceAI  ·  For informational purposes only  ·  Not financial advice",
         ML, PH - 4, { maxWidth: CW - 20 }
       );
       doc.text("Page " + pg, PW - MR, PH - 4, { align: "right" });

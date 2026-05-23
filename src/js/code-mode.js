@@ -25,7 +25,11 @@
   const TOOL_ICON_DEFAULT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
 
   // ── Shared state ───────────────────────────────────────────
-  const sharedState = { projectRoot: null, activeFile: null };
+  const sharedState = { projectRoot: null, activeFile: null, homeDir: null };
+  let _skillsForPrompt = [];
+  let _graphifyContext = '';
+  /** Active Coder tab model id — module scope so context chip helpers can read it. */
+  let coderModel = null;
 
   function esc(s) {
     return String(s || '')
@@ -54,6 +58,68 @@
     rootEl.innerHTML = `<strong>${esc(baseName(path))}</strong><span>${esc(path)}</span>`;
     rootEl.title = path;
   }
+
+  function setRouterChip(label, tooltip) {
+    const chip = document.getElementById('cdrRouterChip');
+    if (chip) {
+      chip.textContent = label || 'Auto';
+      chip.title = tooltip || '';
+      chip.style.display = label ? '' : 'none';
+    }
+  }
+
+    function setStatus(text, cls) {
+      const dot = document.getElementById('cdrStatusDot');
+      const txt = document.getElementById('cdrStatusText');
+      if (txt) txt.textContent = text || 'Ready';
+      if (dot) {
+        dot.className = 'cdr-status-dot';
+        if (cls === 'thinking') dot.classList.add('thinking');
+        else if (cls === 'err') dot.classList.add('err');
+      }
+    }
+
+    function activeModelValue() {
+      const H = window._H;
+      return coderModel || H?.selectedModel?.() || '';
+    }
+
+    function shortModelLabel(val) {
+      if (!val) return 'Auto';
+      const mp = $('cdrModelPicker');
+      if (mp) {
+        for (const opt of mp.options) {
+          if (opt.value === val) return opt.textContent || val;
+        }
+      }
+      if (val.startsWith('cloud:')) {
+        const parts = val.split(':');
+        const id = parts.slice(2).join(':');
+        return id.split('/').pop() || id || val;
+      }
+      return val.split('/').pop() || val;
+    }
+
+    function applyCoderModelToUi(fromCoderPicker) {
+      const mp = $('cdrModelPicker');
+      if (mp) mp.value = coderModel || '';
+      const label = mp?.options?.[mp.selectedIndex]?.text || shortModelLabel(coderModel);
+      onCoderModelChanged(label, fromCoderPicker ?? !!coderModel);
+    }
+
+    function updateCoderContextChip(msgs) {
+      const chip = $('cdrCtxChip');
+      if (!chip || !HC?.contextCompactor?.usageRatio) return;
+      const u = HC.contextCompactor.usageRatio(msgs || _conversationMsgs, activeModelValue());
+      chip.textContent = `Ctx ${u.pct}%`;
+      const compactLine = HC.contextCompactor.getResolvedCompactionLabel?.() || "";
+      chip.title =
+        `~${u.estimated.toLocaleString()} / ${u.max.toLocaleString()} tokens (${u.profile.label}) · compacts at ${u.threshold.toLocaleString()}\n` +
+        compactLine +
+        '\nChange in Settings → APIs → Context compaction';
+      chip.classList.toggle('warn', u.pct >= 70 && u.pct < 88);
+      chip.classList.toggle('hot', u.pct >= 88);
+    }
 
   // ── Slim tool row renderer (v1.6 inline style) ─────────────
   function toolBlockHtml(rec) {
@@ -147,155 +213,41 @@
     }));
   }
 
-  // ── Auto-router ────────────────────────────────────────────
-  // Provider fallback order for coding tasks. Each entry is only added
-  // if the matching API key is present in the Settings DOM.
-  const ROUTER_FALLBACKS = [
-    { keyId: 'groqKey',       provider: 'groq',       model: 'llama-3.3-70b-versatile',           label: 'Groq'      },
-    { keyId: 'cerebrasKey',   provider: 'cerebras',   model: 'llama-3.3-70b',                     label: 'Cerebras'  },
-    { keyId: 'sambaKey',      provider: 'samba',      model: 'Meta-Llama-3.3-70B-Instruct',       label: 'SambaNova' },
-    { keyId: 'openRouterKey', provider: 'openrouter', model: 'meta-llama/llama-4-maverick:free',  label: 'OpenRouter'},
-    { keyId: 'geminiKey',     provider: 'gemini',     model: 'gemini-2.5-flash',                  label: 'Gemini'    },
-    { keyId: 'openaiKey',     provider: 'openai',     model: 'gpt-4o',                            label: 'OpenAI'    },
-    { keyId: 'anthropicKey',  provider: 'anthropic',  model: 'claude-sonnet-4-20250514',          label: 'Anthropic' },
-    { keyId: 'deepseekKey',   provider: 'deepseek',   model: 'deepseek-chat',                     label: 'DeepSeek'  },
-    { keyId: 'moonshotKey',   provider: 'moonshot',   model: 'kimi-k2.6',                         label: 'Moonshot'  },
-    { keyId: 'mistralKey',    provider: 'mistral',    model: 'mistral-large-latest',              label: 'Mistral'   },
-  ];
-
-  function getAdapter(modelValue) {
-    const H = window._H;
-    if (modelValue && modelValue.startsWith('cloud:')) {
-      const parsed = (H?.parseCloudModel && H.parseCloudModel(modelValue)) || { provider: '', modelId: modelValue };
-      if (parsed.provider === 'gemini')    return { kind: 'gemini',    model: parsed.modelId, label: 'Gemini' };
-      if (parsed.provider === 'anthropic') return { kind: 'anthropic', model: parsed.modelId, label: 'Anthropic' };
-      return { kind: 'openai', provider: parsed.provider, model: parsed.modelId, label: parsed.provider };
+    let _statsInterval = null;
+    function startStatsPolling() {
+      if (!window.__TAURI__) return;
+      const widget = document.getElementById('cdrStatsWidget');
+      if (!widget) return;
+      widget.style.display = 'flex';
+      updateStats();
+      if (_statsInterval) clearInterval(_statsInterval);
+      _statsInterval = setInterval(updateStats, 2000);
     }
-    return { kind: 'ollama', model: modelValue || 'llama3.2', label: 'Local' };
-  }
 
-  function buildRouterChain(overrideModel) {
-    const H = window._H;
-    const selected = overrideModel || H?.selectedModel?.() || '';
-    const primary = getAdapter(selected);
-    const chain = [primary];
-
-    // Fetch live available models so fallback IDs never go stale.
-    const liveModels = (typeof H?.getAvailableCloudModels === 'function') ? H.getAvailableCloudModels() : [];
-
-    for (const fb of ROUTER_FALLBACKS) {
-      const key = (document.getElementById(fb.keyId)?.value || '').trim();
-      if (!key) continue;
-      if (primary.kind === 'openai' && primary.provider === fb.provider) continue;
-
-      // Pick the best live model for this provider instead of a hardcoded ID.
-      const providerModels = liveModels.filter(m => m.provider === fb.provider);
-      let modelId = fb.model; // hardcoded safety fallback
-      if (providerModels.length) {
-        providerModels.sort((a, b) => (b.tier || 0) - (a.tier || 0));
-        const parsed = H?.parseCloudModel ? H.parseCloudModel(providerModels[0].value) : null;
-        if (parsed?.modelId) modelId = parsed.modelId;
-      }
-
-      const fbKind = fb.provider === 'gemini' ? 'gemini' : fb.provider === 'anthropic' ? 'anthropic' : 'openai';
-      chain.push({ kind: fbKind, provider: fb.provider, model: modelId, label: fb.label });
-    }
-    return chain;
-  }
-
-  function isRoutableError(err) {
-    const msg = String(err?.message || '');
-    return /rate.?limit|429|quota.?exceed|too.?many.?request|overload|529|not.?found|renamed.?or.?retired|404|model.*unavailable|no.?such.?model|invalid.?model|key.?missing|key.?invalid|401|403/i.test(msg);
-  }
-
-  function setRouterChip(label, state) {
-    const chip = document.getElementById('cdrRouterChip');
-    const lbl  = document.getElementById('cdrRouterLabel');
-    if (!chip) return;
-    chip.className = 'cdr-router-chip' + (state ? ' ' + state : '');
-    chip.textContent = label || '';
-    chip.style.display = label ? '' : 'none';
-    if (lbl) { lbl.textContent = label || ''; }
-  }
-
-  // ── Error classification for solid auto-routing ──
-  // transient: retry SAME model (network / 5xx / timeout)
-  // routable:  try NEXT model (quota / auth / 404 / unavailable)
-  // fatal:     stop chain immediately (4xx bad request shape)
-  function classifyRouterError(err) {
-    if (!err) return 'fatal';
-    const msg = String(err.message || err);
-    if (err.name === 'AbortError') return 'fatal';
-    if (/timeout|timed out|network|fetch failed|ECONN|socket|disconnected/i.test(msg)) return 'transient';
-    if (/\b5\d\d\b|server error|overload|529|503|502/i.test(msg)) return 'transient';
-    if (/rate.?limit|429|quota.?exceed|too.?many.?request|key.?invalid|key.?missing|401|403|404|not.?found|unavailable|no.?such.?model|invalid.?model|renamed|retired/i.test(msg)) return 'routable';
-    return 'routable'; // default to try-next when unsure (safer than fatal)
-  }
-
-  // Session-scoped failure streak counter — models that fail 3x get demoted.
-  const _routerStreaks = new Map();
-
-  async function callWithRouter(messages, tools, temperature, signal, modelOverride) {
-    const H = window._H;
-    let chain = buildRouterChain(modelOverride);
-    if (!chain.length) {
-      throw new Error('No model available. Select a model from the dropdown or add an API key in Settings.');
-    }
-    // Sort: same-tier-or-higher first (preserves quality). Demote any model with ≥3 fails this session.
-    chain = sortChainByQuality(chain);
-    setRouterChip(chain[0].label || 'Auto', '');
-
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
-    for (let i = 0; i < chain.length; i++) {
-      const adapter = chain[i];
-      const key = adapter.label + ':' + adapter.model;
-      if (i > 0) setRouterChip(`> ${adapter.label}`, 'routing');
-
-      let lastErr = null;
-      for (let attempt = 0; attempt < 2; attempt++) {  // up to 2 retries for transient errors on SAME model
-        try {
-          let result;
-          if (adapter.kind === 'gemini') {
-            result = await H.agentTurnGemini({ model: adapter.model, messages, tools, temperature, signal });
-          } else if (adapter.kind === 'anthropic') {
-            result = await H.agentTurnAnthropic({ model: adapter.model, messages, tools, temperature, signal });
-          } else if (adapter.kind === 'openai') {
-            result = await H.agentTurnOpenAI({ provider: adapter.provider, model: adapter.model, messages, tools, temperature, signal });
-          } else {
-            result = await H.agentTurnOllama({ model: adapter.model, messages, tools, temperature, signal });
-          }
-          // Success — reset streak, update chip, return
-          _routerStreaks.set(key, 0);
-          if (i > 0) setRouterChip(adapter.label, 'switched');
-          return result;
-        } catch (e) {
-          if (signal?.aborted) throw e;
-          lastErr = e;
-          const cls = classifyRouterError(e);
-          if (cls === 'transient' && attempt === 0) {
-            setRouterChip(`${adapter.label} retry…`, 'routing');
-            await sleep(900);
-            continue;  // retry same model
-          }
-          if (cls === 'fatal') throw e;
-          break; // routable → fall through to next adapter
+    async function updateStats() {
+      if (!window.__TAURI__) return;
+      try {
+        const s = await window.__TAURI__.core.invoke('system_stats');
+        const cpuEl = document.getElementById('cdrStatCpu');
+        const ramEl = document.getElementById('cdrStatRam');
+        const gpuEl = document.getElementById('cdrStatGpu');
+        if (cpuEl) {
+          const cpuColor = s.cpu_avg > 80 ? 'var(--rose)' : s.cpu_avg > 50 ? '#eab308' : 'var(--muted)';
+          cpuEl.style.color = cpuColor;
+          cpuEl.textContent = `CPU ${s.cpu_avg.toFixed(0)}%`;
         }
-      }
-      // Demote on streak
-      const streak = (_routerStreaks.get(key) || 0) + 1;
-      _routerStreaks.set(key, streak);
-      if (i < chain.length - 1) {
-        const reason = /\b401|403\b/.test(String(lastErr?.message)) ? 'key rejected'
-                     : /\b429|rate|quota/i.test(String(lastErr?.message)) ? 'rate-limited'
-                     : /\b404|unavailable|no.?such/i.test(String(lastErr?.message)) ? 'unavailable'
-                     : 'failed';
-        setRouterChip(`${adapter.label} ${reason} > ${chain[i + 1].label}`, 'routing');
-        continue;
-      }
-      throw lastErr || new Error('All routes failed');
+        if (ramEl) {
+          const ramColor = s.ram_pct > 90 ? 'var(--rose)' : s.ram_pct > 70 ? '#eab308' : 'var(--muted)';
+          ramEl.style.color = ramColor;
+          ramEl.textContent = `RAM ${s.ram_used_gb.toFixed(1)}/${s.ram_total_gb.toFixed(0)}G`;
+        }
+        if (gpuEl && s.gpu_name) {
+          gpuEl.style.display = '';
+          const vram = s.gpu_vram_used_gb != null ? ` ${s.gpu_vram_used_gb.toFixed(1)}/${s.gpu_vram_total_gb?.toFixed(0) || '?'}G` : '';
+          gpuEl.textContent = `GPU${vram}`;
+        }
+      } catch {}
     }
-  }
 
   // Tier ordering — keep quality high during failover.
   function sortChainByQuality(chain) {
@@ -377,25 +329,610 @@
   const CoderMode = (() => {
     let mounted            = false;
     let agentCount         = 1;
+    const MAX_CONCURRENT   = 2;
     let runAbort           = null;
-    let fileChanges        = [];
-    let conversationMsgs   = []; // persists across turns — full chat history
+    let _conversationMsgs  = [];
+    let _fileChanges       = [];
     let toolCallCounter    = 0;
-    let coderModel         = null; // null = use main model picker
-    let activeContentEl    = null; // current assistant bubble — for change pills
+    let activeContentEl    = null;
     let cdrTraceEntries    = [];
     let cdrTraceStartedAt  = Date.now();
     const SESSIONS_KEY     = 'hc-coder-sessions';
     const STATE_KEY        = 'hashui_coder_state';
+    const TABS_KEY         = 'miraxcode_coder_tabs';
+    let _chatVirtual       = null;
+    let _editorPane        = null;
+    let _ideCtx            = null;
+    let _lspDiagUnsub      = null;
+    let _symbolFilter      = '';
+    let _symbolKindFilter  = '';
+    let _domScrollBatch    = 0;
+    let _runGeneration     = 0;
+    let _runTabId          = null;
+    /** File-change array pinned to the tab that started the current run. */
+    let _runFileChanges    = null;
+    let _domWired          = false;
+    let _powerWired        = false;
+    let _onTraceDocClick   = null;
+    let _onCoderKeydown    = null;
+    let _onSymbolKeydown   = null;
+    let _onModelsUpdated   = null;
+    let _terminalBusy      = false;
+    const MAX_TAB_MSGS     = 120;
+    const MAX_TAB_FC       = 40;
+
+    function cloneMsgForStorage(m) {
+      const out = { role: m.role };
+      if (typeof m.content === 'string') {
+        out.content = m.content.slice(0, MAX_SESSION_MSG_CHARS);
+      } else if (m.content != null) {
+        out.content = m.content;
+      }
+      if (m.tool_calls) out.tool_calls = m.tool_calls;
+      if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
+      if (m.name) out.name = m.name;
+      return out;
+    }
+
+    function normalizeTab(tab) {
+      if (!tab || typeof tab !== 'object') return null;
+      return {
+        id: tab.id || _tabMgr.newId(),
+        title: tab.title || 'Session',
+        msgs: Array.isArray(tab.msgs) ? tab.msgs : [],
+        fc: Array.isArray(tab.fc) ? tab.fc : [],
+        model: tab.model ?? null,
+        pendingImages: Array.isArray(tab.pendingImages) ? tab.pendingImages : [],
+        pendingFiles: Array.isArray(tab.pendingFiles) ? tab.pendingFiles : [],
+        agentCount: tab.agentCount || 1,
+        running: false,
+        compactionLedger: tab.compactionLedger || '',
+      };
+    }
+
+    function abortActiveRun(reason) {
+      if (!runAbort) return;
+      try { runAbort.abort(reason || 'Run interrupted'); } catch {}
+      runAbort = null;
+      _runTabId = null;
+      _runFileChanges = null;
+      const runBtn = $('cdrRunBtn');
+      const stopBtn = $('cdrStopBtn');
+      if (runBtn) runBtn.style.display = '';
+      if (stopBtn) stopBtn.style.display = 'none';
+      _tabMgr.tabs.forEach(t => { t.running = false; });
+    }
+
+    function activeFileChanges() {
+      return _runFileChanges || _fileChanges;
+    }
+
+    // ── Tabbed Sessions ──────────────────────────────────────
+    const _tabMgr = {
+      tabs: [],
+      activeId: null,
+      _uid: 0,
+      newId() { return 'tab-' + Date.now() + '-' + (++this._uid); },
+      create(title) {
+        const tab = {
+          id: this.newId(),
+          title: title || 'New Session',
+          msgs: [],
+          fc: [],
+          model: null,
+          pendingImages: [],
+          pendingFiles: [],
+          agentCount: 1,
+          running: false,
+          compactionLedger: "",
+        };
+        this.tabs.push(tab);
+        return tab;
+      },
+      active() { return this.tabs.find(t => t.id === this.activeId) || this.tabs[0]; },
+      switchTo(id) {
+        const prev = this.active();
+        if (prev && prev.id !== id) {
+          prev.msgs = _conversationMsgs;
+          prev.fc = _fileChanges;
+          prev.model = coderModel;
+          window.CdrComposerAttachments?.syncToTab?.();
+          prev.pendingImages = window.CdrComposerAttachments?.getSnapshot?.().images || [];
+          prev.pendingFiles = window.CdrComposerAttachments?.getSnapshot?.().files || [];
+          prev.agentCount = agentCount;
+          prev.running = false;
+        }
+        const tab = this.tabs.find(t => t.id === id);
+        if (!tab) return null;
+        this.activeId = id;
+        _conversationMsgs = tab.msgs || [];
+        _fileChanges = tab.fc || [];
+        coderModel = tab.model;
+        window.CdrComposerAttachments?.loadFromTab?.(tab);
+        agentCount = tab.agentCount || 1;
+        this.save();
+        return tab;
+      },
+      close(id) {
+        const idx = this.tabs.findIndex(t => t.id === id);
+        if (idx < 0) return;
+        if (this.tabs.length <= 1) {
+          this.tabs[0].msgs = [];
+          this.tabs[0].fc = [];
+          this.tabs[0].title = 'New Session';
+          this.tabs[0].running = false;
+          _conversationMsgs = this.tabs[0].msgs;
+          _fileChanges = this.tabs[0].fc;
+          return;
+        }
+        const wasActive = this.activeId === id;
+        this.tabs.splice(idx, 1);
+        if (wasActive) {
+          const next = this.tabs[Math.min(idx, this.tabs.length - 1)];
+          this.activeId = next.id;
+          _conversationMsgs = next.msgs;
+          _fileChanges = next.fc;
+          coderModel = next.model;
+          window.CdrComposerAttachments?.loadFromTab?.(next);
+          agentCount = next.agentCount || 1;
+        }
+        this.save();
+      },
+      syncFromVars() {
+        const tab = this.active();
+        if (tab) {
+          tab.msgs = _conversationMsgs;
+          tab.fc = _fileChanges;
+          tab.model = coderModel;
+          window.CdrComposerAttachments?.syncToTab?.();
+          tab.pendingImages = window.CdrComposerAttachments?.getSnapshot?.().images || [];
+          tab.pendingFiles = window.CdrComposerAttachments?.getSnapshot?.().files || [];
+          tab.agentCount = agentCount;
+          tab.running = !!runAbort;
+        }
+      },
+      save() {
+        this.syncFromVars();
+        try {
+          const tabs = this.tabs.map(t => ({
+            ...t,
+            running: false,
+            msgs: (t.msgs || []).slice(-MAX_TAB_MSGS).map(cloneMsgForStorage),
+            fc: (t.fc || []).slice(-MAX_TAB_FC).map(fc => ({
+              name: fc.name,
+              path: fc.path,
+              kind: fc.kind,
+              status: fc.status,
+              applied: fc.applied,
+              content: typeof fc.content === 'string' ? fc.content.slice(0, 12_000) : fc.content,
+              proposedContent: typeof fc.proposedContent === 'string' ? fc.proposedContent.slice(0, 12_000) : fc.proposedContent,
+            })),
+          }));
+          localStorage.setItem(TABS_KEY, JSON.stringify({ v: 1, tabs, activeId: this.activeId }));
+        } catch (e) {
+          console.warn('[CoderMode] tab save failed:', e);
+        }
+      },
+      load() {
+        try {
+          const raw = localStorage.getItem(TABS_KEY);
+          if (!raw) return false;
+          const data = JSON.parse(raw);
+          if (!data || !Array.isArray(data.tabs) || !data.tabs.length) return false;
+          this.tabs = data.tabs.map(normalizeTab).filter(Boolean);
+          this.activeId = data.activeId || this.tabs[0]?.id;
+          if (!this.tabs.find(t => t.id === this.activeId)) this.activeId = this.tabs[0]?.id;
+          const active = this.active();
+          if (active) {
+            _conversationMsgs = active.msgs;
+            _fileChanges = active.fc;
+            coderModel = active.model;
+            window.CdrComposerAttachments?.loadFromTab?.(active);
+            agentCount = active.agentCount || 1;
+          }
+          return true;
+        } catch (e) {
+          console.warn('[CoderMode] tab load failed:', e);
+          return false;
+        }
+      },
+    };
+
+    function _initFirstTab() {
+      if (!_tabMgr.tabs.length) {
+        const tab = _tabMgr.create('Session 1');
+        _tabMgr.activeId = tab.id;
+        _conversationMsgs = tab.msgs;
+        _fileChanges = tab.fc;
+      }
+    }
+
+    // _conversationMsgs and _fileChanges are the working vars.
+    // On tab switch, _tabMgr.switchTo() reassigns them to the target tab's arrays.
+    // Since arrays are by-reference, .push() mutations flow back to the tab automatically.
+
+    // ── Tab bar rendering ────────────────────────────────────
+    function renderTabBar() {
+      const scroll = document.getElementById('cdrTabsScroll');
+      if (!scroll) return;
+      _tabMgr.syncFromVars();
+      scroll.innerHTML = '';
+      _tabMgr.tabs.forEach(tab => {
+        const el = document.createElement('div');
+        el.className = 'cdr-tab' + (tab.id === _tabMgr.activeId ? ' active' : '');
+        el.dataset.tabId = tab.id;
+        const dotClass = tab.running ? 'cdr-tab-dot running' : 'cdr-tab-dot';
+        const modelTag = tab.model ? shortModelLabel(tab.model) : '';
+        const modelHtml = modelTag && modelTag !== 'Auto'
+          ? `<span class="cdr-tab-model" title="${esc(modelTag)}">${esc(modelTag.length > 14 ? modelTag.slice(0, 12) + '…' : modelTag)}</span>`
+          : '';
+        el.title = modelTag && modelTag !== 'Auto' ? `${tab.title} · ${modelTag}` : tab.title;
+        el.innerHTML = `<span class="${dotClass}"></span><span class="cdr-tab-title">${esc(tab.title)}</span>${modelHtml}<span class="cdr-tab-close" data-close="${tab.id}">&times;</span>`;
+        el.addEventListener('click', (e) => {
+          if (e.target.classList.contains('cdr-tab-close')) {
+            e.stopPropagation();
+            onTabClose(e.target.dataset.close);
+            return;
+          }
+          onTabSwitch(tab.id);
+        });
+        scroll.appendChild(el);
+      });
+    }
+
+    function onTabSwitch(id) {
+      if (id === _tabMgr.activeId) return;
+      if (runAbort) abortActiveRun('Tab switched');
+      saveCoderState();
+      const tab = _tabMgr.switchTo(id);
+      if (!tab) return;
+      renderConversation();
+      renderTabBar();
+      renderFileChangePills();
+      updatePendingChangesHeader();
+      applyCoderModelToUi(!!coderModel);
+      setStatus('Ready', '');
+    }
+
+    function onTabClose(id) {
+      const tab = _tabMgr.tabs.find(t => t.id === id);
+      if (!tab) return;
+      if (tab.msgs.length && !window.confirm('Close "' + tab.title + '"? Chat history will be saved to sessions.')) return;
+      if (runAbort && tab.id === _runTabId) abortActiveRun('Tab closed');
+      saveCurrentSession(tab);
+      _tabMgr.close(id);
+      renderConversation();
+      renderTabBar();
+      renderFileChangePills();
+      setStatus('Ready', '');
+    }
+
+    function onTabNew() {
+      saveCoderState();
+      saveCurrentSession();
+      const tab = _tabMgr.create('Session ' + (_tabMgr.tabs.length + 1));
+      _tabMgr.switchTo(tab.id);
+      clearChatUI();
+      renderTabBar();
+    }
+
+    async function refreshGitStatus() {
+      const list = $('cdrGitList');
+      const root = sharedState.projectRoot;
+      if (!list) return;
+      if (!root || !HC?.invoke) {
+        list.innerHTML = '<div class="cdr-git-empty">Open a project folder</div>';
+        return;
+      }
+      try {
+        const r = await HC.invoke('shell_run', {
+          command: 'git',
+          args: ['status', '--porcelain'],
+          cwd: root,
+        });
+        const lines = String(r?.stdout || '').trim().split('\n').filter(Boolean);
+        if (!lines.length) {
+          list.innerHTML = '<div class="cdr-git-empty">Working tree clean</div>';
+          return;
+        }
+        const base = root.replace(/\/$/, '');
+        list.innerHTML = lines.map(line => {
+          const st = esc(line.slice(0, 2));
+          const file = line.slice(3).trim();
+          const full = file.startsWith('/') ? file : `${base}/${file}`;
+          return `<button type="button" class="cdr-git-item" data-path="${esc(full)}"><span class="cdr-git-st">${st}</span>${esc(file)}</button>`;
+        }).join('');
+        list.querySelectorAll('.cdr-git-item').forEach(btn => {
+          btn.addEventListener('click', () => {
+            setActiveFile(btn.dataset.path);
+            _editorPane?.openFile(btn.dataset.path).catch(() => {});
+          });
+        });
+      } catch {
+        list.innerHTML = '<div class="cdr-git-empty">Not a git repository</div>';
+      }
+    }
+
+    function initCoderPowerFeatures() {
+      if (_powerWired) return;
+      _powerWired = true;
+      getChatVirtual();
+      if (window.CdrEditorPane && !$('cdrEditorPane')?._wired) {
+        _editorPane = new window.CdrEditorPane({
+          paneEl: $('cdrEditorPane'),
+          tabsEl: $('cdrEditorTabs'),
+          tabsElB: $('cdrEditorTabsB'),
+          hostEl: $('cdrEditorMonaco'),
+          hostElB: $('cdrEditorMonacoB'),
+          diffHostEl: $('cdrEditorDiff'),
+          badgeEl: $('cdrEditorDiffBadge'),
+          pathEl: $('cdrEditorPath'),
+          readFile: (p) => HC.code.readFile(p),
+          writeFile: (p, c, r) => HC.code.writeFile(p, c, r),
+          onSaved: () => refreshGitStatus(),
+          onGoToDefinition: (symbol, path) => goToDefinition(symbol, path),
+        });
+        $('cdrEditorPane')._wired = true;
+        _editorPane.syncPendingChanges(_fileChanges);
+        window.CdrStagedRead?.syncFromChanges?.(_fileChanges);
+      }
+      if (window.CdrIdeFeatures) {
+        _ideCtx = window.CdrIdeFeatures.mount({
+          $,
+          ansiToHtml,
+          getProjectRoot: () => sharedState.projectRoot,
+          getFileChanges: () => _fileChanges,
+          getProjectSymbols: () => sharedState.projectSymbols,
+          setActiveFile,
+          openEditor: (p, line, col) => _editorPane?.openFile(p, line, col),
+          scrollMessages,
+          appendTextToBubble,
+          refreshGitStatus,
+          editorPane: _editorPane,
+        });
+        if (_editorPane) {
+          _editorPane.onDiagnosticsChange = (markers) => _ideCtx?.syncMonacoDiagnostics?.(markers);
+        }
+        _lspDiagUnsub?.();
+        _lspDiagUnsub = window.CdrLspClient?.mountDiagnosticsListener?.((path, items) => {
+          const mapped = (items || []).map((d) => ({
+            file: path,
+            line: d.line,
+            col: d.column,
+            message: d.message,
+            severity: d.severity,
+            source: 'lsp',
+          }));
+          if (mapped.length) _ideCtx?.reportProblems?.(mapped);
+        });
+      }
+      $('cdrPendingChip')?.addEventListener('click', scrollToFirstPendingChange);
+      $('cdrSearchOpenBtn')?.addEventListener('click', () => {
+        const panel = $('cdrSearchPanel');
+        if (panel) { panel.hidden = false; $('cdrSearchInput')?.focus(); }
+      });
+      $('cdrGitRefresh')?.addEventListener('click', () => refreshGitStatus());
+      _onSymbolKeydown = (e) => {
+        if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== 'o') return;
+        if (!document.body.classList.contains('coder-mode')) return;
+        e.preventDefault();
+        const inp = $('cdrSymbolFilter');
+        if (inp) { inp.focus(); inp.select(); }
+        else HC?.guard?.notify?.('Open a project to scan symbols first', 'info');
+      };
+      document.addEventListener('keydown', _onSymbolKeydown);
+      if (window.CdrMentions) {
+        window.CdrMentions.attach($('cdrTaskInput'), {
+          getProjectRoot: () => sharedState.projectRoot,
+          listFiles: async (root) => {
+            const out = [];
+            async function walk(dir, depth) {
+              if (out.length >= 400 || depth > 4) return;
+              let entries;
+              try { entries = await HC.code.listDir(dir); } catch { return; }
+              for (const e of entries) {
+                if (['node_modules', 'target', '.git', 'dist'].includes(e.name)) continue;
+                if (e.name.startsWith('.') && e.name !== '.env') continue;
+                const p = e.path || `${dir.replace(/\/$/, '')}/${e.name}`;
+                const rel = relativeFromRoot(p);
+                if (e.is_dir) {
+                  out.push(rel + '/');
+                  await walk(p, depth + 1);
+                } else {
+                  out.push(rel);
+                }
+                if (out.length >= 400) break;
+              }
+            }
+            await walk(root, 0);
+            return out;
+          },
+        });
+      }
+      if (window.MxCommandPalette) {
+        window.MxCommandPalette.registerMany([
+          { id: 'cdr-new-chat', group: 'Coder', label: 'New Coder chat', run: () => onTabNew() },
+          { id: 'cdr-run', group: 'Coder', label: 'Run Coder task', run: () => startRun() },
+          { id: 'cdr-stop', group: 'Coder', label: 'Stop Coder run', run: () => stopRun() },
+          { id: 'cdr-open-folder', group: 'Coder', label: 'Open project folder', run: () => openProject() },
+          { id: 'cdr-git-refresh', group: 'Coder', label: 'Refresh git status', run: () => refreshGitStatus() },
+          { id: 'cdr-accept-all', group: 'Coder', label: 'Accept all pending file changes', run: () => acceptAllPendingChanges(activeContentEl) },
+          { id: 'cdr-pending-jump', group: 'Coder', label: 'Jump to pending file changes', run: () => scrollToFirstPendingChange() },
+          { id: 'cdr-search', group: 'Coder', label: 'Search in project (⌘⇧F)', run: () => {
+            const panel = $('cdrSearchPanel');
+            if (panel) { panel.hidden = false; $('cdrSearchInput')?.focus(); }
+          }},
+          { id: 'cdr-export-changes', group: 'Coder', label: 'Export changes audit (JSON)', run: () => {
+            const out = _ideCtx?.buildChangesExport?.({ fullContent: true }) || '{"changes":[]}';
+            const proj = (sharedState.projectRoot || 'session').split('/').pop() || 'session';
+            const ts = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+            downloadBlob(out, 'application/json', `miraxcode-${proj}-changes-${ts}.json`);
+          }},
+          { id: 'cdr-toggle-plan', group: 'Coder', label: 'Toggle plan-only mode', run: () => {
+            const el = $('cdrPlanOnly');
+            if (el) { el.checked = !el.checked; el.dispatchEvent(new Event('change')); }
+          }},
+          { id: 'cdr-symbol-filter', group: 'Coder', label: 'Focus symbol filter', run: () => {
+            $('cdrSymbolFilter')?.focus();
+            $('cdrSymbolFilter')?.select();
+          }},
+        ]);
+      }
+      refreshGitStatus();
+    }
+
+    function clearChatUI() {
+      activeContentEl = null;
+      enterChatLiveMode();
+      const msgs = $('cdrMessages');
+      if (msgs) {
+        msgs.innerHTML = `<div class="cdr-welcome">
+          <div class="cdr-welcome-hero">
+            <img src="/assets/logo-mark.png" class="cdr-welcome-mark" draggable="false" alt=""/>
+            <div class="cdr-welcome-copy">
+              <h1 class="cdr-welcome-title">Coder Mode</h1>
+              <p class="cdr-welcome-sub">Surgical AI tasks · auto-routed · local-first</p>
+            </div>
+          </div>
+          <div class="cdr-welcome-chips">
+            <span class="cdr-welcome-chip" data-prompt="List all files in the project and give me a quick overview of the codebase structure">Explore codebase</span>
+            <span class="cdr-welcome-chip" data-prompt="Find all TODO and FIXME comments in the project">Find TODOs</span>
+            <span class="cdr-welcome-chip" data-prompt="Check for any obvious bugs or issues in the main source files">Debug &amp; audit</span>
+            <span class="cdr-welcome-chip" data-prompt="Write unit tests for the core functionality">Write tests</span>
+          </div>
+        </div>`;
+        msgs.querySelectorAll('.cdr-welcome-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const ti = $('cdrTaskInput');
+            if (!ti || !chip.dataset.prompt) return;
+            ti.value = chip.dataset.prompt;
+            autoResize(ti);
+            ti.focus();
+          });
+        });
+      }
+      setStatus('Ready', '');
+      setRouterChip('Auto', '');
+    }
+
+    function updatePendingChangesHeader() {
+      const chip = $('cdrPendingChip');
+      if (!chip) return;
+      const pending = _fileChanges.filter(fc => fc.status === 'pending').length;
+      const applied = _fileChanges.filter(fc => fc.status === 'accepted').length;
+      if (pending > 0) {
+        chip.hidden = false;
+        chip.classList.add('hot');
+        chip.textContent = `${pending} pending`;
+        chip.title = 'Click to jump to pending file changes';
+      } else if (applied > 0) {
+        chip.hidden = false;
+        chip.classList.remove('hot');
+        chip.textContent = `${applied} applied`;
+        chip.title = 'All staged changes reviewed — Revert available on accepted rows';
+      } else {
+        chip.hidden = true;
+        chip.classList.remove('hot');
+      }
+      _editorPane?.syncPendingChanges?.(_fileChanges);
+      window.CdrStagedRead?.syncFromChanges?.(_fileChanges);
+    }
+
+    function scrollToFirstPendingChange() {
+      const row = document.querySelector('.cdr-change-row.pending');
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        row.classList.add('cdr-change-flash');
+        setTimeout(() => row.classList.remove('cdr-change-flash'), 1400);
+        const idx = parseInt(row.dataset.changeIdx, 10);
+        const entry = _fileChanges[idx];
+        if (entry?.path && _editorPane) {
+          setActiveFile(entry.path);
+          _editorPane.openFile(entry.path).catch(() => {});
+        }
+        return;
+      }
+      HC?.guard?.notify?.('No pending changes in the current view', 'info');
+    }
+
+    function renderFileChangePills() {
+      const el = $('cdrChangePills');
+      if (!el) return;
+      el.innerHTML = '';
+      const pending = _fileChanges.filter(fc => fc.status === 'pending').length;
+      if (pending > 1) {
+        const batch = document.createElement('button');
+        batch.type = 'button';
+        batch.className = 'cdr-change-pill batch';
+        batch.textContent = `Accept all (${pending})`;
+        batch.addEventListener('click', () => acceptAllPendingChanges(activeContentEl));
+        el.appendChild(batch);
+      }
+      _fileChanges.forEach((fc, i) => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'cdr-change-pill ' + (fc.kind || 'write') + (fc.status === 'accepted' ? ' done' : fc.status === 'rejected' ? ' skip' : '');
+        pill.textContent = fc.name || fc.path || 'change';
+        pill.title = (fc.status || 'pending') + (fc.path ? ' · ' + fc.path : '');
+        pill.addEventListener('click', () => {
+          showChangeOverlay(i);
+          if (fc.path && _editorPane) {
+            setActiveFile(fc.path);
+            _editorPane.openFile(fc.path).catch(() => {});
+          }
+        });
+        el.appendChild(pill);
+      });
+      updatePendingChangesHeader();
+    }
 
     // ── State persistence ─────────────────────────────────────
+    function resolveCoderAdapter(rawModel) {
+      const H = window._H;
+      if (!rawModel) return { kind: 'ollama', model: 'llama3' };
+      if (rawModel.startsWith('cloud:') && H?.selectAgentAdapter) {
+        return H.selectAgentAdapter(rawModel);
+      }
+      return { kind: 'ollama', model: rawModel || 'llama3' };
+    }
+
+    async function callWithRouter(messages, tools, temperature, signal, modelOverride, onToken) {
+      const H = window._H;
+      if (!H) throw new Error('window._H bridge not available');
+      const rawModel = modelOverride || H.selectedModel() || '';
+      const adapter = resolveCoderAdapter(rawModel);
+      const common = { messages, tools, temperature, signal, onToken };
+
+      if (adapter.kind === 'openai') {
+        if (onToken && H.agentTurnOpenAIStream) {
+          return H.agentTurnOpenAIStream({ provider: adapter.provider, model: adapter.model, ...common });
+        }
+        return H.agentTurnOpenAI({ provider: adapter.provider, model: adapter.model, messages, tools, temperature, signal });
+      }
+      if (adapter.kind === 'gemini') {
+        if (onToken && H.agentTurnGeminiStream) {
+          return H.agentTurnGeminiStream({ model: adapter.model, ...common });
+        }
+        return H.agentTurnGemini({ model: adapter.model, messages, tools, temperature, signal });
+      }
+      if (adapter.kind === 'anthropic') {
+        if (onToken && H.agentTurnAnthropicStream) {
+          return H.agentTurnAnthropicStream({ model: adapter.model, ...common });
+        }
+        return H.agentTurnAnthropic({ model: adapter.model, messages, tools, temperature, signal });
+      }
+      if (onToken && H.agentTurnOllamaStream) {
+        return H.agentTurnOllamaStream({ model: adapter.model, ...common });
+      }
+      return H.agentTurnOllama({ model: adapter.model, messages, tools, temperature, signal });
+    }
+
     function saveCoderState() {
+      _tabMgr.save();
       try {
         const state = {
           projectRoot: sharedState.projectRoot,
           homeDir: sharedState.homeDir,
-          chatHistory: conversationMsgs,
-          fileChangeLog: fileChanges,
           activeFile: sharedState.activeFile,
           ts: Date.now(),
         };
@@ -417,13 +954,6 @@
           setExplorerRootLabel(state.projectRoot);
           renderExplorerTree(state.projectRoot).catch(() => {});
         }
-        if (Array.isArray(state.chatHistory) && state.chatHistory.length) {
-          conversationMsgs = state.chatHistory;
-          renderConversation();
-        }
-        if (Array.isArray(state.fileChangeLog)) {
-          fileChanges = state.fileChangeLog;
-        }
       } catch (e) { console.warn('[CoderMode] restore state failed:', e); }
     }
     function clearCoderState() {
@@ -434,34 +964,207 @@
     function mount() {
       if (mounted) return;
       mounted = true;
+      // Init tabs: restore or create first
+      const loaded = _tabMgr.load();
+      if (!loaded) _initFirstTab();
       wireDom();
+      window.CdrComposerAttachments?.loadFromTab?.(_tabMgr.active());
       syncProjectLabel();
       setRouterChip('Auto', '');
-      if (sharedState.projectRoot) HC?.guard?.setProjectRoot?.(sharedState.projectRoot);
-      // Discover home dir for system-prompt path hints. Bypasses HC.code.shellRun intentionally
-      // — this is an internal app initialisation, not an AI agent action, so a permission
-      // dialog would be jarring UX. The command is read-only and hardcoded.
+      if (sharedState.projectRoot) {
+        HC?.guard?.setProjectRoot?.(sharedState.projectRoot);
+        if (HC?.code) HC.code.getProjectRoot = () => sharedState.projectRoot;
+      }
+      syncCoderGuardToggles();
+      refreshCoderSkills();
+      refreshGraphifyForProject();
       if (HC?.isTauri && !sharedState.homeDir) {
         HC.invoke('shell_run', { command: 'sh', args: ['-c', 'echo $HOME'], cwd: null })
-          .then(r => { if (r?.stdout?.trim()) sharedState.homeDir = r.stdout.trim(); })
+          .then(r => {
+            if (r?.stdout?.trim()) {
+              sharedState.homeDir = r.stdout.trim();
+              refreshCoderSkills();
+            }
+          })
           .catch(() => {});
       }
       restoreCoderState();
+      initCoderPowerFeatures();
+      // Restore active tab conversation
+      if (_conversationMsgs.length) renderConversation();
+      renderTabBar();
+      renderFileChangePills();
       syncTerminalPrompt();
+      updateCoderContextChip(_conversationMsgs);
     }
 
     function remount() {
       populateModelPicker();
       renderSessions();
+      renderTabBar();
     }
 
     function destroy() {
       mounted = false;
-      if (runAbort) { runAbort.abort(); runAbort = null; }
+      _runGeneration++;
+      abortActiveRun('Coder unmounted');
+      if (_statsInterval) {
+        clearInterval(_statsInterval);
+        _statsInterval = null;
+      }
+      if (_onTraceDocClick) {
+        document.removeEventListener('click', _onTraceDocClick);
+        _onTraceDocClick = null;
+      }
+      if (_onCoderKeydown) {
+        document.removeEventListener('keydown', _onCoderKeydown);
+        _onCoderKeydown = null;
+      }
+      if (_onSymbolKeydown) {
+        document.removeEventListener('keydown', _onSymbolKeydown);
+        _onSymbolKeydown = null;
+      }
+      if (_onModelsUpdated) {
+        document.removeEventListener('miraxcode:models-updated', _onModelsUpdated);
+        _onModelsUpdated = null;
+      }
+      _domWired = false;
+      _powerWired = false;
+      const pane = $('cdrEditorPane');
+      if (pane) pane._wired = false;
+      _lspDiagUnsub?.();
+      _lspDiagUnsub = null;
+      _ideCtx = null;
+      window.CdrMarkdown?.terminate?.();
+      _editorPane?.dispose?.();
+      _editorPane = null;
+      activeContentEl = null;
+    }
+
+    function syncCoderGuardToggles() {
+      const prefs = HC?.guard?.getPrefs?.() || {};
+      const yoloEl = $('cdrYoloMode');
+      const bypassEl = $('cdrBypassPerms');
+      if (yoloEl) yoloEl.checked = !!prefs.yoloMode;
+      if (bypassEl) {
+        bypassEl.checked = !!prefs.bypassPermissions;
+        bypassEl.disabled = !!prefs.yoloMode;
+        bypassEl.title = prefs.yoloMode
+          ? 'YOLO enables bypass automatically'
+          : 'Bypass permission prompts for tools and shell';
+      }
+    }
+
+    function refreshSystemPromptInConversation() {
+      if (_conversationMsgs.length && _conversationMsgs[0]?.role === 'system') {
+        _conversationMsgs[0].content = sysPrompt();
+      }
+    }
+
+    function updateGraphChip(ready, nodesHint) {
+      const chip = $('cdrGraphChip');
+      if (!chip) return;
+      if (!sharedState.projectRoot) {
+        chip.textContent = 'Graph —';
+        chip.title = 'Open a project to build Graphify map';
+        return;
+      }
+      chip.textContent = ready ? (nodesHint || 'Graph ✓') : 'Graph …';
+      chip.title = ready
+        ? `Graphify: ${HC.coderGraphify?.reportPath?.(sharedState.projectRoot) || 'graphify-out/'}`
+        : 'Click to build Graphify knowledge graph';
+    }
+
+    async function refreshGraphifyForProject({ force = false } = {}) {
+      const root = sharedState.projectRoot;
+      if (!root) {
+        _graphifyContext = '';
+        updateGraphChip(false);
+        return;
+      }
+      updateGraphChip(false);
+      const onStatus = (t) => { if (t) setStatus(t, 'thinking'); };
+      const ok = await HC?.coderGraphify?.ensureGraph?.(root, onStatus, { force });
+      if (ok) {
+        const report = await HC.coderGraphify.loadReportExcerpt(root);
+        const m = report.match(/(\d+)\s+nodes/i);
+        updateGraphChip(true, m ? `Graph ${m[1]}` : 'Graph ✓');
+      } else {
+        updateGraphChip(false);
+      }
+      refreshSystemPromptInConversation();
+      setStatus('Ready', '');
+    }
+
+    async function loadGraphifyContextForTask(task) {
+      const root = sharedState.projectRoot;
+      if (!root || !HC?.coderGraphify?.contextForTask) {
+        _graphifyContext = '';
+        return '';
+      }
+      _graphifyContext = await HC.coderGraphify.contextForTask(root, task, (t) => {
+        if (t) setStatus(t, 'thinking');
+      });
+      setStatus('Ready', '');
+      return _graphifyContext;
+    }
+
+    function onCoderModelChanged(label, fromCoderPicker) {
+      _tabMgr.syncFromVars();
+      const short = label.length > 28 ? label.slice(0, 26) + '…' : label;
+      setRouterChip(short, fromCoderPicker ? 'Coder model' : 'Following main model picker');
+      const turns = _conversationMsgs.filter(m => m.role === 'user').length;
+      if (_conversationMsgs.length && _conversationMsgs[0]?.role === 'system') {
+        const continuity =
+          `\n[Session continuity: ${turns} user turn(s) in this tab — full message history is preserved. ` +
+          `Active model: ${label}. Continue from prior context; do not restart the task.]`;
+        _conversationMsgs[0].content = sysPrompt() + continuity;
+      }
+      _tabMgr.save();
+      updateCoderContextChip(_conversationMsgs);
+      if (turns > 0) {
+        HC?.guard?.notify?.(`Model → ${short} (conversation kept)`, 'info');
+      }
+    }
+
+    async function refreshCoderSkills({ force = false } = {}) {
+      const chip = $('cdrSkillsChip');
+      let home = sharedState.homeDir || '';
+      if (!home && HC?.isTauri) {
+        try {
+          const r = await HC.invoke('shell_run', { command: 'sh', args: ['-c', 'echo $HOME'], cwd: null });
+          if (r?.stdout?.trim()) {
+            sharedState.homeDir = r.stdout.trim();
+            home = sharedState.homeDir;
+          }
+        } catch {}
+      }
+      if (!home) {
+        _skillsForPrompt = HC?.coderSkills?.getCached?.() || [];
+        if (chip) chip.textContent = _skillsForPrompt.length ? `Skills ${_skillsForPrompt.length}` : 'Skills …';
+        return;
+      }
+      if (chip && force) chip.textContent = 'Skills …';
+      try {
+        const skills = await HC?.coderSkills?.discoverInstalledSkills?.(home, { force });
+        _skillsForPrompt = skills || [];
+        if (chip) {
+          chip.textContent = `Skills ${_skillsForPrompt.length}`;
+          chip.title = _skillsForPrompt.length
+            ? _skillsForPrompt.slice(0, 24).map(s => `${s.name} (${s.source})`).join('\n')
+            : 'No skills found — click to rescan';
+        }
+        refreshSystemPromptInConversation();
+      } catch (e) {
+        console.warn('[CoderMode] skills scan failed:', e);
+        if (chip) chip.textContent = 'Skills err';
+      }
     }
 
     // ── DOM wiring ────────────────────────────────────────────
     function wireDom() {
+      if (_domWired) return;
+      _domWired = true;
       const runBtn            = $('cdrRunBtn');
       const stopBtn           = $('cdrStopBtn');
       const backBtn           = $('cdrBackBtn');
@@ -501,13 +1204,57 @@
         tracePanel.addEventListener('click', e => e.stopPropagation());
       }
       if (traceClear) traceClear.addEventListener('click', () => cdrTraceReset('Trace cleared'));
-      document.addEventListener('click', () => $('cdrTracePanel')?.classList.remove('open'));
+      _onTraceDocClick = () => $('cdrTracePanel')?.classList.remove('open');
+      document.addEventListener('click', _onTraceDocClick);
       if (exportBtn)         exportBtn.addEventListener('click', exportChat);
       if (sessionsClearAll)  sessionsClearAll.addEventListener('click', async () => {
         try { localStorage.removeItem(SESSIONS_KEY); } catch {}
         renderSessions();
       });
       if (sessionsSearchEl)  sessionsSearchEl.addEventListener('input', () => renderSessions(sessionsSearchEl.value));
+
+      const yoloEl = $('cdrYoloMode');
+      const bypassEl = $('cdrBypassPerms');
+      const skillsChip = $('cdrSkillsChip');
+      if (yoloEl) {
+        yoloEl.addEventListener('change', () => {
+          HC?.guard?.setYoloMode?.(yoloEl.checked);
+          syncCoderGuardToggles();
+          refreshSystemPromptInConversation();
+        });
+      }
+      if (bypassEl) {
+        bypassEl.addEventListener('change', () => {
+          if (yoloEl?.checked) return;
+          HC?.guard?.setBypassPermissions?.(bypassEl.checked);
+          syncCoderGuardToggles();
+          refreshSystemPromptInConversation();
+        });
+      }
+      if (skillsChip) {
+        skillsChip.addEventListener('click', () => {
+          refreshCoderSkills({ force: true });
+        });
+      }
+      const graphChip = $('cdrGraphChip');
+      if (graphChip) {
+        graphChip.addEventListener('click', () => {
+          if (!sharedState.projectRoot) {
+            HC?.guard?.notify?.('Open a project folder first', 'info');
+            return;
+          }
+          refreshGraphifyForProject({ force: true });
+        });
+      }
+
+      const mainModel = document.getElementById('model');
+      if (mainModel) {
+        mainModel.addEventListener('change', () => {
+          const mp = $('cdrModelPicker');
+          if (!mp || mp.value) return;
+          onCoderModelChanged(mainModel.options[mainModel.selectedIndex]?.text || 'Auto', false);
+        });
+      }
 
       // Terminal wiring
       const termInput = $('cdrTerminalInput');
@@ -539,7 +1286,24 @@
       const overlay = $('cdrChangeOverlay');
       if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeChangeOverlay(); });
 
+      // Tab bar wiring
+      const tabAddBtn = document.getElementById('cdrTabAdd');
+      if (tabAddBtn) tabAddBtn.addEventListener('click', onTabNew);
+
+      // Ctrl+T for new tab
+      _onCoderKeydown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 't' && document.getElementById('coder-mode-wrap')?.style.display !== 'none') {
+          if (document.body.classList.contains('coder-mode')) {
+            e.preventDefault();
+            onTabNew();
+          }
+        }
+      };
+      document.addEventListener('keydown', _onCoderKeydown);
+
       renderSessions();
+      initExplorerContextMenu();
+      wireChangeRowDelegation();
 
       // Quick-action chips on welcome screen
       document.querySelectorAll('.cdr-welcome-chip').forEach(chip => {
@@ -568,14 +1332,20 @@
       }
 
       populateModelPicker();
+      window.CdrComposerAttachments?.mount?.({
+        getTab: () => _tabMgr.active(),
+        onChange: () => _tabMgr.save(),
+      });
+      _onModelsUpdated = () => populateModelPicker();
+      document.addEventListener('miraxcode:models-updated', _onModelsUpdated);
       const modelPicker = $('cdrModelPicker');
       if (modelPicker) {
         modelPicker.addEventListener('change', () => {
           coderModel = modelPicker.value || null;
-          const label = modelPicker.options[modelPicker.selectedIndex]?.text || 'Auto';
-          setRouterChip(label.length > 22 ? label.slice(0, 20) + '…' : label, '');
+          applyCoderModelToUi(true);
         });
       }
+      startStatsPolling();
     }
 
     // Models known to reliably support structured tool/function calling.
@@ -589,11 +1359,18 @@
       autoOpt.value = '';
       autoOpt.textContent = 'Auto (follow main picker)';
       dest.appendChild(autoOpt);
-      src.querySelectorAll('optgroup, option').forEach(node => {
+      // Only clone direct children of #model. querySelectorAll('optgroup, option')
+      // also matches options inside optgroups, which duplicates every cloud model twice
+      // (once indented under the group label, once flush left as orphan options).
+      Array.from(src.children).forEach(node => {
         if (node.tagName === 'OPTGROUP') {
           const group = document.createElement('optgroup');
           group.label = node.label;
-          node.querySelectorAll('option').forEach(opt => group.appendChild(opt.cloneNode(true)));
+          if (node.dataset.cloud) group.dataset.cloud = node.dataset.cloud;
+          if (node.dataset.provider) group.dataset.provider = node.dataset.provider;
+          Array.from(node.children).forEach(opt => {
+            if (opt.tagName === 'OPTION') group.appendChild(opt.cloneNode(true));
+          });
           if (group.childElementCount) dest.appendChild(group);
         } else if (node.tagName === 'OPTION') {
           dest.appendChild(node.cloneNode(true));
@@ -621,6 +1398,7 @@
       const root = sharedState.projectRoot;
       sub.textContent = root ? root.split('/').slice(-1)[0] : 'No project open';
       sub.title = root || '';
+      _ideCtx?.updateTrustChip?.();
     }
 
     function setActiveFile(path) {
@@ -630,6 +1408,308 @@
         sub.textContent = path.split('/').slice(-1)[0] || path;
         sub.title = path;
       }
+    }
+
+    // ── Explorer context menu (Cursor-style) ───────────────────
+    let _explorerCtxTarget = null;
+    let _explorerCtxMenu = null;
+
+    function explorerCtxMenuEl() {
+      if (_explorerCtxMenu) return _explorerCtxMenu;
+      const menu = document.createElement('div');
+      menu.id = 'cdrExplorerCtxMenu';
+      menu.className = 'cdr-ctx-menu';
+      menu.setAttribute('role', 'menu');
+      menu.hidden = true;
+      document.body.appendChild(menu);
+      menu.addEventListener('click', e => e.stopPropagation());
+      menu.addEventListener('contextmenu', e => e.stopPropagation());
+      _explorerCtxMenu = menu;
+      document.addEventListener('click', () => hideExplorerContextMenu());
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') hideExplorerContextMenu();
+      });
+      window.addEventListener('blur', () => hideExplorerContextMenu());
+      window.addEventListener('resize', () => hideExplorerContextMenu());
+      return menu;
+    }
+
+    function hideExplorerContextMenu() {
+      const menu = _explorerCtxMenu;
+      if (!menu) return;
+      menu.classList.remove('open');
+      menu.hidden = true;
+      menu.innerHTML = '';
+      _explorerCtxTarget = null;
+    }
+
+    function ctxMenuItem(label, { shortcut, danger, disabled, onClick } = {}) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'cdr-ctx-item' + (danger ? ' danger' : '');
+      btn.setAttribute('role', 'menuitem');
+      btn.disabled = !!disabled;
+      const span = document.createElement('span');
+      span.textContent = label;
+      btn.appendChild(span);
+      if (shortcut) {
+        const sc = document.createElement('span');
+        sc.className = 'cdr-ctx-shortcut';
+        sc.textContent = shortcut;
+        btn.appendChild(sc);
+      }
+      if (!disabled && onClick) {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          hideExplorerContextMenu();
+          void onClick();
+        });
+      }
+      return btn;
+    }
+
+    function ctxMenuSep() {
+      const sep = document.createElement('div');
+      sep.className = 'cdr-ctx-sep';
+      sep.setAttribute('role', 'separator');
+      return sep;
+    }
+
+    function copyClipboard(text) {
+      const t = String(text || '');
+      if (!t) return;
+      navigator.clipboard?.writeText(t)?.catch(() => {});
+    }
+
+    function shellEscapePath(p) {
+      return String(p || '').replace(/'/g, "'\\''");
+    }
+
+    async function revealInFinder(path) {
+      if (!path || !HC?.isTauri) return;
+      try {
+        if (window.__TAURI__?.opener?.revealItemInDir) {
+          await window.__TAURI__.opener.revealItemInDir(path);
+          return;
+        }
+      } catch {}
+      await HC.invoke('shell_run', { command: 'open', args: ['-R', path], cwd: null });
+    }
+
+    async function openPathExternal(path) {
+      if (!path || !HC?.isTauri) return;
+      try {
+        if (window.__TAURI__?.opener?.openPath) {
+          await window.__TAURI__.opener.openPath(path);
+          return;
+        }
+      } catch {}
+      await HC.invoke('shell_run', { command: 'open', args: [path], cwd: null });
+    }
+
+    function focusIntegratedTerminal() {
+      const panel = $('cdrTerminalPanel');
+      const input = $('cdrTerminalInput');
+      if (panel) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      input?.focus();
+      return input;
+    }
+
+    async function openInIntegratedTerminal(path, isDir) {
+      const cwd = isDir ? path : (path.replace(/\/[^/]+$/, '') || path);
+      const input = focusIntegratedTerminal();
+      if (!cwd) return;
+      const cmd = `cd '${shellEscapePath(cwd)}' && pwd`;
+      if (input) {
+        input.value = `cd '${shellEscapePath(cwd)}'`;
+        input.focus();
+      }
+      if (!HC?.isTauri) {
+        terminalLog('Terminal requires Tauri backend.', 'cdr-terminal-error');
+        return;
+      }
+      terminalLog(`${terminalPrompt()} ${cmd}`, 'cdr-terminal-prompt');
+      try {
+        const result = await HC.invoke('shell_run', {
+          command: 'sh',
+          args: ['-c', cmd],
+          cwd: sharedState.projectRoot || undefined,
+        });
+        if (result?.stdout) result.stdout.split('\n').forEach(l => { if (l) terminalLog(l); });
+        if (result?.stderr) result.stderr.split('\n').forEach(l => { if (l) terminalLog(l, 'cdr-terminal-error'); });
+      } catch (err) {
+        terminalLog(String(err?.message || err), 'cdr-terminal-error');
+      }
+    }
+
+    function appendFileToComposer(path, { newSession = false, isDir = false } = {}) {
+      if (newSession) onTabNew();
+      const ti = $('cdrTaskInput');
+      if (!ti) return;
+      const rel = relativeFromRoot(path);
+      const block = isDir
+        ? `\n\n[Folder context: \`${rel}\`]\nFull path: ${path}\nPlease explore this folder and summarize its structure.\n`
+        : `\n\n[File context: \`${rel}\`]\nFull path: ${path}\nPlease read this file and use it in your response.\n`;
+      ti.value = (ti.value.trim() ? ti.value.trim() + '\n' : '') + block;
+      autoResize(ti);
+      ti.focus();
+      setActiveFile(path);
+      document.querySelectorAll('.cdr-tree-entry').forEach(el => {
+        el.classList.toggle('active', el.dataset.path === path);
+      });
+      HC?.guard?.notify?.(`Added ${rel} to Coder chat`, 'info');
+    }
+
+    async function copyFileContents(path) {
+      if (!HC?.code?.readFile) return;
+      try {
+        const content = await HC.code.readFile(path);
+        copyClipboard(typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+        HC?.guard?.notify?.('File contents copied', 'info');
+      } catch (e) {
+        HC?.guard?.notify?.(String(e?.message || e), 'err');
+      }
+    }
+
+    async function renameExplorerPath(path, isDir) {
+      const base = path.split('/').filter(Boolean).pop() || path;
+      const next = window.prompt(isDir ? 'Rename folder to:' : 'Rename file to:', base);
+      if (!next || next === base) return;
+      if (next.includes('/') || next.includes('\\')) {
+        HC?.guard?.notify?.('Name cannot contain path separators', 'err');
+        return;
+      }
+      const parent = path.replace(/\/[^/]+$/, '') || '/';
+      const dest = `${parent}/${next}`;
+      const ok = await HC.guard.request('write', path, `Rename to ${next}`);
+      if (!ok) return;
+      try {
+        await HC.invoke('shell_run', { command: 'mv', args: [path, dest], cwd: null });
+        HC?.guard?.notify?.('Renamed', 'info');
+        if (sharedState.projectRoot) await renderExplorerTree(sharedState.projectRoot);
+        if (sharedState.activeFile === path) setActiveFile(dest);
+      } catch (e) {
+        HC?.guard?.notify?.(String(e?.message || e), 'err');
+      }
+    }
+
+    async function deleteExplorerPath(path, isDir) {
+      const label = isDir ? 'folder' : 'file';
+      if (!window.confirm(`Delete this ${label}?\n\n${path}\n\nThis cannot be undone.`)) return;
+      const ok = await HC.guard.request('delete', path, `Delete ${label}`);
+      if (!ok) return;
+      try {
+        if (isDir) {
+          await HC.invoke('shell_run', { command: 'rm', args: ['-rf', path], cwd: null });
+        } else {
+          await HC.code.deleteFile(path, `Delete ${label}`);
+        }
+        HC?.guard?.notify?.('Deleted', 'info');
+        if (sharedState.activeFile === path) sharedState.activeFile = null;
+        if (sharedState.projectRoot) await renderExplorerTree(sharedState.projectRoot);
+      } catch (e) {
+        HC?.guard?.notify?.(String(e?.message || e), 'err');
+      }
+    }
+
+    function toggleDirEntry(entryEl) {
+      entryEl?.click();
+    }
+
+    function showExplorerContextMenu(event, entryEl) {
+      const path = entryEl?.dataset?.path;
+      if (!path) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const isDir = entryEl.dataset.isDir === '1' || entryEl.classList.contains('dir');
+      _explorerCtxTarget = { path, isDir, el: entryEl };
+      const menu = explorerCtxMenuEl();
+      menu.innerHTML = '';
+
+      if (isDir) {
+        menu.appendChild(ctxMenuItem('Expand / Collapse', { onClick: () => toggleDirEntry(entryEl) }));
+      } else {
+        menu.appendChild(ctxMenuItem('Open', { onClick: () => {
+          document.querySelectorAll('.cdr-tree-entry').forEach(el => el.classList.remove('active'));
+          entryEl.classList.add('active');
+          setActiveFile(path);
+          void openPathExternal(path);
+        } }));
+      }
+
+      menu.appendChild(ctxMenuSep());
+      menu.appendChild(ctxMenuItem('Reveal in Finder', {
+        shortcut: '⌥⌘R',
+        disabled: !HC?.isTauri,
+        onClick: () => revealInFinder(path),
+      }));
+      menu.appendChild(ctxMenuItem('Open in Integrated Terminal', {
+        disabled: !HC?.isTauri,
+        onClick: () => openInIntegratedTerminal(path, isDir),
+      }));
+
+      menu.appendChild(ctxMenuSep());
+      menu.appendChild(ctxMenuItem('Add to Coder Chat', {
+        onClick: () => appendFileToComposer(path, { newSession: false, isDir }),
+      }));
+      menu.appendChild(ctxMenuItem('Add to New Coder Session', {
+        onClick: () => appendFileToComposer(path, { newSession: true, isDir }),
+      }));
+
+      menu.appendChild(ctxMenuSep());
+      menu.appendChild(ctxMenuItem('Copy Path', {
+        shortcut: '⌥⌘C',
+        onClick: () => { copyClipboard(path); HC?.guard?.notify?.('Path copied', 'info'); },
+      }));
+      menu.appendChild(ctxMenuItem('Copy Relative Path', {
+        shortcut: '⌥⇧⌘C',
+        onClick: () => {
+          copyClipboard(relativeFromRoot(path));
+          HC?.guard?.notify?.('Relative path copied', 'info');
+        },
+      }));
+      if (!isDir) {
+        menu.appendChild(ctxMenuItem('Copy File Contents', {
+          shortcut: '⌘C',
+          disabled: !HC?.isTauri,
+          onClick: () => copyFileContents(path),
+        }));
+      }
+
+      menu.appendChild(ctxMenuSep());
+      menu.appendChild(ctxMenuItem('Rename…', {
+        disabled: !HC?.isTauri,
+        onClick: () => renameExplorerPath(path, isDir),
+      }));
+      menu.appendChild(ctxMenuItem('Delete', {
+        shortcut: '⌘⌫',
+        danger: true,
+        disabled: !HC?.isTauri,
+        onClick: () => deleteExplorerPath(path, isDir),
+      }));
+
+      menu.hidden = false;
+      menu.classList.add('open');
+      const pad = 8;
+      const mw = menu.offsetWidth || 248;
+      const mh = menu.offsetHeight || 200;
+      let x = event.clientX;
+      let y = event.clientY;
+      if (x + mw > window.innerWidth - pad) x = window.innerWidth - mw - pad;
+      if (y + mh > window.innerHeight - pad) y = window.innerHeight - mh - pad;
+      menu.style.left = `${Math.max(pad, x)}px`;
+      menu.style.top = `${Math.max(pad, y)}px`;
+    }
+
+    function initExplorerContextMenu() {
+      const body = $('cdrExplorerBody');
+      if (!body || body.dataset.ctxWired === '1') return;
+      body.dataset.ctxWired = '1';
+      body.addEventListener('contextmenu', e => {
+        const entry = e.target.closest('.cdr-tree-entry[data-path]');
+        if (!entry) return;
+        showExplorerContextMenu(e, entry);
+      });
     }
 
     // ── Explorer ──────────────────────────────────────────────
@@ -732,15 +1812,39 @@
       if (!folder || typeof folder !== 'string') return;
       sharedState.projectRoot = folder;
       HC?.guard?.setProjectRoot?.(folder);
+      if (HC?.code) HC.code.getProjectRoot = () => sharedState.projectRoot;
+      void refreshGraphifyForProject({ force: false });
       // Keep system prompt current so the model always sees the real project root.
-      if (conversationMsgs.length && conversationMsgs[0]?.role === 'system') {
-        conversationMsgs[0].content = sysPrompt();
+      if (_conversationMsgs.length && _conversationMsgs[0]?.role === 'system') {
+        _conversationMsgs[0].content = sysPrompt();
+      } else if (!_conversationMsgs.length) {
+        _graphifyContext = '';
+        void (async () => {
+          await loadGraphifyContextForTask('project structure overview');
+          if (!_conversationMsgs.length) {
+            _conversationMsgs.push({ role: 'system', content: sysPrompt() });
+          }
+        })();
       }
       syncProjectLabel();
       syncTerminalPrompt();
       setExplorerRootLabel(folder);
       await renderExplorerTree(folder);
+      refreshGitStatus();
+      _ideCtx?.updateTrustChip?.();
       scanProjectSymbols(folder);
+      void ingestProjectRag(folder);
+      void runProjectLintChecks(folder);
+      try {
+        const top = await HC.code.listDir(folder);
+        const hint = (top || []).map((e) => ({ path: e.name, name: e.name }));
+        const langs = await window.CdrLspClient?.startForProject?.(folder, hint);
+        if (langs?.length) {
+          HC?.guard?.notify?.(`LSP: ${langs.join(', ')}`, 'ok');
+        }
+      } catch (e) {
+        console.warn('[CoderMode] LSP start:', e);
+      }
       const sidebar = $('cdrSidebar');
       const body = $('cdrBody');
       if (sidebar) sidebar.classList.add('open');
@@ -763,6 +1867,7 @@
       sharedState.projectRoot = null;
       sharedState.activeFile = null;
       sharedState.projectSymbols = {};
+      window.CdrLspClient?.stopAll?.();
       HC?.guard?.clearProjectRoot?.();
       syncProjectLabel();
       syncTerminalPrompt();
@@ -807,6 +1912,8 @@
         : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
       row.innerHTML = `${icon}<span class="cdr-tree-text"><span class="cdr-tree-name">${esc(name)}</span><span class="cdr-tree-path">${esc(displayPath)}</span></span>`;
       row.title = filePath;
+      row.dataset.path = filePath;
+      row.dataset.isDir = '0';
       row.addEventListener('click', () => {
         setActiveFile(filePath);
         const ti = $('cdrTaskInput');
@@ -839,13 +1946,15 @@
           const item = document.createElement('div');
           item.className = 'cdr-tree-entry' + (entry.is_dir ? ' dir' : '');
           item.style.paddingLeft = `${7 + (depth || 0) * 12}px`;
-          const fullPath = (dir.endsWith('/') ? dir : dir + '/') + entry.name;
+          const fullPath = entry.path || `${dir.endsWith('/') ? dir : dir + '/'}${entry.name}`;
           const en = esc(entry.name);
+          item.dataset.path = fullPath;
+          item.dataset.isDir = entry.is_dir ? '1' : '0';
           item.innerHTML = entry.is_dir
             ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span class="cdr-tree-name">${en}</span>`
             : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span class="cdr-tree-name">${en}</span>`;
           item.title = fullPath;
-          item.dataset.path = fullPath;
+          window.CdrComposerAttachments?.wireExplorerEntry?.(item, fullPath, entry.is_dir);
           item.addEventListener('click', async e => {
             e.stopPropagation();
             if (entry.is_dir) {
@@ -863,6 +1972,7 @@
               document.querySelectorAll('.cdr-tree-entry').forEach(el => el.classList.remove('active'));
               item.classList.add('active');
               setActiveFile(fullPath);
+              _editorPane?.openFile(fullPath).catch(() => {});
               const ti = $('cdrTaskInput');
               if (ti && !ti.value.trim()) ti.value = `Read and summarize: ${fullPath}`;
             }
@@ -928,37 +2038,142 @@
       renderSymbolTree();
     }
 
+    async function ingestProjectRag(folder) {
+      try {
+        const r = await window.CdrProjectRag?.ingestProject?.(folder);
+        if (r?.ingested > 0) {
+          HC?.guard?.notify?.(`Indexed ${r.ingested} project files for RAG (@codebase)`, 'info');
+        } else if (r?.skipped === 'rag_disabled') {
+          HC?.guard?.notify?.('Enable RAG in Agents tab to index this project', 'info');
+        }
+      } catch (e) {
+        console.warn('[CoderMode] RAG ingest:', e);
+      }
+    }
+
+    async function runProjectLintChecks(folder) {
+      if (!_ideCtx?.reportProblems) return;
+      try {
+        await window.CdrProjectLint?.runProjectChecks?.(folder, (items) => {
+          if (items?.length) _ideCtx.reportProblems(items);
+        });
+      } catch (e) {
+        console.warn('[CoderMode] project lint:', e);
+      }
+    }
+
+    async function goToDefinition(symbol, fromPath) {
+      if (fromPath && window.CdrLspClient?.sessionForPath?.(fromPath)) {
+        const line = _editorPane?.editor?.getPosition?.()?.lineNumber || 1;
+        const col = _editorPane?.editor?.getPosition?.()?.column || 1;
+        const lspLoc = await window.CdrLspClient.definition(fromPath, line, col);
+        if (lspLoc?.path) {
+          setActiveFile(lspLoc.path);
+          _editorPane?.openFile(lspLoc.path, lspLoc.line, lspLoc.column).catch(() => {});
+          return;
+        }
+      }
+      if (!window.CdrGoto?.findDefinition) return;
+      const loc = await window.CdrGoto.findDefinition({
+        symbol,
+        path: fromPath,
+        projectRoot: sharedState.projectRoot,
+        projectSymbols: sharedState.projectSymbols,
+        readFile: (p) => HC.code.readFile(p),
+        grepCode: (dir, pat, ext) => HC.code.grepCode(dir, pat, ext),
+      });
+      if (!loc?.path) {
+        HC?.guard?.notify?.(`No definition found for "${symbol}"`, 'info');
+        return;
+      }
+      setActiveFile(loc.path);
+      _editorPane?.openFile(loc.path, loc.line, loc.col).catch(() => {});
+    }
+
+    function symbolMatchesFilter(s, fileName, q) {
+      if (_symbolKindFilter && s.kind !== _symbolKindFilter) return false;
+      if (!q) return true;
+      const hay = `${s.name} ${s.kind} ${fileName}`.toLowerCase();
+      return hay.includes(q);
+    }
+
     function renderSymbolTree() {
       const container = $('cdrExplorerBody');
       if (!container) return;
       const syms = sharedState.projectSymbols || {};
-      const existing = container.querySelector('.cdr-symbols-section');
-      if (existing) existing.remove();
-      if (!Object.keys(syms).length) return;
-      const section = document.createElement('div');
-      section.className = 'cdr-symbols-section';
-      section.innerHTML = `<div class="cdr-sidebar-title" style="margin:12px 6px 4px">Symbols</div>`;
+      let section = container.querySelector('.cdr-symbols-section');
+      if (!Object.keys(syms).length) {
+        section?.remove();
+        return;
+      }
+      const q = _symbolFilter.trim().toLowerCase();
+      if (!section) {
+        section = document.createElement('div');
+        section.className = 'cdr-symbols-section';
+        section.innerHTML = `
+          <div class="cdr-symbol-filter-bar">
+            <div class="cdr-sidebar-title">Symbols</div>
+            <input type="search" class="cdr-symbol-filter-input" id="cdrSymbolFilter" placeholder="Filter symbols…" spellcheck="false" autocomplete="off"/>
+            <div class="cdr-symbol-kinds" id="cdrSymbolKinds">
+              <button type="button" class="cdr-symbol-kind active" data-kind="">all</button>
+              <button type="button" class="cdr-symbol-kind" data-kind="fn">fn</button>
+              <button type="button" class="cdr-symbol-kind" data-kind="class">class</button>
+              <button type="button" class="cdr-symbol-kind" data-kind="type">type</button>
+              <button type="button" class="cdr-symbol-kind" data-kind="interface">iface</button>
+            </div>
+          </div>
+          <div class="cdr-symbol-list" id="cdrSymbolList"></div>`;
+        container.appendChild(section);
+        const filterInput = section.querySelector('#cdrSymbolFilter');
+        filterInput?.addEventListener('input', () => {
+          _symbolFilter = filterInput.value;
+          renderSymbolTree();
+        });
+        section.querySelector('#cdrSymbolKinds')?.addEventListener('click', (e) => {
+          const btn = e.target.closest('.cdr-symbol-kind');
+          if (!btn) return;
+          _symbolKindFilter = btn.dataset.kind || '';
+          section.querySelectorAll('.cdr-symbol-kind').forEach(b =>
+            b.classList.toggle('active', b === btn)
+          );
+          renderSymbolTree();
+        });
+      }
+      const filterInput = section.querySelector('#cdrSymbolFilter');
+      if (filterInput && filterInput.value !== _symbolFilter) filterInput.value = _symbolFilter;
+      const listRoot = section.querySelector('#cdrSymbolList');
+      if (!listRoot) return;
+      listRoot.innerHTML = '';
+      let total = 0;
       for (const [path, items] of Object.entries(syms)) {
         const fileName = path.split('/').pop();
+        const filtered = items.filter(s => symbolMatchesFilter(s, fileName, q));
+        if (!filtered.length) continue;
+        total += filtered.length;
         const fileDiv = document.createElement('div');
-        fileDiv.style.margin = '2px 6px';
-        fileDiv.innerHTML = `<div style="font-size:10px;color:var(--cdr-text-muted);margin-bottom:2px">${esc(fileName)}</div>`;
+        fileDiv.className = 'cdr-symbol-file';
+        fileDiv.innerHTML = `<div class="cdr-symbol-file-name">${esc(fileName)}</div>`;
         const list = document.createElement('div');
-        list.style.display = 'flex'; list.style.flexDirection = 'column'; list.style.gap = '1px';
-        for (const s of items) {
-          const el = document.createElement('div');
-          el.className = 'cdr-tree-entry';
-          el.style.paddingLeft = '14px';
-          el.style.fontSize = '10px';
+        list.className = 'cdr-symbol-entries';
+        for (const s of filtered) {
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'cdr-tree-entry cdr-symbol-entry';
           const kindColor = { class:'var(--cdr-gold)', struct:'var(--cdr-gold)', enum:'var(--cdr-gold)', interface:'var(--cdr-gold)', trait:'var(--cdr-violet)', type:'var(--cdr-violet)', fn:'var(--cdr-cyan)' }[s.kind] || 'var(--cdr-text-dim)';
-          el.innerHTML = `<span style="color:${kindColor};font-weight:600;margin-right:4px">${s.kind}</span>${esc(s.name)}`;
-          el.title = `${s.kind} ${s.name} — line ${s.line}`;
+          el.innerHTML = `<span class="cdr-symbol-kind-tag" style="color:${kindColor}">${esc(s.kind)}</span><span class="cdr-symbol-name">${esc(s.name)}</span><span class="cdr-symbol-line">:${s.line}</span>`;
+          el.title = `Go to ${s.kind} ${s.name} at line ${s.line}`;
+          el.addEventListener('click', () => {
+            setActiveFile(path);
+            _editorPane?.openFile(path, s.line, 1).catch(() => {});
+          });
           list.appendChild(el);
         }
         fileDiv.appendChild(list);
-        section.appendChild(fileDiv);
+        listRoot.appendChild(fileDiv);
       }
-      container.appendChild(section);
+      if (!total) {
+        listRoot.innerHTML = '<div class="cdr-git-empty">No symbols match filter</div>';
+      }
     }
 
     // ── Status helpers ────────────────────────────────────────
@@ -970,9 +2185,42 @@
     }
 
     // ── Chat rendering ────────────────────────────────────────
-    function scrollMessages() {
+    const MAX_RENDER_MSGS = 80;
+    const MAX_SESSION_MSG_CHARS = 16_000;
+    let _scrollRaf = 0;
+
+    function getChatVirtual() {
+      if (!_chatVirtual && window.CdrChatVirtual) {
+        const el = $('cdrMessages');
+        if (el) _chatVirtual = new window.CdrChatVirtual(el);
+      }
+      return _chatVirtual;
+    }
+
+    function enterChatLiveMode() {
+      getChatVirtual()?.enterLiveMode();
+    }
+
+    function scrollMessages(force = false) {
+      if (_domScrollBatch > 0 && !force) return;
+      const v = getChatVirtual();
+      if (v && !v.isLiveMode()) {
+        v.scrollToBottom(force);
+        return;
+      }
       const el = $('cdrMessages');
-      if (el) el.scrollTop = el.scrollHeight;
+      if (!el) return;
+      if (force) {
+        if (_scrollRaf) cancelAnimationFrame(_scrollRaf);
+        _scrollRaf = 0;
+        el.scrollTop = el.scrollHeight;
+        return;
+      }
+      if (_scrollRaf) return;
+      _scrollRaf = requestAnimationFrame(() => {
+        _scrollRaf = 0;
+        el.scrollTop = el.scrollHeight;
+      });
     }
 
     function renderMarkdown(text) {
@@ -987,14 +2235,20 @@
       return esc(text).replace(/\n/g, '<br>');
     }
 
-    function appendUserMsg(text) {
-      const msgs = $('cdrMessages');
-      if (!msgs) return;
-      msgs.querySelector('.cdr-welcome')?.remove();
+    function scheduleMarkdownHtml(el, text) {
+      if (!el || !text || !window.CdrMarkdown?.renderAsync) return;
+      window.CdrMarkdown.renderAsync(text).then(html => {
+        if (html) el.innerHTML = html;
+      }).catch(() => {});
+    }
+
+    function buildUserMsgElement(text, attachHtml) {
       const el = document.createElement('div');
       el.className = 'cdr-msg user';
       const svgCopy = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      const att = attachHtml || '';
       el.innerHTML = `
+        ${att}
         <div class="cdr-user-bubble">${esc(text)}</div>
         <div class="cdr-msg-actions">
           <button class="cdr-action-btn cdr-act-copy">${svgCopy} copy</button>
@@ -1005,6 +2259,44 @@
           setTimeout(() => this.classList.remove('flash'), 1200);
         }).catch(() => {});
       });
+      return el;
+    }
+
+    function buildAssistantMsgElement(roleLabel, text) {
+      const el = document.createElement('div');
+      el.className = 'cdr-msg assistant';
+      const svgCopy = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      el.innerHTML = `
+        <div class="cdr-msg-role">${esc(roleLabel || 'MiraXCode Coder')}</div>
+        <div class="cdr-msg-content"></div>
+        <div class="cdr-msg-actions">
+          <button class="cdr-action-btn cdr-act-copy">${svgCopy} copy</button>
+        </div>`;
+      const contentEl = el.querySelector('.cdr-msg-content');
+      if (text) {
+        const div = document.createElement('div');
+        div.className = 'cdr-msg-text';
+        const shown = text.length > 48_000 ? text.slice(0, 48_000) + '\n\n… (truncated for display)' : text;
+        div.innerHTML = renderMarkdown(shown);
+        scheduleMarkdownHtml(div, shown);
+        contentEl.appendChild(div);
+      }
+      el.querySelector('.cdr-act-copy')?.addEventListener('click', function () {
+        const txt = contentEl.innerText || contentEl.textContent || '';
+        navigator.clipboard.writeText(txt).then(() => {
+          this.classList.add('flash');
+          setTimeout(() => this.classList.remove('flash'), 1200);
+        }).catch(() => {});
+      });
+      return el;
+    }
+
+    function appendUserMsg(text, attachHtml) {
+      const msgs = $('cdrMessages');
+      if (!msgs) return;
+      enterChatLiveMode();
+      msgs.querySelector('.cdr-welcome')?.remove();
+      const el = buildUserMsgElement(text, attachHtml);
       msgs.appendChild(el);
       scrollMessages();
     }
@@ -1012,15 +2304,17 @@
     function appendAssistantBubble(roleLabel) {
       const msgs = $('cdrMessages');
       if (!msgs) return null;
+      enterChatLiveMode();
+      msgs.querySelector('.cdr-welcome')?.remove();
       const el = document.createElement('div');
-      el.className = 'cdr-msg assistant' + (roleLabel && roleLabel !== 'HashCortX Coder' ? ' boss' : '');
+      el.className = 'cdr-msg assistant' + (roleLabel && roleLabel !== 'MiraXCode Coder' ? ' boss' : '');
 
       const svgCopy  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
       const svgReply = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
       const svgRegen = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.18"/></svg>`;
 
       el.innerHTML = `
-        <div class="cdr-msg-role">${esc(roleLabel || 'HashCortX Coder')}</div>
+        <div class="cdr-msg-role">${esc(roleLabel || 'MiraXCode Coder')}</div>
         <div class="cdr-msg-content"></div>
         <div class="cdr-msg-actions">
           <button class="cdr-action-btn cdr-act-copy">${svgCopy} copy</button>
@@ -1049,24 +2343,41 @@
         ti.setSelectionRange(ti.value.length, ti.value.length);
       });
 
-      el.querySelector('.cdr-act-regen').addEventListener('click', () => {
+      el.querySelector('.cdr-act-regen').addEventListener('click', async () => {
         if (runAbort) return;
-        // Remove the last assistant message from history
-        for (let i = conversationMsgs.length - 1; i >= 0; i--) {
-          if (conversationMsgs[i].role === 'assistant') { conversationMsgs.splice(i, 1); break; }
+        for (let i = _conversationMsgs.length - 1; i >= 0; i--) {
+          if (_conversationMsgs[i].role === 'assistant') { _conversationMsgs.splice(i, 1); break; }
         }
         el.remove();
         const runBtn  = $('cdrRunBtn');
         const stopBtn = $('cdrStopBtn');
         if (runBtn)  runBtn.style.display = 'none';
         if (stopBtn) stopBtn.style.display = '';
+        const gen = ++_runGeneration;
+        if (runAbort) abortActiveRun('Regen');
         runAbort = new AbortController();
-        runSingleTurn(runAbort.signal).catch(() => {}).finally(() => {
+        _runTabId = _tabMgr.active()?.id || null;
+        _runFileChanges = _fileChanges;
+        const tab = _tabMgr.active();
+        if (tab) { tab.running = true; renderTabBar(); }
+        try {
+          await runSingleTurn(runAbort.signal);
+        } catch (e) {
+          if (e?.name !== 'AbortError') {
+            setStatus(e?.message || 'Regen failed', 'err');
+            console.error('[CoderMode] regen failed:', e);
+          }
+        } finally {
+          if (gen !== _runGeneration) return;
           if (runBtn)  runBtn.style.display = '';
           if (stopBtn) stopBtn.style.display = 'none';
           runAbort = null;
+          _runTabId = null;
+          _runFileChanges = null;
           setRouterChip('Auto', '');
-        });
+          const at = _tabMgr.active();
+          if (at) { at.running = false; renderTabBar(); }
+        }
       });
 
       msgs.appendChild(el);
@@ -1135,6 +2446,7 @@
       const el = document.createElement('div');
       el.className = 'cdr-msg-text';
       el.innerHTML = renderMarkdown(text);
+      scheduleMarkdownHtml(el, text);
       contentEl.appendChild(el);
       scrollMessages();
     }
@@ -1153,14 +2465,28 @@
       return words.slice(0, 3).join(' ') || 'New Chat';
     }
 
-    function saveCurrentSession() {
-      const userMsgs = conversationMsgs.filter(m => m.role === 'user');
+    function saveCurrentSession(forTab) {
+      const tab = forTab || _tabMgr.active();
+      if (!tab) return;
+      const msgs = forTab ? (tab.msgs || []) : _conversationMsgs;
+      const userMsgs = msgs.filter(m => m.role === 'user');
       if (!userMsgs.length) return;
       const title = enforceThreeWordName(userMsgs[0].content);
       const now = new Date();
       const date = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
                    now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-      const session = { id: Date.now(), title, date, msgs: conversationMsgs.slice() };
+      const session = {
+        id: Date.now(),
+        title,
+        date,
+        model: tab.model ?? coderModel ?? null,
+        msgs: msgs.map(m => ({
+          role: m.role,
+          content: typeof m.content === 'string'
+            ? m.content.slice(0, MAX_SESSION_MSG_CHARS)
+            : m.content,
+        })),
+      };
       const sessions = loadSessions();
       sessions.unshift(session);
       saveSessions(sessions);
@@ -1204,6 +2530,7 @@
       list.innerHTML = sessions.map(s => {
         const realIdx = all.indexOf(s);
         const userCount = s.msgs.filter(m => m.role === 'user').length;
+        const modelNote = s.model ? shortModelLabel(s.model) : '';
         return `
         <div class="cdr-session-item" data-idx="${realIdx}">
           <div class="cdr-session-row">
@@ -1213,7 +2540,7 @@
               <button class="cdr-session-act cdr-session-del" data-act="delete" title="Delete chat">${deleteSvg}</button>
             </div>
           </div>
-          <div class="cdr-session-meta">${esc(s.date)} &middot; ${userCount} msg${userCount !== 1 ? 's' : ''}</div>
+          <div class="cdr-session-meta">${esc(s.date)} &middot; ${userCount} msg${userCount !== 1 ? 's' : ''}${modelNote ? ` &middot; ${esc(modelNote)}` : ''}</div>
         </div>`;
       }).join('');
       list.querySelectorAll('.cdr-session-item').forEach(item => {
@@ -1234,8 +2561,19 @@
 
     function restoreSession(session) {
       if (!session?.msgs?.length) return;
-      conversationMsgs = session.msgs.slice();
-      fileChanges = [];
+      _conversationMsgs.length = 0;
+      session.msgs.forEach(m => _conversationMsgs.push(m));
+      _fileChanges.length = 0;
+      coderModel = session.model ?? null;
+      const tab = _tabMgr.active();
+      if (tab) {
+        tab.title = session.title || tab.title;
+        tab.model = coderModel;
+        _tabMgr.save();
+      }
+      populateModelPicker();
+      applyCoderModelToUi(!!coderModel);
+      renderTabBar();
       renderConversation();
       setStatus('Ready', '');
     }
@@ -1243,25 +2581,38 @@
     function renderConversation() {
       const msgs = $('cdrMessages');
       if (!msgs) return;
-      msgs.innerHTML = '';
-      for (const m of conversationMsgs) {
-        if (m.role === 'user') {
-          appendUserMsg(m.content);
-        } else if (m.role === 'assistant' && m.content) {
-          const el = appendAssistantBubble('HashCortX Coder');
-          if (el) {
-            const div = document.createElement('div');
-            div.className = 'cdr-msg-text';
-            div.innerHTML = renderMarkdown(m.content);
-            el.appendChild(div);
-          }
-        }
+      const hidden = Math.max(0, _conversationMsgs.length - MAX_RENDER_MSGS);
+      const slice = hidden > 0 ? _conversationMsgs.slice(-MAX_RENDER_MSGS) : _conversationMsgs;
+      const display = slice.filter(m =>
+        m.role === 'user' || (m.role === 'assistant' && m.content)
+      );
+      const v = getChatVirtual();
+      if (v && display.length > 12) {
+        v.setMessages(display, (m) => {
+          if (m.role === 'user') return buildUserMsgElement(m.content);
+          return buildAssistantMsgElement('MiraXCode Coder', m.content);
+        }, { hiddenCount: hidden });
+        scrollMessages(true);
+        return;
       }
+      enterChatLiveMode();
+      msgs.innerHTML = '';
+      if (hidden > 0) {
+        const note = document.createElement('div');
+        note.className = 'cdr-msg-truncated-note';
+        note.textContent = `${hidden} earlier message${hidden === 1 ? '' : 's'} hidden for performance — export chat for full history`;
+        msgs.appendChild(note);
+      }
+      for (const m of display) {
+        if (m.role === 'user') msgs.appendChild(buildUserMsgElement(m.content));
+        else if (m.role === 'assistant') msgs.appendChild(buildAssistantMsgElement('MiraXCode Coder', m.content));
+      }
+      scrollMessages(true);
     }
 
     // ── Change overlay ────────────────────────────────────────
     function showChangeOverlay(idx) {
-      const entry = fileChanges[idx];
+      const entry = _fileChanges[idx];
       if (!entry) return;
       const overlay = $('cdrChangeOverlay');
       const title   = $('cdrChangeOverlayTitle');
@@ -1354,6 +2705,10 @@
     }
 
     function terminalLog(text, className = '') {
+      if (_ideCtx?.terminalLog) {
+        _ideCtx.terminalLog(text, className);
+        return;
+      }
       const body = $('cdrTerminalBody');
       if (!body) return;
       const line = document.createElement('div');
@@ -1369,6 +2724,7 @@
     async function onTerminalKey(e) {
       if (e.key !== 'Enter') return;
       e.preventDefault();
+      if (_terminalBusy) return;
       const input = $('cdrTerminalInput');
       if (!input) return;
       const cmd = input.value.trim();
@@ -1380,6 +2736,8 @@
         terminalLog('Terminal requires Tauri backend.', 'cdr-terminal-error');
         return;
       }
+      _terminalBusy = true;
+      try {
       // Try streaming first (v1.7), fall back to blocking shell_run
       const ChannelCtor = typeof Channel !== 'undefined' ? Channel : window.__TAURI__?.core?.Channel;
       const useStream = !!ChannelCtor;
@@ -1387,12 +2745,14 @@
         try {
           const channel = new ChannelCtor();
           let exitCode = null;
+          let done = false;
           channel.onmessage = (chunk) => {
             if (chunk.kind === 'stdout') terminalLog(chunk.data);
             else if (chunk.kind === 'stderr') terminalLog(chunk.data, 'cdr-terminal-error');
-            else if (chunk.kind === 'done') exitCode = chunk.code;
+            else if (chunk.kind === 'done') { exitCode = chunk.code; done = true; }
           };
-          await HC.invoke('shell_run_stream', { command: 'sh', args: ['-c', cmd], cwd: sharedState.projectRoot || undefined, on_chunk: channel });
+          await HC.invoke('shell_run_stream', { command: 'sh', args: ['-c', cmd], cwd: sharedState.projectRoot || undefined, onChunk: channel });
+          for (let i = 0; !done && i < 200; i++) await new Promise(r => setTimeout(r, 25));
           if (exitCode !== 0 && exitCode !== null) {
             terminalLog(`(exit code: ${exitCode})`, 'cdr-terminal-error');
           }
@@ -1410,6 +2770,9 @@
         } catch (err) {
           terminalLog(String(err?.message || err), 'cdr-terminal-error');
         }
+      }
+      } finally {
+        _terminalBusy = false;
       }
     }
 
@@ -1438,40 +2801,20 @@
 
     function clearChat() {
       saveCurrentSession();
-      conversationMsgs = [];
-      fileChanges = [];
+      _conversationMsgs.length = 0;
+      _fileChanges.length = 0;
       activeContentEl = null;
-      const msgs = $('cdrMessages');
-      if (msgs) {
-        msgs.innerHTML = `<div class="cdr-welcome">
-          <img src="/assets/hashcortx-logo.png" class="cdr-welcome-logo" draggable="false" alt="HashCortx"/>
-          <div class="cdr-welcome-title">Coder Mode</div>
-          <div class="cdr-welcome-sub">Surgical AI tasks &middot; auto-routed &middot; local-first</div>
-          <div class="cdr-welcome-chips">
-            <span class="cdr-welcome-chip" data-prompt="List all files in the project and give me a quick overview of the codebase structure">Explore codebase</span>
-            <span class="cdr-welcome-chip" data-prompt="Find all TODO and FIXME comments in the project">Find TODOs</span>
-            <span class="cdr-welcome-chip" data-prompt="Check for any obvious bugs or issues in the main source files">Debug &amp; audit</span>
-            <span class="cdr-welcome-chip" data-prompt="Write unit tests for the core functionality">Write tests</span>
-          </div>
-        </div>`;
-        msgs.querySelectorAll('.cdr-welcome-chip').forEach(chip => {
-          chip.addEventListener('click', () => {
-            const ti = $('cdrTaskInput');
-            if (!ti || !chip.dataset.prompt) return;
-            ti.value = chip.dataset.prompt;
-            autoResize(ti);
-            ti.focus();
-          });
-        });
-      }
-      setStatus('Ready', '');
-      setRouterChip('Auto', '');
+      const tab = _tabMgr.active();
+      if (tab) tab.compactionLedger = "";
+      clearChatUI();
+      _tabMgr.save();
+      updateCoderContextChip([]);
     }
 
     // ── Export — opens a small menu under the Export button with format choices.
     // Formats: txt (plain), code (only fenced code blocks extracted), pdf (rendered).
     function exportChat() {
-      if (!conversationMsgs.length) { alert('No conversation to export.'); return; }
+      if (!_conversationMsgs.length) { alert('No conversation to export.'); return; }
       // If a menu is already open, close it
       const existing = document.getElementById('cdrExportMenu');
       if (existing) { existing.remove(); return; }
@@ -1496,6 +2839,10 @@
         <button data-fmt="pdf" type="button">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           PDF (.pdf)
+        </button>
+        <button data-fmt="changes" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Changes audit (.json)
         </button>`;
       document.body.appendChild(menu);
       const rect = btn.getBoundingClientRect();
@@ -1528,26 +2875,29 @@
 
       if (fmt === 'txt') {
         const out = buildPlainText();
-        downloadBlob(out, 'text/plain', `hashcortx-${proj}-${ts}.txt`);
+        downloadBlob(out, 'text/plain', `miraxcode-${proj}-${ts}.txt`);
       } else if (fmt === 'md') {
         const out = buildMarkdown();
-        downloadBlob(out, 'text/markdown', `hashcortx-${proj}-${ts}.md`);
+        downloadBlob(out, 'text/markdown', `miraxcode-${proj}-${ts}.md`);
       } else if (fmt === 'code') {
         const out = buildCodeOnly();
         if (!out.trim()) { alert('No fenced code blocks found in this conversation.'); return; }
-        downloadBlob(out, 'text/plain', `hashcortx-${proj}-code-${ts}.txt`);
+        downloadBlob(out, 'text/plain', `miraxcode-${proj}-code-${ts}.txt`);
       } else if (fmt === 'pdf') {
-        exportAsPdf(`hashcortx-${proj}-${ts}.pdf`);
+        exportAsPdf(`miraxcode-${proj}-${ts}.pdf`);
+      } else if (fmt === 'changes') {
+        const out = _ideCtx?.buildChangesExport?.({ fullContent: true }) || '{"changes":[]}';
+        downloadBlob(out, 'application/json', `miraxcode-${proj}-changes-${ts}.json`);
       }
     }
 
     function buildMarkdown() {
       const lines = [];
-      lines.push(`# HashCortx Coder — Chat Export`);
+      lines.push(`# MiraXcode Coder — Chat Export`);
       lines.push(`Date: ${new Date().toLocaleString()}`);
       if (sharedState.projectRoot) lines.push(`Project: ${sharedState.projectRoot}`);
       lines.push('');
-      for (const m of conversationMsgs) {
+      for (const m of _conversationMsgs) {
         if (m.role === 'system') continue;
         const role = m.role === 'user' ? '## User' : '## Agent';
         lines.push(role); lines.push('');
@@ -1558,11 +2908,11 @@
 
     function buildPlainText() {
       const lines = [];
-      lines.push(`HashCortx Coder — Chat Export`);
+      lines.push(`MiraXcode Coder — Chat Export`);
       lines.push(`Date: ${new Date().toLocaleString()}`);
       if (sharedState.projectRoot) lines.push(`Project: ${sharedState.projectRoot}`);
       lines.push('═'.repeat(60));
-      for (const m of conversationMsgs) {
+      for (const m of _conversationMsgs) {
         if (m.role === 'system') continue;
         lines.push('');
         lines.push((m.role === 'user' ? '>>> USER' : '<<< AGENT') + ' ' + '─'.repeat(40));
@@ -1575,7 +2925,7 @@
       const out = [];
       const fence = /```(\w*)\n([\s\S]*?)```/g;
       let n = 0;
-      for (const m of conversationMsgs) {
+      for (const m of _conversationMsgs) {
         if (!m.content || m.role === 'system') continue;
         let match;
         while ((match = fence.exec(m.content)) !== null) {
@@ -1626,11 +2976,11 @@
             y += lineH;
           }
         };
-        write('HashCortx Coder — Chat Export', { size: 14, bold: true });
+        write('MiraXcode Coder — Chat Export', { size: 14, bold: true });
         write(new Date().toLocaleString(), { size: 8, color: '#666' });
         if (sharedState.projectRoot) write('Project: ' + sharedState.projectRoot, { size: 8, color: '#666' });
         y += 6;
-        for (const m of conversationMsgs) {
+        for (const m of _conversationMsgs) {
           if (m.role === 'system') continue;
           y += 4;
           write(m.role === 'user' ? '▸ USER' : '◂ AGENT', {
@@ -1668,10 +3018,10 @@ h1{font-size:18px;border-bottom:1px solid #ddd;padding-bottom:8px}
 pre{background:#f4f6f8;border:1px solid #e2e4e8;border-radius:5px;padding:10px;overflow:auto;font:11px/1.45 ui-monospace,Menlo,monospace}
 .meta{color:#888;font-size:11px}
 </style></head><body>
-<h1>HashCortx Coder — Chat Export</h1>
+<h1>MiraXcode Coder — Chat Export</h1>
 <div class="meta">${esc(new Date().toLocaleString())}</div>
 ${sharedState.projectRoot ? `<div class="meta">Project: ${esc(sharedState.projectRoot)}</div>` : ''}
-${conversationMsgs.filter(m => m.role !== 'system').map(m => `
+${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
   <div class="role ${m.role === 'user' ? 'user' : 'agent'}">${m.role === 'user' ? '▸ User' : '◂ Agent'}</div>
   <div>${renderMarkdown(m.content || '')}</div>
 `).join('')}
@@ -1693,66 +3043,245 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
       setTimeout(() => setStatus('Ready', ''), 2400);
     }
 
-    function addChangeEntry(name, path, kind, content) {
-      const idx = fileChanges.length;
-      fileChanges.push({ name, path, kind, content });
+    const CHANGE_SVG = {
+      accept: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`,
+      reject: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
+      view: `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+      file: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+    };
+
+    function getChangesWrap(contentEl) {
+      if (!contentEl) return null;
+      let wrap = contentEl.querySelector('.cdr-changes-wrap');
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.className = 'cdr-changes-wrap';
+        const bar = document.createElement('div');
+        bar.className = 'cdr-changes-batch-bar';
+        bar.hidden = true;
+        bar.innerHTML = `
+          <span class="cdr-changes-batch-count"></span>
+          <div class="cdr-changes-batch-actions">
+            <button type="button" class="cdr-change-btn primary cdr-changes-accept-all">${CHANGE_SVG.accept} Accept all</button>
+            <button type="button" class="cdr-change-btn danger cdr-changes-reject-all">${CHANGE_SVG.reject} Reject all</button>
+          </div>`;
+        wrap.appendChild(bar);
+        contentEl.appendChild(wrap);
+      }
+      return wrap;
+    }
+
+    function updateChangesBatchBar(contentEl) {
+      const wrap = contentEl?.querySelector?.('.cdr-changes-wrap');
+      const bar = wrap?.querySelector('.cdr-changes-batch-bar');
+      if (!bar) return;
+      const pending = wrap.querySelectorAll('.cdr-change-row.pending').length;
+      const countEl = bar.querySelector('.cdr-changes-batch-count');
+      if (countEl) countEl.textContent = pending ? `${pending} pending` : 'All reviewed';
+      bar.hidden = wrap.querySelectorAll('.cdr-change-row').length === 0;
+      const acceptAll = bar.querySelector('.cdr-changes-accept-all');
+      const rejectAll = bar.querySelector('.cdr-changes-reject-all');
+      if (acceptAll) acceptAll.disabled = pending === 0;
+      if (rejectAll) rejectAll.disabled = pending === 0;
+    }
+
+    async function setChangeRowState(row, state) {
+      if (!row) return;
+      const idx = parseInt(row.dataset.changeIdx, 10);
+      const entry = !Number.isNaN(idx) ? _fileChanges[idx] : null;
+
+      if (entry && window.CdrFileStage) {
+        if (state === 'accepted' && !entry.applied) {
+          try {
+            await window.CdrFileStage.applyEntry(entry, (p, c, r) => HC.code.writeFile(p, c, r));
+            addAIFileToExplorer(entry.path, entry.kind || 'write');
+            HC?.guard?.notify?.('Change applied to disk', 'ok');
+          } catch (e) {
+            HC?.guard?.notify?.(e?.message || 'Apply failed', 'err');
+            return;
+          }
+        } else if (state === 'rejected') {
+          try {
+            await window.CdrFileStage.rejectEntry(
+              entry,
+              (p) => HC.code.readFile(p),
+              (p, c, r) => HC.code.writeFile(p, c, r),
+              (p, r) => HC.code.deleteFile(p, r)
+            );
+            HC?.guard?.notify?.(
+              entry.applied ? 'Change reverted on disk' : 'Change discarded',
+              'info'
+            );
+          } catch (e) {
+            HC?.guard?.notify?.(e?.message || 'Revert failed', 'err');
+            return;
+          }
+        }
+        entry.status = state;
+      }
+
+      row.classList.remove('pending', 'accepted', 'rejected');
+      row.classList.add(state);
+      const acceptBtn = row.querySelector('.cdr-change-accept');
+      const rejectBtn = row.querySelector('.cdr-change-reject');
+      const viewBtn = row.querySelector('.cdr-change-view');
+      if (state === 'accepted') {
+        if (acceptBtn) { acceptBtn.disabled = true; acceptBtn.innerHTML = `${CHANGE_SVG.accept} Accepted`; }
+        if (rejectBtn) {
+          rejectBtn.disabled = false;
+          rejectBtn.innerHTML = `${CHANGE_SVG.reject} Revert`;
+          rejectBtn.title = 'Revert this change on disk';
+        }
+        if (viewBtn) viewBtn.disabled = false;
+      } else if (state === 'rejected') {
+        if (rejectBtn) { rejectBtn.disabled = true; rejectBtn.innerHTML = `${CHANGE_SVG.reject} Rejected`; }
+        if (acceptBtn) acceptBtn.disabled = true;
+        if (viewBtn) viewBtn.disabled = false;
+      }
+      const contentEl = row.closest('.cdr-msg-content');
+      updateChangesBatchBar(contentEl);
+      if (entry) entry.status = state;
+      renderFileChangePills();
+      updatePendingChangesHeader();
+      if (entry?.path && _editorPane?.activePath === entry.path) {
+        if (entry.status === 'pending') {
+          _editorPane.openFile(entry.path).catch(() => {});
+        } else {
+          _editorPane.openFile(entry.path).catch(() => {});
+        }
+      }
+    }
+
+    async function acceptAllPendingChanges(contentEl) {
+      const root = contentEl || activeContentEl;
+      if (!root) return;
+      const rows = [...root.querySelectorAll('.cdr-change-row.pending')];
+      for (const row of rows) await setChangeRowState(row, 'accepted');
+      HC?.guard?.notify?.('All changes accepted', 'info');
+    }
+
+    async function rejectAllPendingChanges(contentEl) {
+      const root = contentEl || activeContentEl;
+      if (!root) return;
+      const rows = [...root.querySelectorAll('.cdr-change-row.pending, .cdr-change-row.accepted')];
+      for (const row of rows) await setChangeRowState(row, 'rejected');
+      HC?.guard?.notify?.('All changes rejected or reverted', 'info');
+    }
+
+    function toggleChangePreview(row) {
+      const idx = parseInt(row?.dataset?.changeIdx, 10);
+      const entry = _fileChanges[idx];
+      if (!entry) return;
+      let preview = row.nextElementSibling;
+      if (!preview?.classList?.contains('cdr-diff-preview')) {
+        preview = document.createElement('div');
+        preview.className = 'cdr-diff-preview';
+        preview.style.display = 'none';
+        const lineCount = entry.content ? (entry.content.match(/\n/g) || []).length + 1 : 0;
+        const body = (entry.content || '').length > 24_000
+          ? (entry.content || '').slice(0, 24_000) + '\n\n… (preview truncated)'
+          : (entry.content || '');
+        preview.innerHTML = `
+          <div class="cdr-diff-header">
+            <span>${esc(entry.name || entry.path)}</span>
+            <span style="color:var(--cdr-text-muted)">${lineCount} lines</span>
+          </div>
+          <div class="cdr-diff-body"><pre><code>${esc(body)}</code></pre></div>`;
+        row.after(preview);
+      }
+      const open = preview.style.display !== 'block';
+      preview.style.display = open ? 'block' : 'none';
+      const viewBtn = row.querySelector('.cdr-change-view');
+      if (viewBtn) viewBtn.innerHTML = open ? `${CHANGE_SVG.view} Hide` : `${CHANGE_SVG.view} View`;
+    }
+
+    function wireChangeRowDelegation() {
+      const msgs = $('cdrMessages');
+      if (!msgs || msgs.dataset.changeDelegate === '1') return;
+      msgs.dataset.changeDelegate = '1';
+      msgs.addEventListener('click', e => {
+        const row = e.target.closest('.cdr-change-row');
+        if (row) {
+          if (e.target.closest('.cdr-change-accept')) {
+            e.preventDefault();
+            setChangeRowState(row, 'accepted');
+            return;
+          }
+          if (e.target.closest('.cdr-change-reject')) {
+            e.preventDefault();
+            setChangeRowState(row, 'rejected');
+            return;
+          }
+          if (e.target.closest('.cdr-change-view')) {
+            e.preventDefault();
+            toggleChangePreview(row);
+            return;
+          }
+        }
+        const wrap = e.target.closest('.cdr-changes-wrap');
+        if (!wrap) return;
+        if (e.target.closest('.cdr-changes-accept-all')) {
+          e.preventDefault();
+          acceptAllPendingChanges(wrap.closest('.cdr-msg-content'));
+        } else if (e.target.closest('.cdr-changes-reject-all')) {
+          e.preventDefault();
+          rejectAllPendingChanges(wrap.closest('.cdr-msg-content'));
+        }
+      });
+    }
+
+    function addChangeEntry(name, path, kind, content, existingEntry) {
+      const fc = activeFileChanges();
+      const idx = fc.length;
+      const stored = typeof content === 'string' && content.length > 80_000
+        ? content.slice(0, 80_000) + '\n… (stored truncated)'
+        : content;
+      const entry = existingEntry || {
+        name, path, kind,
+        content: stored,
+        proposedContent: stored,
+        previousContent: null,
+        status: 'pending',
+        applied: false,
+      };
+      if (existingEntry) {
+        entry.name = entry.name || name;
+        entry.path = entry.path || path;
+        entry.kind = entry.kind || kind;
+        entry.content = entry.content ?? stored;
+        entry.proposedContent = entry.proposedContent ?? stored;
+      }
+      fc.push(entry);
       const target = activeContentEl || $('cdrMessages')?.querySelector('.cdr-msg.assistant:last-of-type .cdr-msg-content');
       if (!target) return;
-      const safeId = 'ch_' + Math.random().toString(36).slice(2, 9);
+      const wrap = getChangesWrap(target);
+      if (!wrap) return;
+      const lineCount = stored ? (String(stored).match(/\n/g) || []).length + 1 : 0;
+      const stats = stored ? `+${lineCount} lines` : '';
       const row = document.createElement('div');
       row.className = 'cdr-change-row pending';
       row.dataset.changeIdx = String(idx);
-      const lineCount = content ? (content.match(/\n/g) || []).length + 1 : 0;
-      const stats = content ? `+${lineCount} lines` : '';
-      const svgAccept = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-      const svgReject = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-      const svgView = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
       row.innerHTML = `
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        ${CHANGE_SVG.file}
         <span class="cdr-change-file">${esc(name)}</span>
         <span class="cdr-change-stats">${esc(stats)}</span>
         <div class="cdr-change-actions">
-          <button class="cdr-change-btn primary cdr-change-accept">${svgAccept} Accept</button>
-          <button class="cdr-change-btn danger cdr-change-reject">${svgReject} Reject</button>
-          <button class="cdr-change-btn cdr-change-view">${svgView} View</button>
+          <button type="button" class="cdr-change-btn primary cdr-change-accept">${CHANGE_SVG.accept} Accept</button>
+          <button type="button" class="cdr-change-btn danger cdr-change-reject">${CHANGE_SVG.reject} Reject</button>
+          <button type="button" class="cdr-change-btn cdr-change-view">${CHANGE_SVG.view} View</button>
         </div>`;
-      row.querySelector('.cdr-change-accept').addEventListener('click', () => {
-        row.classList.remove('pending'); row.classList.add('accepted');
-        const btn = row.querySelector('.cdr-change-accept');
-        if (btn) btn.innerHTML = `${svgAccept} Accepted`;
-      });
-      row.querySelector('.cdr-change-reject').addEventListener('click', () => {
-        row.classList.remove('pending'); row.classList.add('rejected');
-        const btn = row.querySelector('.cdr-change-reject');
-        if (btn) btn.innerHTML = `${svgReject} Rejected`;
-      });
-      row.querySelector('.cdr-change-view').addEventListener('click', () => {
-        const preview = document.getElementById(safeId);
-        if (preview) {
-          const isOpen = preview.style.display === 'block';
-          preview.style.display = isOpen ? 'none' : 'block';
-        }
-      });
-      target.appendChild(row);
-
-      // Inline diff preview
-      const preview = document.createElement('div');
-      preview.className = 'cdr-diff-preview';
-      preview.id = safeId;
-      preview.style.display = 'none';
-      const ext = name.split('.').pop() || 'txt';
-      preview.innerHTML = `
-        <div class="cdr-diff-header">
-          <span>${esc(name)}</span>
-          <span style="color:var(--cdr-text-muted)">${lineCount} lines</span>
-        </div>
-        <div class="cdr-diff-body"><pre><code>${esc(content || '')}</code></pre></div>`;
-      target.appendChild(preview);
+      wrap.appendChild(row);
+      updateChangesBatchBar(target);
+      renderFileChangePills();
+      if (path && (_ideCtx?.shouldAutoOpenDiff?.() !== false)) {
+        _editorPane?.openFile(path).catch(() => {});
+      }
       scrollMessages();
     }
 
     // ── Build tools + system ──────────────────────────────────
     function buildTools() {
+      if (_ideCtx?.isPlanOnly?.()) return [];
       return (HC?.code?.TOOL_DEFINITIONS || []).map(t => ({
         type: 'function',
         function: {
@@ -1783,14 +3312,23 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
       }
 
       const lines = [
-        'You are HashCortx Coder — a precise coding agent.',
+        'You are MiraXcode Coder — a precise coding agent.',
+      ];
+      if (_ideCtx?.isPlanOnly?.()) {
+        lines.push(
+          'PLAN MODE (active): Do not use tools. Reply with a structured plan only — steps, files, risks, and verification.',
+          'Use markdown headings and numbered steps. No file writes until the user disables Plan mode.'
+        );
+      } else {
+        lines.push(
         'Rules:',
         '1. One change at a time. Use tool calls for any file/shell action — do not narrate plans.',
         '2. Replies must be ≤3 short sentences unless the user asks for detail.',
         '3. For code edits, return only the changed region. No surrounding context.',
         '4. Never call tools for greetings or conversational questions — answer in plain text.',
         '5. Blocked paths: /System, /etc, /private, /usr, /bin — refuse without asking.',
-      ];
+        );
+      }
       if (root) {
         lines.push(`Project root: ${root}`);
         lines.push(`6. If the project directory is empty or new, immediately start creating files — do NOT explore the filesystem first.`);
@@ -1799,57 +3337,66 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
         lines.push(`No project open. Home: ${homeDir || 'unknown'}. Ask user to open a folder for write ops.`);
       }
 
-      // Optional memory recall — kept terse, opt-in only
+      const task = _conversationMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
       try {
-        const H = window._H;
-        if (H?.memRecall) {
-          const task = conversationMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-          const scored = H.memRecall(task, 4);
-          if (scored && scored.length) {
+        const memBlock = HC?.coderMemory?.formatMergedForPrompt?.(root, task);
+        if (memBlock) lines.push(memBlock.trim());
+        else if (window._H?.memRecall) {
+          const scored = window._H.memRecall(task, 8);
+          if (scored?.length) {
             lines.push('Memory (silent context, do not recite):');
-            scored.forEach(f => lines.push(`  - ${f.key}: ${String(f.value).slice(0, 120)}`));
+            scored.forEach(f => lines.push(`  - ${f.key}: ${String(f.value).slice(0, 160)}`));
           }
         }
       } catch {}
+
+      if (_graphifyContext) {
+        lines.push(HC?.coderGraphify?.formatPromptBlock?.(root, _graphifyContext) || _graphifyContext);
+      } else if (root && HC?.coderGraphify) {
+        lines.push(
+          'Graphify: graphify-out/ will be used when available. Call graphify_report or graphify_query before blind repo search.'
+        );
+      }
+
+      if (HC?.guard?.isYolo?.()) {
+        lines.push('YOLO mode: run tools and shell without permission prompts (hard-blocked paths/commands still denied).');
+      } else if (HC?.guard?.isBypassPermissions?.()) {
+        lines.push('Bypass permissions: approve tool/shell actions without prompts (hard-blocked still denied).');
+      }
+
+      const skList = _skillsForPrompt?.length
+        ? _skillsForPrompt
+        : (HC?.coderSkills?.getCached?.() || []);
+      const skBlock = HC?.coderSkills?.formatSkillsForPrompt?.(skList);
+      if (skBlock) lines.push(skBlock);
 
       const richBase = HC?.code?.SYSTEM_PROMPT || '';
       const out = (richBase ? richBase + '\n' : '') + lines.join('\n');
       return out + (extra ? '\n' + extra : '');
     }
 
-    // ── History compression: keep last 8 turns verbatim, roll older into one summary line.
-    // Tool results trimmed to 800 chars when sent to the API (full version stays in UI).
-    function compressHistory(msgs) {
-      if (!Array.isArray(msgs) || msgs.length <= 18) {
-        return msgs.map(m => trimToolResult(m));
+    /** Model-aware compaction — preserves WORKING_STATE ledger on the tab. */
+    async function prepareMessagesForModel(msgs, signal) {
+      const tab = _tabMgr.active();
+      const modelValue = activeModelValue();
+      if (!HC?.contextCompactor?.prepareForApi) {
+        return HC?.contextCompactor?.trimAllTools?.(msgs, 1200) || msgs;
       }
-      // Always preserve the original system prompt at index 0.
-      const systemMsg = msgs[0]?.role === 'system' ? msgs[0] : null;
-      const rest      = systemMsg ? msgs.slice(1) : msgs;
-
-      // Don't cut inside a tool call pair — advance past any leading tool messages.
-      let cutIdx = Math.max(0, rest.length - 16);
-      while (cutIdx < rest.length && rest[cutIdx]?.role === 'tool') cutIdx++;
-
-      const tail  = rest.slice(cutIdx);
-      const older = rest.slice(0, cutIdx);
-      const users = older.filter(m => m.role === 'user').length;
-      const tools = older.filter(m => m.role === 'tool').length;
-      const asst  = older.filter(m => m.role === 'assistant').length;
-      const summary = `[Earlier context compressed: ${users} user msg${users !== 1 ? 's' : ''}, ${asst} assistant repl${asst !== 1 ? 'ies' : 'y'}, ${tools} tool call${tools !== 1 ? 's' : ''}.]`;
-
-      // Append summary to the system message so there is only ever one system turn.
-      const newSystem = systemMsg
-        ? { ...systemMsg, content: systemMsg.content + '\n' + summary }
-        : { role: 'system', content: summary };
-
-      return [newSystem].concat(tail.map(m => trimToolResult(m)));
-    }
-
-    function trimToolResult(m) {
-      if (!m || m.role !== 'tool' || typeof m.content !== 'string') return m;
-      if (m.content.length <= 800) return m;
-      return Object.assign({}, m, { content: m.content.slice(0, 800) + '\n…[truncated for prompt size]' });
+      const prepared = await HC.contextCompactor.prepareForApi(msgs, {
+        modelValue,
+        signal,
+        ledger: tab?.compactionLedger || "",
+        cacheKey: tab?.id || "coder",
+        onStatus: (t) => { if (t) setStatus(t, 'thinking'); },
+        onLedgerUpdate: (ledger) => {
+          if (tab) {
+            tab.compactionLedger = ledger;
+            _tabMgr.save();
+          }
+        },
+      });
+      updateCoderContextChip(prepared);
+      return prepared;
     }
 
     // ── Core agent loop — renders inline into a bubble ────────
@@ -1857,11 +3404,14 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
       const H = window._H;
       const temperature = H?.selectedTemperature ? Math.min(H.selectedTemperature(), 0.35) : 0.15;
       activeContentEl = contentEl;
-      const MAX_ITER = 16;
+      const runTabId = _runTabId;
+      const yolo = !!HC?.guard?.isYolo?.();
+      const MAX_ITER = yolo ? 40 : 16;
       let iter = 0;
       let thinkEl = appendThinking(contentEl);
       let reasoningEl = null; // real-time reasoning display
 
+      try {
       while (iter < MAX_ITER) {
         iter++;
 
@@ -1870,18 +3420,33 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
 
         // On the final iteration pass a copy with a wrap-up nudge so the model
         // stops calling tools. We use a copy so the nudge never persists into
-        // conversationMsgs on the next user turn.
+        // _conversationMsgs on the next user turn.
         // Also compress older turns to keep the prompt small (Claude-Code style).
         const baseMsgs = iter === MAX_ITER
           ? [...messages, { role: 'user', content: 'Stop calling tools now. Write a 2-sentence summary of what was done and any leftover.' }]
           : messages;
-        const callMessages = compressHistory(baseMsgs);
+        const callMessages = await prepareMessagesForModel(baseMsgs, signal);
+        if (callMessages.length < baseMsgs.length) {
+          const ctxU = HC?.contextCompactor?.usageRatio?.(callMessages, activeModelValue());
+          cdrTraceAdd('Context', `Compacted · ~${ctxU?.estimated || '?'} tok`, 'run');
+        }
 
         cdrTraceAdd('Step', `Iter ${iter}${label ? ' · ' + label : ''} · calling model`, 'run');
         let turn;
+        let liveStreamActive = false;
+        const onToken = (_delta, full) => {
+          if (signal?.aborted || _runTabId !== runTabId) return;
+          if (!liveStreamActive) {
+            _ideCtx?.beginStreamBubble?.(contentEl);
+            liveStreamActive = true;
+          }
+          _ideCtx?.updateStreamBubble?.(full);
+          scrollMessages();
+        };
         try {
-          turn = await callWithRouter(callMessages, tools, temperature, signal, coderModel);
+          turn = await callWithRouter(callMessages, tools, temperature, signal, coderModel, onToken);
         } catch (e) {
+          if (liveStreamActive) _ideCtx?.cancelStreamBubble?.();
           thinkEl?.remove(); thinkEl = null;
           reasoningEl?.remove(); reasoningEl = null;
           cdrTraceAdd('Error', e?.message || String(e), 'err');
@@ -1899,20 +3464,27 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
         }
         thinkEl?.remove(); thinkEl = null;
 
-        // Show reasoning content between iterations (model's thought process)
-        if (turn.content && turn.tool_calls?.length) {
-          if (!reasoningEl) {
-            reasoningEl = document.createElement('div');
-            reasoningEl.className = 'cdr-thinking-stream';
-            contentEl.appendChild(reasoningEl);
+        if (turn.tool_calls?.length) {
+          if (liveStreamActive) {
+            _ideCtx?.cancelStreamBubble?.();
+            liveStreamActive = false;
           }
-          reasoningEl.innerHTML = `<div class="cdr-thinking-hd">Reasoning</div>${esc(turn.content)}`;
-          reasoningEl.classList.remove('empty');
-          scrollMessages();
+          if (turn.content) {
+            if (!reasoningEl) {
+              reasoningEl = document.createElement('div');
+              reasoningEl.className = 'cdr-thinking-stream';
+              contentEl.appendChild(reasoningEl);
+            }
+            reasoningEl.innerHTML = `<div class="cdr-thinking-hd">Reasoning</div>${esc(turn.content)}`;
+            reasoningEl.classList.remove('empty');
+            scrollMessages();
+          }
         }
 
         if (turn.tool_calls?.length) {
           H.appendAssistantToolCallTurn(messages, turn.content, turn.tool_calls); // always append to real history
+          _domScrollBatch++;
+          try {
           for (const call of turn.tool_calls) {
             if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
@@ -1932,29 +3504,74 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
             const t0 = performance.now();
             let resultStr, ok = true;
             try {
-              const def = (HC?.code?.TOOL_DEFINITIONS || []).find(t => t.name === call.name);
-              if (!def) throw new Error('Unknown tool: ' + call.name);
-              const raw = await def.fn(call.arguments || {});
-              resultStr = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+              if ((call.name === 'write_file' || call.name === 'patch_file') && window.CdrFileStage) {
+                const staged = await window.CdrFileStage.computeProposed(call, (p) => HC.code.readFile(p));
+                const stored = staged.proposedContent.length > 80_000
+                  ? staged.proposedContent.slice(0, 80_000) + '\n… (stored truncated)'
+                  : staged.proposedContent;
+                const entry = {
+                  name: baseName(staged.path),
+                  path: staged.path,
+                  kind: staged.kind,
+                  content: stored,
+                  proposedContent: staged.proposedContent,
+                  previousContent: staged.previousContent,
+                  status: 'pending',
+                  applied: false,
+                  tool: staged.tool,
+                };
+                const fcRun = activeFileChanges();
+                const changeIdx = fcRun.length;
+                addChangeEntry(entry.name, entry.path, entry.kind, stored, entry);
+                resultStr = window.CdrFileStage.stagedResult(staged.path, staged.proposedContent.length);
+                if (yolo && ok) {
+                  const entry = fcRun[changeIdx];
+                  try {
+                    await window.CdrFileStage.applyEntry(entry, (p, c, r) => HC.code.writeFile(p, c, r));
+                    addAIFileToExplorer(entry.path, entry.kind || 'write');
+                    const row = contentEl?.querySelector(
+                      `.cdr-change-row[data-change-idx="${changeIdx}"]`
+                    );
+                    if (row) await setChangeRowState(row, 'accepted');
+                    resultStr = JSON.stringify({
+                      ok: true,
+                      applied: true,
+                      path: entry.path,
+                      message: 'YOLO: change written to disk immediately (revert still available).',
+                    });
+                  } catch (applyErr) {
+                    ok = false;
+                    resultStr = JSON.stringify({ error: String(applyErr?.message || applyErr) });
+                  }
+                }
+              } else {
+                const def = (HC?.code?.TOOL_DEFINITIONS || []).find(t => t.name === call.name);
+                if (!def) throw new Error('Unknown tool: ' + call.name);
+                const raw = await def.fn(call.arguments || {});
+                resultStr = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
+              }
             } catch (e) {
               resultStr = JSON.stringify({ error: String(e?.message || e) }); ok = false;
             }
             const ms = Math.round(performance.now() - t0);
             cdrTraceAdd('Tool', call.name + ' · ' + ms + 'ms', ok ? 'ok' : 'err');
             finalizeToolBlock(toolEl, resultStr, ok, ms);
+            if (!ok && _ideCtx?.reportProblems && window.CdrDiagnostics?.parseOutput) {
+              const parsed = window.CdrDiagnostics.parseOutput(resultStr);
+              if (parsed.length) _ideCtx.reportProblems(parsed);
+            }
 
-            if (call.name === 'write_file' || call.name === 'patch_file') {
-              const fp = call.arguments?.path || '';
-              addChangeEntry(fp.split('/').slice(-1)[0] || fp, fp, 'write',
-                call.arguments?.content || call.arguments?.patch || resultStr);
-              if (ok && fp) addAIFileToExplorer(fp, 'write');
-            } else if (call.name === 'delete_file') {
+            if (call.name === 'delete_file') {
               const fp = call.arguments?.path || '';
               addChangeEntry(fp.split('/').slice(-1)[0] || fp, fp, 'delete', '(file deleted)');
               if (ok && fp) addAIFileToExplorer(fp, 'delete');
             }
             H.appendToolResult(messages, call, resultStr);
           }
+          } finally {
+            _domScrollBatch--;
+          }
+          scrollMessages();
           thinkEl = appendThinking(contentEl);
           continue;
         }
@@ -1967,7 +3584,11 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
           appendTextToBubble(contentEl, '*No response from model. Try again or check your model settings.*');
         } else {
           cdrTraceAdd('Done', (label || 'Agent') + ' · ' + finalText.length + ' chars', 'ok');
-          appendTextToBubble(contentEl, finalText);
+          if (liveStreamActive) {
+            _ideCtx?.endStreamBubble?.(contentEl, finalText);
+          } else {
+            appendTextToBubble(contentEl, finalText);
+          }
         }
         return finalText;
       }
@@ -1979,53 +3600,117 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
       while (messages.length && messages[messages.length - 1].role === 'assistant' &&
              Array.isArray(messages[messages.length - 1].tool_calls)) messages.pop();
       cdrTraceAdd('Done', 'Max iterations reached', 'warn');
+      if (yolo && !signal?.aborted) {
+        messages.push({
+          role: 'user',
+          content: 'Continue from where you left off. Finish remaining work with tool calls as needed, then summarize.',
+        });
+        cdrTraceAdd('YOLO', 'Auto-continuing after max iterations', 'run');
+        return agentLoop(messages, tools, contentEl, label, signal);
+      }
       appendTextToBubble(contentEl, '*Task paused — reply to continue or click regen to retry.*');
       return '';
+      } finally {
+        if (activeContentEl === contentEl) activeContentEl = null;
+      }
+    }
+
+    async function expandTaskMentions(task) {
+      let t = task;
+      if (_ideCtx?.expandCodebase) {
+        t = await _ideCtx.expandCodebase(t);
+      }
+      const root = sharedState.projectRoot;
+      if (!root || !t.includes('@')) return t;
+      task = t;
+      const re = /@([^\s@]+)/g;
+      let extra = '';
+      let m;
+      while ((m = re.exec(task)) !== null) {
+        const rel = m[1].replace(/\/$/, '');
+        const full = rel.startsWith('/') ? rel : `${root.replace(/\/$/, '')}/${rel}`;
+        try {
+          const content = await HC.code.readFile(full);
+          extra += `\n\n--- @${rel} ---\n${String(content).slice(0, 12_000)}`;
+        } catch { /* skip missing paths */ }
+      }
+      return extra ? task + extra : task;
     }
 
     // ── Main send ─────────────────────────────────────────────
     async function startRun() {
       const taskInput = $('cdrTaskInput');
       const task = taskInput?.value?.trim();
-      if (!task) { taskInput?.focus(); return; }
+      const hasAttach = window.CdrComposerAttachments?.hasPending?.();
+      if (!task && !hasAttach) { taskInput?.focus(); return; }
+
+      const attachHtml = window.CdrComposerAttachments?.renderUserAttachmentHtml?.() || '';
+      const userPayload = window.CdrComposerAttachments?.buildUserMessagePayload?.(task || '(see attached files)') || { role: 'user', content: task || '(see attached files)' };
 
       // Clear input and resize
       taskInput.value = '';
       autoResize(taskInput);
 
+      enterChatLiveMode();
       // Show user message
-      appendUserMsg(task);
+      appendUserMsg(task || '(see attached files)', attachHtml);
 
-      // Auto-extract memory from user message
+      // Memory + Graphify context before model call
       try { window._H?.memAutoExtract?.(task); } catch {}
+      try { HC?.coderMemory?.extractFromUserMessage?.(sharedState.projectRoot, task); } catch {}
+      await loadGraphifyContextForTask(task);
 
       // Bootstrap conversation on first message
-      if (!conversationMsgs.length) {
-        conversationMsgs = [{ role: 'system', content: sysPrompt() }];
+      if (!_conversationMsgs.length) {
+        _conversationMsgs.push({ role: 'system', content: sysPrompt() });
+      } else if (_conversationMsgs[0]?.role === 'system') {
+        _conversationMsgs[0].content = sysPrompt();
       }
-      conversationMsgs.push({ role: 'user', content: task });
+      const modelTask = await expandTaskMentions(userPayload.content);
+      const userMsg = { ...userPayload, content: modelTask };
+      _conversationMsgs.push(userMsg);
+      window.CdrComposerAttachments?.clear?.();
+      updateCoderContextChip(_conversationMsgs);
+
+      // Update tab title from first user message
+      const tab = _tabMgr.active();
+      if (tab && (!tab.title || tab.title.startsWith('Session'))) {
+        tab.title = enforceThreeWordName(task);
+        renderTabBar();
+      }
 
       const runBtn  = $('cdrRunBtn');
       const stopBtn = $('cdrStopBtn');
       if (runBtn)  runBtn.style.display = 'none';
       if (stopBtn) stopBtn.style.display = '';
 
-      if (runAbort) runAbort.abort();
+      const gen = ++_runGeneration;
+      if (runAbort) abortActiveRun('New run');
       runAbort = new AbortController();
       const { signal } = runAbort;
+      _runTabId = tab?.id || _tabMgr.activeId || null;
+      _runFileChanges = _fileChanges;
 
       setStatus('Thinking…', 'thinking');
       cdrTraceReset('Run started');
 
+      // Mark tab as running
+      if (tab) { tab.running = true; renderTabBar(); }
+
       try {
+        const swarmMode = (document.getElementById('cdrSwarmMode')?.value || 'boss');
         if (agentCount === 1) {
           await runSingleTurn(signal);
+        } else if (swarmMode === 'vote') {
+          await runAllVote(task, agentCount, signal);
+        } else if (swarmMode === 'chain') {
+          await runChainRefine(task, agentCount, signal);
         } else {
           await runMultiTurn(task, agentCount, signal);
         }
       } catch (e) {
         if (e.name === 'AbortError') {
-          const c = appendAssistantBubble('HashCortX Coder');
+          const c = appendAssistantBubble('MiraXCode Coder');
           if (c) appendTextToBubble(c, '*Stopped.*');
           setStatus('Stopped', '');
         } else {
@@ -2034,18 +3719,27 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
           console.error('[CoderMode] run failed:', e);
         }
       } finally {
+        if (gen !== _runGeneration) return;
         if (runBtn)  runBtn.style.display = '';
         if (stopBtn) stopBtn.style.display = 'none';
         runAbort = null;
+        _runTabId = null;
+        _runFileChanges = null;
         setRouterChip('Auto', '');
+        const at = _tabMgr.active();
+        if (at) { at.running = false; renderTabBar(); }
       }
     }
 
     async function runSingleTurn(signal) {
       const tools     = buildTools();
-      const contentEl = appendAssistantBubble('HashCortX Coder');
-      const finalText = await agentLoop(conversationMsgs, tools, contentEl, '', signal);
-      if (finalText) conversationMsgs.push({ role: 'assistant', content: finalText });
+      const contentEl = appendAssistantBubble('MiraXCode Coder');
+      const finalText = await agentLoop(_conversationMsgs, tools, contentEl, '', signal);
+      if (finalText) {
+        _conversationMsgs.push({ role: 'assistant', content: finalText });
+        try { window._H?.memAutoExtractFromAssistant?.(finalText); } catch {}
+        try { HC?.coderMemory?.extractFromAssistant?.(sharedState.projectRoot, finalText); } catch {}
+      }
       saveCoderState();
       setStatus('Ready', '');
     }
@@ -2055,7 +3749,7 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
 
       // Multi-agent tasks need a project root to be useful — bail early otherwise
       if (!sharedState.projectRoot) {
-        const el = appendAssistantBubble('HashCortX Coder');
+        const el = appendAssistantBubble('MiraXCode Coder');
         appendTextToBubble(el, 'Multi-agent mode works best with a project open. Click **Open Project** to select your project folder, then try again.');
         setStatus('Ready', '');
         return;
@@ -2085,24 +3779,33 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
       setStatus('Agents running…', 'thinking');
 
       // Workers — each gets its own bubble and independent message history
+      // Run max 2 agents concurrently to avoid overwhelming the app
       cdrTraceAdd('Boss', `Decomposed into ${subTasks.length} sub-task${subTasks.length !== 1 ? 's' : ''}`, 'ok');
-      const results = await Promise.all(subTasks.map(async (st, i) => {
-        cdrTraceAdd(`Agent ${i + 2}`, (st.task || task).slice(0, 60), 'run');
-        const wEl   = appendAssistantBubble(`Agent ${i + 2}`);
-        const wMsgs = [
-          { role: 'system', content: sysPrompt(`You are sub-agent ${i + 2} of ${count}. Focus only on your assigned task.`) },
-          { role: 'user',   content: st.task || task }
-        ];
-        try {
-          const result = await agentLoop(wMsgs, buildTools(), wEl, `Agent ${i + 2}`, signal);
-          cdrTraceAdd(`Agent ${i + 2}`, 'Finished', 'ok');
-          return result;
-        } catch (e) {
-          cdrTraceAdd(`Agent ${i + 2}`, e?.message || 'Failed', 'err');
-          appendTextToBubble(wEl, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
-          return '';
-        }
-      }));
+      const results = [];
+      for (let batch = 0; batch < subTasks.length; batch += MAX_CONCURRENT) {
+        if (signal?.aborted) break;
+        const batchTasks = subTasks.slice(batch, batch + MAX_CONCURRENT);
+        const batchResults = await Promise.all(batchTasks.map(async (st, j) => {
+          const idx = batch + j + 2;
+          cdrTraceAdd(`Agent ${idx}`, (st.task || task).slice(0, 60), 'run');
+          const wEl   = appendAssistantBubble(`Agent ${idx}`);
+          const wMsgs = [
+            { role: 'system', content: sysPrompt(`You are sub-agent ${idx} of ${count}. Focus only on your assigned task.`) },
+            { role: 'user',   content: st.task || task }
+          ];
+          try {
+            const result = await agentLoop(wMsgs, buildTools(), wEl, `Agent ${idx}`, signal);
+            cdrTraceAdd(`Agent ${idx}`, 'Finished', 'ok');
+            return result;
+          } catch (e) {
+            cdrTraceAdd(`Agent ${idx}`, e?.message || 'Failed', 'err');
+            appendTextToBubble(wEl, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
+            return '';
+          }
+        }));
+        results.push(...batchResults);
+        setStatus(`Agents ${Math.min(batch + MAX_CONCURRENT, subTasks.length)}/${subTasks.length} done…`, 'thinking');
+      }
 
       // Synthesis — boss combines all agent output into a final answer
       const synthEl   = appendAssistantBubble('Boss — Synthesis');
@@ -2118,15 +3821,126 @@ ${conversationMsgs.filter(m => m.role !== 'system').map(m => `
       ];
       setStatus('Synthesizing…', 'thinking');
       const finalText = await agentLoop(synthMsgs, [], synthEl, 'Boss', signal);
-      if (finalText) conversationMsgs.push({ role: 'assistant', content: finalText });
+      if (finalText) _conversationMsgs.push({ role: 'assistant', content: finalText });
       saveCoderState();
       setStatus('Ready', '');
     }
 
+    async function runAllVote(task, count, signal) {
+      const H = window._H;
+      cdrTraceAdd('AllVote', `Sending to ${count} model(s) simultaneously`, 'run');
+
+      const chain = buildRouterChain(coderModel);
+      const voterAdapters = chain.slice(0, count);
+      if (!voterAdapters.length) {
+        const el = appendAssistantBubble('AllVote');
+        appendTextToBubble(el, 'No models available. Add API keys in Settings.');
+        setStatus('Ready', '');
+        return;
+      }
+
+      const votes = [];
+      for (let batch = 0; batch < voterAdapters.length; batch += MAX_CONCURRENT) {
+        if (signal?.aborted) break;
+        const batchAdapters = voterAdapters.slice(batch, batch + MAX_CONCURRENT);
+        const batchVotes = await Promise.all(batchAdapters.map(async (adapter, j) => {
+          const idx = batch + j + 1;
+          const label = adapter.label || `Model ${idx}`;
+          const vEl = appendAssistantBubble(`Vote ${idx} — ${label}`);
+          cdrTraceAdd(label, 'Answering…', 'run');
+          setStatus(`Vote ${idx}/${voterAdapters.length}…`, 'thinking');
+          try {
+            const msgs = [
+              { role: 'system', content: sysPrompt('Answer the user request directly and thoroughly.') },
+              { role: 'user', content: task }
+            ];
+            const result = await callWithRouter(msgs, buildTools(), 0.7, signal, adapter.kind === 'ollama' ? adapter.model : null);
+            const text = result?.content || '';
+            appendTextToBubble(vEl, text);
+            cdrTraceAdd(label, 'Done', 'ok');
+            return { label, text };
+          } catch (e) {
+            if (e.name === 'AbortError') throw e;
+            cdrTraceAdd(label, e?.message || 'Failed', 'err');
+            appendTextToBubble(vEl, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
+            return { label, text: '' };
+          }
+        }));
+        votes.push(...batchVotes);
+      }
+
+      const judgeEl = appendAssistantBubble('Judge — Best Answer');
+      setStatus('Judging…', 'thinking');
+      cdrTraceAdd('Judge', 'Picking best answer', 'run');
+
+      const judgePrompt = `Original task: ${task.slice(0, 500)}
+
+${votes.map((v, i) => `### Response ${i + 1} (${v.label}):\n${v.text.slice(0, 1500)}`).join('\n---\n')}
+
+Pick the best response or merge them into one final answer. Provide the complete answer.`;
+
+      const judgeMsgs = [
+        { role: 'system', content: sysPrompt('You are a judge. Pick or merge the best response into one clear, complete answer. Write the full answer, not just which one you picked.') },
+        { role: 'user', content: judgePrompt }
+      ];
+      const finalText = await agentLoop(judgeMsgs, [], judgeEl, 'Judge', signal);
+      if (finalText) _conversationMsgs.push({ role: 'assistant', content: finalText });
+      saveCoderState();
+      cdrTraceAdd('Judge', 'Verdict ready', 'ok');
+      setStatus('Ready', '');
+    }
+
+    async function runChainRefine(task, steps, signal) {
+      cdrTraceAdd('Chain', `Starting ${steps}-step refinement`, 'run');
+
+      const chain = buildRouterChain(coderModel);
+      const stages = [
+        'Write an initial answer',
+        'Review and improve — fix errors, add depth',
+        'Polish — clearer structure, better formatting',
+        'Final pass — concise, complete, well-formatted',
+        'Ultimate refinement — production quality output'
+      ];
+
+      let current = task;
+
+      for (let i = 0; i < steps; i++) {
+        if (signal?.aborted) break;
+        const adapter = chain[i % chain.length];
+        const label = adapter?.label || `Step ${i + 1}`;
+        const stage = stages[i] || 'Improve and refine the previous output';
+        const el = appendAssistantBubble(`Step ${i + 1} — ${label}`);
+        setStatus(`Chain step ${i + 1}/${steps}…`, 'thinking');
+        cdrTraceAdd(label, stage.slice(0, 50), 'run');
+
+        const prompt = i === 0 ? task : `${stage}:\n\n${current.slice(0, 2000)}`;
+        const msgs = [
+          { role: 'system', content: sysPrompt(`You are step ${i + 1} in a refinement chain. ${stage}.`) },
+          { role: 'user', content: prompt }
+        ];
+        try {
+          const result = await callWithRouter(msgs, buildTools(), 0.5, signal, adapter?.kind === 'ollama' ? adapter?.model : null);
+          current = result?.content || current;
+          appendTextToBubble(el, current);
+          cdrTraceAdd(label, 'Done', 'ok');
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          cdrTraceAdd(label, e?.message || 'Failed', 'err');
+          appendTextToBubble(el, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
+        }
+      }
+
+      if (current && current !== task) {
+        _conversationMsgs.push({ role: 'assistant', content: current });
+      }
+      saveCoderState();
+      cdrTraceAdd('Chain', 'Complete', 'ok');
+      setStatus('Ready', '');
+    }
+
     function stopRun() {
-      if (runAbort) { runAbort.abort(); runAbort = null; }
-      if ($('cdrRunBtn'))  $('cdrRunBtn').style.display  = '';
-      if ($('cdrStopBtn')) $('cdrStopBtn').style.display = 'none';
+      _runGeneration++;
+      abortActiveRun('Stopped');
       setStatus('Stopped', '');
     }
 

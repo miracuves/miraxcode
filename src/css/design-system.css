@@ -1,0 +1,813 @@
+/* ============================================================
+   HashCortX / MiraXcode — Design System v2
+   Loaded last. CSS-only — no HTML/JS changes.
+   ============================================================ */
+
+/* ── HC token bridge (styles.css uses --hc-*) ── */
+:root {
+  --hc-accent: #e5e5e5;
+  --hc-accent-dim: rgba(255, 255, 255, 0.45);
+  --hc-accent-glow: rgba(255, 255, 255, 0.06);
+  --hc-accent-border: rgba(255, 255, 255, 0.14);
+  --hc-cyan: #d4d4d4;
+  --hc-amber: #a3a3a3;
+  --hc-red: #f87171;
+  --hc-purple: #a3a3a3;
+  --hc-bg: #141414;
+  --hc-bg-2: #181818;
+  --hc-bg-3: #1e1e1e;
+  --hc-bg-4: #252526;
+  --hc-text: #eef2f7;
+  --hc-text-dim: rgba(238, 242, 247, 0.58);
+  --hc-text-muted: rgba(238, 242, 247, 0.32);
+  --hc-text-faint: rgba(238, 242, 247, 0.16);
+  --hc-border: rgba(255, 255, 255, 0.08);
+  --hc-border-strong: rgba(255, 255, 255, 0.14);
+  --hc-border-subtle: rgba(255, 255, 255, 0.06);
+  --hc-font: var(--sans);
+  --hc-font-mono: var(--mono);
+  --hc-r-sm: 6px;
+  --hc-r-md: 10px;
+  --hc-r-lg: 14px;
+  --hc-r-xl: 18px;
+  --toolbar-h: 48px;
+}
+
+/* ── Global typography (Inter) ── */
+html {
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  font-optical-sizing: auto;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body,
+#coder-mode-wrap,
+#forge-mode-wrap,
+#finance-mode-wrap,
+#sandbox-mode-wrap,
+.system-maker-wrap,
+#void-mode-wrap,
+#agent-maker-wrap,
+#swarm-maker-wrap {
+  font-family: var(--sans) !important;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.38);
+}
+
+/* Ambient background — cooler, subtler */
+body::before {
+  background: var(--layer-chrome, #141414) !important;
+}
+
+.pcb-traces { opacity: 0.05 !important; }
+body:has(#app:not(.has-chat)) .pcb-traces {
+  opacity: 0.02 !important;
+  animation: none !important;
+}
+body:has(#app:not(.has-chat)) .circuit-spot {
+  opacity: 0.08 !important;
+  animation: none !important;
+}
+.circuit-spot {
+  background: radial-gradient(closest-side,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.05) 42%,
+    transparent 72%) !important;
+  opacity: 0.45 !important;
+}
+
+/* ── Toolbar ── */
+.hc-toolbar {
+  height: var(--toolbar-h) !important;
+  background: rgba(5, 6, 8, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 8px 32px rgba(0, 0, 0, 0.35) !important;
+}
+
+.hc-toolbar-name {
+  font-family: var(--sans) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--text) !important;
+  text-shadow: none !important;
+}
+
+.hc-toolbar-badge {
+  font-family: var(--mono) !important;
+  font-size: 9px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.12em !important;
+  color: var(--gold) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.hc-toolbar-btn {
+  border-radius: var(--hc-r-md) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--text-dim) !important;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), transform 0.1s ease !important;
+}
+.hc-toolbar-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: var(--gold-2) !important;
+}
+
+#mainApp {
+  top: var(--toolbar-h) !important;
+}
+
+/* ============================================================
+   SPLASH / INTRO SCREEN
+   ============================================================ */
+#intro-screen {
+  --bg-0: #141414 !important;
+  --bg-1: #06080c !important;
+  --bg-2: #0a0d12 !important;
+  --line: rgba(255, 255, 255, 0.1) !important;
+  --line-soft: rgba(255, 255, 255, 0.05) !important;
+  --line-strong: rgba(255, 255, 255, 0.22) !important;
+  --ink: #eef2f7 !important;
+  --ink-mute: rgba(238, 242, 247, 0.62) !important;
+  --ink-dim: rgba(238, 242, 247, 0.42) !important;
+  --ink-faint: rgba(238, 242, 247, 0.2) !important;
+  --gold: #e5e5e5 !important;
+  --gold-bright: #d4d4d4 !important;
+  --gold-deep: #525252 !important;
+  --accent-glow: rgba(255, 255, 255, 0.5) !important;
+  --ok: #d4d4d4 !important;
+  --font-display: var(--sans) !important;
+  --font-mono: var(--mono) !important;
+  font-family: var(--mono) !important;
+}
+
+#intro-screen .stage {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 42%, rgba(255, 255, 255, 0.06) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 50%, var(--bg-2) 0%, var(--bg-0) 52%, #141414 100%) !important;
+}
+
+#intro-screen .grid-bg {
+  background-size: 48px 48px !important;
+  opacity: 0.32 !important;
+}
+
+#intro-screen .boot-lines {
+  font-family: var(--mono) !important;
+  font-size: clamp(9px, 0.82vw, 10.5px) !important;
+  letter-spacing: 0.06em !important;
+  font-weight: 500 !important;
+}
+
+#intro-screen .boot-lines .ok { color: var(--gold) !important; }
+#intro-screen .boot-lines .gold { color: var(--gold-bright) !important; }
+
+#intro-screen .boot-lines .cta,
+#intro-screen .cta {
+  font-family: var(--sans) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2em !important;
+  color: var(--gold-bright) !important;
+}
+
+#intro-screen .perfection-quote {
+  font-family: var(--sans) !important;
+  font-style: normal !important;
+  font-weight: 600 !important;
+  font-size: clamp(13px, 1.6vmin, 18px) !important;
+  letter-spacing: 0.04em !important;
+  color: var(--text) !important;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.35) !important;
+}
+
+#intro-screen .patch-badge,
+#intro-screen .timestamp {
+  font-family: var(--mono) !important;
+  letter-spacing: 0.14em !important;
+}
+
+#intro-screen .signature {
+  font-family: var(--sans) !important;
+  font-style: normal !important;
+  font-weight: 500 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.08em !important;
+}
+
+#intro-screen .bracket {
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  opacity: 0.75 !important;
+}
+
+#intro-screen .ring::before {
+  background: var(--gold-bright) !important;
+  box-shadow: 0 0 12px 3px var(--accent-glow) !important;
+}
+
+#intro-screen .status-badge {
+  font-family: var(--sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.16em !important;
+  border-radius: var(--radius-pill) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: var(--gold) !important;
+  backdrop-filter: blur(12px);
+}
+
+#intro-screen .status-badge .dot {
+  background: var(--gold) !important;
+  box-shadow: 0 0 10px var(--accent-glow) !important;
+}
+
+#intro-screen .intro-loading-bar {
+  border-radius: var(--radius-pill) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  overflow: hidden;
+}
+
+#intro-screen .intro-loading-bar span {
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright)) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+#intro-screen .hc-logo-full {
+  filter:
+    drop-shadow(0 0 24px rgba(255, 255, 255, 0.35))
+    drop-shadow(0 4px 20px rgba(0, 0, 0, 0.4)) !important;
+}
+
+#intro-screen .logo-glow {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.25) 0%, transparent 65%) !important;
+}
+
+#intro-screen .spark {
+  background: var(--gold-bright) !important;
+  box-shadow: 0 0 8px var(--gold-bright) !important;
+}
+
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+aside {
+  background:
+    linear-gradient(180deg, rgba(8, 10, 14, 0.97), rgba(5, 6, 8, 0.98)) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.35) !important;
+}
+
+aside::before { opacity: 0.35 !important; }
+
+.brand {
+  padding-bottom: 14px !important;
+  border-bottom-color: var(--line) !important;
+}
+
+.brand .name .title {
+  font-family: var(--sans) !important;
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.brand .name .sub {
+  font-family: var(--mono) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--muted) !important;
+}
+
+.section-label {
+  font-family: var(--sans) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+  color: var(--muted) !important;
+}
+
+.chat-item {
+  border-radius: var(--radius) !important;
+  transition: background var(--t-fast), border-color var(--t-fast) !important;
+}
+
+.chat-item:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.chat-item.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+.chat-item .title-txt {
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.search input,
+.side-model-row select {
+  font-family: var(--sans) !important;
+  border-radius: var(--radius) !important;
+}
+
+/* Mode nav buttons */
+.mode-nav button,
+.sidebar-modes button {
+  font-family: var(--sans) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius) !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* ============================================================
+   MAIN CHAT AREA
+   ============================================================ */
+header.topbar,
+.crumbs {
+  font-family: var(--sans) !important;
+}
+
+.crumbs .title {
+  font-family: var(--sans) !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.crumbs .sub {
+  font-family: var(--mono) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.04em !important;
+}
+
+.tab,
+button.tab {
+  font-family: var(--sans) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius) !important;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast) !important;
+}
+
+.tab.active,
+button.tab.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.24) !important;
+  color: var(--gold-2) !important;
+}
+
+/* Empty / welcome state */
+.empty h1 {
+  font-family: var(--sans) !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.04em !important;
+  background: linear-gradient(180deg, #fff 0%, var(--gold-2) 72%, var(--gold) 100%) !important;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+}
+
+.empty p,
+.empty .sub {
+  font-family: var(--sans) !important;
+  color: var(--text-dim) !important;
+  line-height: 1.6 !important;
+}
+
+.empty .chips button {
+  font-family: var(--sans) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-pill) !important;
+  border-color: var(--line) !important;
+  transition: all var(--t-fast) !important;
+}
+
+.empty .chips button:hover {
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  color: var(--gold-2) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Messages */
+.msg .bubble {
+  font-family: var(--sans) !important;
+  font-size: 14px !important;
+  line-height: 1.62 !important;
+  border-radius: var(--radius-lg) !important;
+  letter-spacing: -0.01em !important;
+}
+
+.msg.user .bubble {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+}
+
+.msg.assistant .bubble {
+  background: var(--panel) !important;
+  backdrop-filter: var(--glass-blur);
+  border-color: var(--line) !important;
+}
+
+.bubble pre,
+.bubble code {
+  font-family: var(--mono) !important;
+  font-size: 12.5px !important;
+}
+
+.bubble :not(pre) > code {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: var(--gold-2) !important;
+  border-radius: 4px !important;
+  padding: 0.12em 0.35em !important;
+}
+
+/* Composer */
+.composer,
+.composer-wrap {
+  font-family: var(--sans) !important;
+}
+
+.composer textarea,
+#composerInput {
+  font-family: var(--sans) !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+  border-radius: var(--radius-lg) !important;
+  letter-spacing: -0.01em !important;
+}
+
+button.primary,
+.send-btn,
+.composer .primary {
+  font-family: var(--sans) !important;
+  font-weight: 600 !important;
+  border-radius: var(--radius) !important;
+  background: linear-gradient(165deg, var(--gold-2), var(--gold-deep)) !important;
+  color: #041210 !important;
+  border: none !important;
+  box-shadow: 0 4px 16px rgba(255, 255, 255, 0.25) !important;
+}
+
+button.primary:hover,
+.send-btn:hover {
+  filter: brightness(1.06) !important;
+  box-shadow: 0 6px 24px rgba(255, 255, 255, 0.32) !important;
+}
+
+button:not(.primary) {
+  font-family: var(--sans) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius) !important;
+}
+
+/* ============================================================
+   MODALS & SETTINGS
+   ============================================================ */
+.modal-overlay {
+  backdrop-filter: blur(12px) saturate(140%) !important;
+  background: rgba(3, 4, 7, 0.72) !important;
+}
+
+.modal {
+  border-radius: var(--radius-xl) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  font-family: var(--sans) !important;
+}
+
+.modal-header h2,
+.modal-title {
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.modal-tab {
+  font-family: var(--sans) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+.modal-tab.active {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  color: var(--gold-2) !important;
+}
+
+.modal input,
+.modal select,
+.modal textarea {
+  font-family: var(--sans) !important;
+  border-radius: var(--radius) !important;
+}
+
+/* Permission guard */
+#hc-perm-dialog { backdrop-filter: blur(14px) !important; }
+
+.hc-perm-card {
+  border-radius: var(--radius-lg) !important;
+  border-color: rgba(255, 255, 255, 0.18) !important;
+  font-family: var(--sans) !important;
+  box-shadow: var(--shadow-lg), var(--shadow-glow) !important;
+}
+
+.hc-perm-title {
+  font-family: var(--sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.06em !important;
+}
+
+/* ============================================================
+   FULL-SCREEN MODES — shared chrome
+   ============================================================ */
+#coder-mode-wrap,
+#forge-mode-wrap,
+#finance-mode-wrap,
+#sandbox-mode-wrap,
+.system-maker-wrap,
+#void-mode-wrap,
+#agent-maker-wrap,
+#swarm-maker-wrap {
+  font-family: var(--sans);
+}
+
+/* Mode headers */
+.cdr-header,
+.frg-header,
+.fin-header,
+.sys-header,
+.void-header,
+.amk-header,
+.swm-header,
+.sbx-header {
+  font-family: var(--sans) !important;
+  backdrop-filter: blur(20px) saturate(150%) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.cdr-header-title,
+.frg-title,
+.fin-title,
+.sys-title,
+.void-title,
+.amk-title {
+  font-weight: 600 !important;
+  letter-spacing: -0.03em !important;
+  font-size: 15px !important;
+}
+
+/* Coder mode — layout/typography in coder-mode-ui.css (loaded after this file) */
+#coder-mode-wrap .cdr-terminal,
+#coder-mode-wrap .cdr-terminal pre {
+  font-family: var(--mono) !important;
+}
+
+/* Forge mode */
+.frg-panel,
+.frg-chat,
+.frg-viewport {
+  font-family: var(--sans) !important;
+}
+
+.frg-msg .bubble {
+  border-radius: var(--radius-lg) !important;
+  line-height: 1.6 !important;
+}
+
+/* Finance mode */
+.fin-panel,
+.fin-chat,
+.fin-kpi,
+.fin-chart-wrap {
+  font-family: var(--sans) !important;
+}
+
+.fin-kpi-value {
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.fin-kpi-label {
+  font-family: var(--mono) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase;
+}
+
+/* System maker / ERP */
+.sys-panel,
+.sys-chat,
+.sys-preview {
+  font-family: var(--sans) !important;
+}
+
+/* Virtual OS */
+.void-desktop,
+.void-panel,
+.void-chat-welcome {
+  font-family: var(--sans) !important;
+}
+
+.void-chat-welcome > b {
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+}
+
+/* Agent maker */
+.amk-panel,
+.amk-form,
+.amk-preview {
+  font-family: var(--sans) !important;
+}
+
+.amk-form label {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase;
+  color: var(--muted) !important;
+}
+
+/* Swarm maker */
+.swm-panel,
+.swm-node,
+.swm-pipeline {
+  font-family: var(--sans) !important;
+}
+
+/* Sandbox */
+.sbx-panel,
+.sbx-report {
+  font-family: var(--sans) !important;
+}
+
+.sbx-severity-high { color: var(--rose) !important; }
+
+/* Mode shells — toolbar offset + unified palette */
+#coder-mode-wrap,
+#forge-mode-wrap,
+#finance-mode-wrap,
+#sandbox-mode-wrap,
+.system-maker-wrap,
+#void-mode-wrap,
+#agent-maker-wrap,
+#swarm-maker-wrap {
+  padding-top: var(--toolbar-h, 48px) !important;
+}
+
+#coder-mode-wrap {
+  --cdr-cyan: #e5e5e5 !important;
+  --cdr-success: #d4d4d4 !important;
+  --cdr-border: rgba(255, 255, 255, 0.08) !important;
+  --cdr-border-hover: rgba(255, 255, 255, 0.16) !important;
+  background: var(--layer-chrome, #141414) !important;
+  font-family: var(--sans) !important;
+}
+
+/* Coder header fonts — coder-mode-ui.css */
+
+/* Coder typography — see coder-mode-ui.css */
+
+#forge-mode-wrap {
+  background: var(--layer-chrome, #141414) !important;
+  color: var(--text) !important;
+}
+
+#forge-mode-wrap .frg-header {
+  border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(8, 10, 14, 0.94) !important;
+}
+
+#finance-mode-wrap {
+  font-family: var(--sans) !important;
+}
+
+#agent-maker-wrap {
+  --amk: #e5e5e5 !important;
+  --amk-bright: #fafafa !important;
+  --amk-ui: #e5e5e5 !important;
+  --amk-dim: rgba(255, 255, 255, 0.1) !important;
+  --amk-line: rgba(255, 255, 255, 0.18) !important;
+}
+
+.amk-header,
+.amk-blueprints-panel,
+.amk-editor-panel {
+  font-family: var(--sans) !important;
+}
+
+.amk-title {
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.amk-btn,
+.amk-icon-btn {
+  font-family: var(--sans) !important;
+  font-weight: 500 !important;
+  border-radius: var(--radius) !important;
+}
+
+/* Split mode badges */
+.code-mode-badge,
+.forge-mode-badge {
+  font-family: var(--mono) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.12em !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+/* RAM / stats panel */
+.ram-panel {
+  border-radius: var(--radius-lg) !important;
+  font-family: var(--sans) !important;
+}
+
+.ram-row {
+  border-radius: var(--radius) !important;
+}
+
+/* Brand logos */
+.mode-logo-img,
+.cdr-welcome-mark,
+.cdr-logo,
+.frg-logo,
+.amk-logo,
+.sys-logo,
+.void-logo {
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.1));
+}
+
+.brand-logo-img,
+.about-logo-img,
+.mode-logo-img {
+  filter:
+    drop-shadow(0 0 12px rgba(255, 255, 255, 0.4))
+    drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3)) !important;
+}
+
+/* Inputs global polish */
+input[type="text"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+input[type="email"],
+textarea,
+select {
+  font-family: var(--sans) !important;
+  border-radius: var(--radius) !important;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast) !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Hint / chip / attachment pills */
+.hint,
+.chip,
+.attachment {
+  font-family: var(--sans) !important;
+  border-radius: var(--radius-pill) !important;
+}
+
+/* Light theme token sync */
+html[data-theme="light"] {
+  --text: #1a1f26;
+  --text-dim: #4a5568;
+  --gold: #0d9668;
+  --gold-2: #0b7d56;
+}

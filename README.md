@@ -21,7 +21,7 @@
 
 **HashCortX is a local-first, open-source AI desktop application for developers that combines a multi-provider chat workspace, an autonomous coding agent, multi-agent swarms, 9 pre-built specialist agents, financial document analysis, security scanning, 3D planning, and a virtual project desktop — into a single native 8.9 MB macOS app built with Tauri v2, Rust, and vanilla JavaScript.**
 
-API keys live in the OS keychain. Files never leave your machine. There is no HashCortX backend, no telemetry, no analytics, no accounts, and no subscriptions. With Ollama, the entire app runs air-gapped offline. With cloud providers, every request travels directly from your device to the provider you chose — nothing passes through HashCortX infrastructure, because HashCortX infrastructure does not exist.
+API keys are stored in the OS Keychain (with a local cache for performance). Files never leave your machine. There is no HashCortX backend, no telemetry, no analytics, no accounts, and no subscriptions. With Ollama, the entire app runs air-gapped offline. With cloud providers, every request travels directly from your device to the provider you chose — nothing passes through HashCortX infrastructure, because HashCortX infrastructure does not exist.
 
 **HashCortX is a free, open-source alternative to commercial AI coding tools** like Cursor, Claude Code, Continue, Aider, and Cline — with a wider feature set than any of them.
 
@@ -51,7 +51,7 @@ API keys live in the OS keychain. Files never leave your machine. There is no Ha
 - **Truly local-first.** No cloud backend, no auto-update, no telemetry, no accounts. The binary phones home to nothing.
 - **Multi-provider by design.** Ten cloud providers and Ollama for local models — all configured side-by-side, switched freely, with automatic provider failover in swarm runs.
 - **One app, eleven modes.** Coding, chat, swarms, research, financial analysis, security scanning, 3D planning, ERP generation, virtual OS — without juggling separate tools.
-- **OS-grade key storage.** API keys live in the macOS Keychain. Never in config files, never in environment variables, never on disk in plaintext.
+- **OS-grade key storage.** API keys are stored in the macOS Keychain (primary) with a local WebKit cache for fast reads — never in `atelier` settings or repo config files. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
 - **Tiny footprint.** 8.9 MB — roughly 30× smaller than Electron-based AI desktop apps that ship at 100–300 MB.
 - **Open source under MIT.** Read every line. Fork it. Ship your own version.
 

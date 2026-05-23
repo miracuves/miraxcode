@@ -1,49 +1,49 @@
 /* ============================================================
-   HASHCORTX — Master Design System + Intro Screen
+   MIRAXCODX — Master Design System + Intro Screen
    All brand tokens live here. Component CSS goes in src/components/
    ============================================================ */
 
 :root {
-  --hc-green:         #22d3ee;
-  --hc-green-dim:     rgba(34,211,238,0.50);
-  --hc-green-glow:    rgba(34,211,238,0.12);
-  --hc-green-border:  rgba(34,211,238,0.18);
+  --hc-accent:         #e5e5e5;
+  --hc-accent-dim:     rgba(255,255,255,0.45);
+  --hc-accent-glow:    rgba(255,255,255,0.06);
+  --hc-accent-border:  rgba(255,255,255,0.14);
 
-  --hc-cyan:          #22d3ee;
-  --hc-amber:         #fbbf24;
+  --hc-cyan:          #d4d4d4;
+  --hc-amber:         #a3a3a3;
   --hc-red:           #f87171;
-  --hc-purple:        #a78bfa;
+  --hc-purple:        #a3a3a3;
 
-  --hc-bg:            #040507;
-  --hc-bg-2:          #08090d;
-  --hc-bg-3:          #0d0f14;
-  --hc-bg-4:          #11131a;
+  --hc-bg:            #141414;
+  --hc-bg-2:          #181818;
+  --hc-bg-3:          #1e1e1e;
+  --hc-bg-4:          #252526;
 
-  --hc-text:          #c7e6f0;
-  --hc-text-dim:      rgba(199,230,240,0.50);
-  --hc-text-muted:    rgba(199,230,240,0.28);
-  --hc-text-faint:    rgba(199,230,240,0.14);
+  --hc-text:          #ffffff;
+  --hc-text-dim:      #a1a1a1;
+  --hc-text-muted:    #6b6b6b;
+  --hc-text-faint:    rgba(255,255,255,0.14);
 
-  --hc-border:        rgba(34,211,238,0.13);
-  --hc-border-strong: rgba(34,211,238,0.28);
-  --hc-border-subtle: rgba(34,211,238,0.07);
+  --hc-border:        rgba(255,255,255,0.08);
+  --hc-border-strong: rgba(255,255,255,0.14);
+  --hc-border-subtle: rgba(255,255,255,0.05);
 
-  --hc-font: 'JetBrains Mono','Berkeley Mono','Fira Code',
-             'Cascadia Code','SF Mono','Menlo','Consolas',monospace;
-  --hc-font-size: 13px;
-  --hc-line: 1.65;
+  --hc-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --hc-font-mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --hc-font-size: 14px;
+  --hc-line: 1.55;
 
   --hc-s1:4px; --hc-s2:8px; --hc-s3:12px; --hc-s4:16px;
   --hc-s5:20px;--hc-s6:24px;--hc-s8:32px; --hc-s10:40px;
 
-  --hc-r-sm:3px; --hc-r-md:6px; --hc-r-lg:12px; --hc-r-xl:18px;
+  --hc-r-sm:6px; --hc-r-md:10px; --hc-r-lg:14px; --hc-r-xl:18px;
 
-  --hc-t:0.15s ease; --hc-t-slow:0.28s ease;
+  --hc-t:0.14s ease; --hc-t-slow:0.22s cubic-bezier(0.22,1,0.36,1);
 
-  --hc-shadow:    0 4px 24px rgba(0,0,0,0.65);
-  --hc-shadow-lg: 0 12px 48px rgba(0,0,0,0.75);
+  --hc-shadow:    0 4px 24px rgba(0,0,0,0.55);
+  --hc-shadow-lg: 0 12px 48px rgba(0,0,0,0.65);
 
-  --toolbar-h: 44px;   /* iOS nav-bar height — used by all views below it */
+  --toolbar-h: 48px;
 }
 
 /* ── Reset ───────────────────────────────────────────────── */
@@ -90,7 +90,7 @@ input, textarea, [contenteditable="true"],
 ::-webkit-scrollbar-track       { background:transparent; }
 ::-webkit-scrollbar-thumb       { background:var(--hc-border); border-radius:2px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--hc-border-strong); }
-::selection { background:rgba(34,211,238,0.18); color:var(--hc-green); }
+::selection { background:rgba(255,255,255,0.22); color:#fff; }
 
 /* ── iOS-style toolbar / drag handle ─────────────────────────
    Always sits at the very top, above every other layer.
@@ -113,11 +113,9 @@ input, textarea, [contenteditable="true"],
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
 
-  /* Subtle green hairline at the bottom */
-  border-bottom: 1px solid rgba(57, 255, 129, 0.12);
+  border-bottom: 1px solid rgba(45, 212, 168, 0.12);
 
-  /* Soft shadow so it lifts above the intro stage */
-  box-shadow: 0 1px 0 rgba(34,211,238,0.06),
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03),
               0 4px 24px rgba(0,0,0,0.45);
 
   -webkit-app-region: drag;             /* entire bar is draggable */
@@ -161,8 +159,8 @@ input, textarea, [contenteditable="true"],
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
-  color: var(--hc-green);
-  text-shadow: 0 0 12px rgba(34,211,238,0.45);
+  color: var(--hc-accent);
+  text-shadow: 0 0 12px rgba(255,255,255,0.45);
   -webkit-app-region: drag;   /* must be explicit on each child */
 }
 
@@ -174,9 +172,9 @@ input, textarea, [contenteditable="true"],
   color: var(--hc-text-muted);
   text-transform: uppercase;
   padding: 1px 5px;
-  border: 1px solid rgba(34,211,238,0.18);
+  border: 1px solid rgba(255,255,255,0.18);
   border-radius: 4px;
-  background: rgba(34,211,238,0.05);
+  background: rgba(255,255,255,0.05);
   margin-left: 2px;
   -webkit-app-region: drag;   /* must be explicit on each child */
 }
@@ -199,8 +197,8 @@ input, textarea, [contenteditable="true"],
   width: 28px; height: 28px;
   display: flex; align-items: center; justify-content: center;
   border-radius: 7px;
-  border: 1px solid rgba(34,211,238,0.14);
-  background: rgba(34,211,238,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06);
   color: var(--hc-text-dim);
   font-size: 13px;
   cursor: pointer;
@@ -208,9 +206,9 @@ input, textarea, [contenteditable="true"],
   -webkit-app-region: no-drag;
 }
 .hc-toolbar-btn:hover {
-  background: rgba(34,211,238,0.13);
-  border-color: rgba(34,211,238,0.32);
-  color: var(--hc-green);
+  background: rgba(255,255,255,0.13);
+  border-color: rgba(255,255,255,0.32);
+  color: var(--hc-accent);
 }
 .hc-safe-exit-mode {
   display: none;
@@ -218,7 +216,7 @@ input, textarea, [contenteditable="true"],
   border-color: rgba(251,191,36,0.24);
   background: rgba(251,191,36,0.07);
 }
-body.hashcortx-fullscreen-active .hc-safe-exit-mode {
+body.miraxcode-fullscreen-active .hc-safe-exit-mode {
   display: flex;
 }
 .hc-safe-exit-mode:hover {
@@ -260,21 +258,19 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 }
 /* Brand sidebar logo image sizing */
 .brand-logo-img {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
-  filter: drop-shadow(0 0 8px rgba(240,168,0,0.80))
-          drop-shadow(0 0 20px rgba(240,168,0,0.40));
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.18));
   -webkit-user-drag: none;
 }
 
-/* About-pane logo (replaces the "H" monogram) */
+/* About-pane logo */
 .about-logo-img {
   width: 72px;
   height: 72px;
   object-fit: contain;
-  filter: drop-shadow(0 0 10px rgba(240,168,0,0.85))
-          drop-shadow(0 0 28px rgba(240,168,0,0.45));
+  filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.2));
   -webkit-user-drag: none;
   margin-bottom: 4px;
 }
@@ -293,23 +289,23 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 #intro-screen {
   position: fixed; inset: 0; z-index: 9999;
 
-  --bg-0: #040507;
-  --bg-1: #060d06;
-  --bg-2: #0d1a0d;
-  --line:        rgba(34,211,238,0.10);
-  --line-soft:   rgba(34,211,238,0.06);
-  --line-strong: rgba(34,211,238,0.28);
-  --ink:         #c7e6f0;
-  --ink-mute:    rgba(199,230,240,0.65);
-  --ink-dim:     rgba(199,230,240,0.38);
-  --ink-faint:   rgba(199,230,240,0.18);
-  --gold:        #22d3ee;
-  --gold-bright: #6feaff;
-  --gold-deep:   #1a5a7a;
-  --accent-glow: rgba(34,211,238,0.45);
-  --ok:          #22d3ee;
+  --bg-0: #141414;
+  --bg-1: #06080c;
+  --bg-2: #0a0d12;
+  --line:        rgba(255,255,255,0.10);
+  --line-soft:   rgba(255,255,255,0.04);
+  --line-strong: rgba(255,255,255,0.1);
+  --ink:         #fafafa;
+  --ink-mute:    #a3a3a3;
+  --ink-dim:     #737373;
+  --ink-faint:   rgba(255,255,255,0.14);
+  --gold:        #a3a3a3;
+  --gold-bright: #d4d4d4;
+  --gold-deep:   #525252;
+  --accent-glow: rgba(255,255,255,0.06);
+  --ok:          #d4d4d4;
   --font-mono:   'JetBrains Mono', ui-monospace, monospace;
-  --font-display: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Inter', -apple-system, sans-serif;
 
   font-family: var(--font-mono);
 }
@@ -343,7 +339,7 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 .vignette {
   position: absolute; inset: 0;
   background: radial-gradient(ellipse at center,
-    transparent 30%, rgba(0,0,0,0.68) 80%, #000 100%);
+    transparent 30%, rgba(20,20,20,0.75) 80%, #141414 100%);
   pointer-events: none;
 }
 
@@ -391,17 +387,17 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
   font-size: 10px; letter-spacing:.25em;
   color: var(--gold-bright); text-transform:uppercase;
   opacity:0; margin-top:6px;
-  text-shadow: 0 0 10px var(--accent-glow), 0 0 20px rgba(34,211,238,0.4);
+  text-shadow: 0 0 10px var(--accent-glow), 0 0 20px rgba(255,255,255,0.4);
   animation: ifi 0.5s 3.2s forwards, cta-radiate 2.4s 3.6s ease-in-out infinite;
 }
 @keyframes cta-radiate {
   0%,100% {
     opacity:.62;
-    text-shadow: 0 0 10px var(--accent-glow), 0 0 20px rgba(34,211,238,0.35);
+    text-shadow: 0 0 10px var(--accent-glow), 0 0 20px rgba(255,255,255,0.35);
   }
   50% {
     opacity:1;
-    text-shadow: 0 0 18px var(--gold-bright), 0 0 42px rgba(34,211,238,0.75), 0 0 90px rgba(34,211,238,0.35);
+    text-shadow: 0 0 18px var(--gold-bright), 0 0 42px rgba(255,255,255,0.75), 0 0 90px rgba(255,255,255,0.35);
   }
 }
 
@@ -510,7 +506,7 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
   position: absolute; top:20%; left:50%; transform:translateX(-50%);
   display:inline-flex; align-items:center; gap:7px; padding:4px 12px;
   border:1px solid var(--line-strong); border-radius:999px;
-  background: rgba(34,211,238,0.04);
+  background: rgba(255,255,255,0.04);
   font-family: var(--font-mono);
   font-size: clamp(7.8px,0.72vw,9px); letter-spacing:.24em;
   color: var(--gold); text-transform:uppercase; z-index:4;
@@ -530,14 +526,14 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
   box-shadow: 0 0 8px var(--gold);
 }
 #intro-screen .status-badge.ready {
-  border-color: rgba(57,255,129,0.55);
-  background: rgba(57,255,129,0.07);
-  color: #6fffaa;
-  text-shadow: 0 0 12px rgba(57,255,129,0.42);
+  border-color: rgba(255,255,255,0.55);
+  background: rgba(255,255,255,0.07);
+  color: #a1a1a1;
+  text-shadow: 0 0 12px rgba(255,255,255,0.42);
 }
 #intro-screen .status-badge.ready .dot {
-  background: #39ff81;
-  box-shadow: 0 0 10px #39ff81, 0 0 18px rgba(57,255,129,0.55);
+  background: #fafafa;
+  box-shadow: none;
 }
 #intro-screen .intro-loading-bar {
   position: absolute;
@@ -549,9 +545,9 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
   border-radius: 999px;
   overflow: hidden;
   z-index: 4;
-  background: rgba(57,255,129,0.09);
-  border: 1px solid rgba(57,255,129,0.24);
-  box-shadow: 0 0 14px rgba(57,255,129,0.12), inset 0 0 8px rgba(57,255,129,0.08);
+  background: rgba(255,255,255,0.09);
+  border: 1px solid rgba(255,255,255,0.24);
+  box-shadow: 0 0 14px rgba(255,255,255,0.12), inset 0 0 8px rgba(255,255,255,0.08);
   transition: opacity 0.35s ease, transform 0.35s ease;
 }
 #intro-screen .intro-loading-bar span {
@@ -559,8 +555,8 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(57,255,129,0.45), #39ff81);
-  box-shadow: 0 0 10px rgba(57,255,129,0.42);
+  background: #fafafa;
+  box-shadow: 0 0 10px rgba(255,255,255,0.42);
   transition: width 0.42s cubic-bezier(.2,.8,.2,1);
 }
 #intro-screen .intro-loading-bar.done {
@@ -619,25 +615,19 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 .logo-glow {
   position:absolute; width:88%; height:88%; border-radius:50%;
   background: radial-gradient(circle,
-    rgba(201,169,110,0.28) 0%,
+    rgba(255,255,255,0.28) 0%,
     transparent 65%);
   filter:blur(22px); pointer-events:none;
   animation: ipglow 4s ease-in-out infinite;
 }
 @keyframes ipglow { 0%,100%{opacity:.4;transform:scale(1)} 50%{opacity:.8;transform:scale(1.1)} }
 
-/* Full brand logo image — star mark + "HashCortx" text below.
-   Sits inside .logo-wrap at the center of .emblem-stage.
-   Height is intentionally taller than width since the PNG
-   is portrait (mark on top, text below). */
+/* MiraXcode triangular mark — intro emblem center */
 .hc-logo-full {
-  /* Fill the emblem stage — let it breathe but dominate the circle */
-  height: clamp(260px, 46vmin, 440px);
-  width:  auto;
+  width: clamp(200px, 38vmin, 360px);
+  height: clamp(200px, 38vmin, 360px);
   object-fit: contain;
-  filter:
-    drop-shadow(0 0 6px  rgba(240,168,0,0.90))
-    drop-shadow(0 0 20px rgba(240,168,0,0.50));
+  filter: drop-shadow(0 0 24px rgba(255, 255, 255, 0.14));
   animation: hcLogoFloat 6s ease-in-out infinite;
   -webkit-user-drag: none;
   user-select: none;
@@ -722,7 +712,7 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
   to   { opacity:1; transform:translate(-50%,0);    }
 }
 
-/* Main title: #hashcortx_ — JetBrains Mono bold in green */
+/* Main title: #miraxcode_ — JetBrains Mono bold in green */
 .hc-title {
   font-family: var(--font-mono); font-weight:700;
   font-size: clamp(36px, 5.5vmin, 72px);
@@ -775,15 +765,15 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 }
 .hc-shell-logo {
   width: 80px; height: 80px; object-fit: contain;
-  filter: drop-shadow(0 0 12px rgba(34,211,238,0.6));
+  filter: drop-shadow(0 0 12px rgba(255,255,255,0.6));
   opacity: 0.85;
   -webkit-user-drag: none;
 }
 .hc-shell-title {
   font-family: var(--hc-font); font-weight: 700;
   font-size: 28px; letter-spacing: -1px;
-  color: var(--hc-green);
-  text-shadow: 0 0 24px rgba(34,211,238,0.5);
+  color: var(--hc-accent);
+  text-shadow: 0 0 24px rgba(255,255,255,0.5);
 }
 .hc-shell-sub {
   font-family: var(--hc-font); font-size: 11px;
@@ -807,8 +797,8 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 .amk-back-btn#amkBackBtn,
 .sys-btn#sysBackBtn,
 .void-btn#voidBackBtn {
-  background: rgba(201,169,110,0.12) !important;
-  border: 1px solid rgba(201,169,110,0.45) !important;
+  background: rgba(255,255,255,0.12) !important;
+  border: 1px solid rgba(255,255,255,0.45) !important;
   color: #dfc38e !important;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -820,8 +810,8 @@ body.hashcortx-fullscreen-active .hc-safe-exit-mode {
 .amk-back-btn#amkBackBtn:hover,
 .sys-btn#sysBackBtn:hover,
 .void-btn#voidBackBtn:hover {
-  background: rgba(201,169,110,0.22) !important;
-  border-color: rgba(201,169,110,0.75) !important;
+  background: rgba(255,255,255,0.22) !important;
+  border-color: rgba(255,255,255,0.75) !important;
   color: #f5d98a !important;
 }
 
@@ -1194,14 +1184,14 @@ header.topbar .badge-row #activeAgentChip.agent-chip {
   white-space: nowrap !important;
   vertical-align: middle;
   border-radius: 8px !important;
-  border: 1px solid rgba(201,169,110,0.42) !important;
+  border: 1px solid rgba(255,255,255,0.42) !important;
   background:
-    linear-gradient(180deg, rgba(245,215,122,0.13), rgba(201,169,110,0.045)),
+    linear-gradient(180deg, rgba(94,236,196,0.13), rgba(255,255,255,0.045)),
     rgba(8,10,16,0.72) !important;
   color: rgba(245,225,174,0.96) !important;
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,0.08),
-    0 0 14px rgba(201,169,110,0.08) !important;
+    0 0 14px rgba(255,255,255,0.08) !important;
   font: 600 10.5px var(--mono) !important;
   letter-spacing: 0.045em !important;
 }
@@ -1213,9 +1203,9 @@ header.topbar .badge-row #activeAgentChip.agent-chip .ico {
   min-width: 17px !important;
   height: 17px !important;
   border-radius: 6px !important;
-  border: 1px solid rgba(201,169,110,0.34) !important;
-  background: rgba(201,169,110,0.11) !important;
-  color: rgba(245,215,122,0.94) !important;
+  border: 1px solid rgba(255,255,255,0.34) !important;
+  background: rgba(255,255,255,0.11) !important;
+  color: rgba(94,236,196,0.94) !important;
 }
 header.topbar .badge-row #activeAgentChip.agent-chip .ico svg {
   width: 11px !important;
@@ -1248,9 +1238,9 @@ header.topbar .badge-row #activeAgentChip.agent-chip .agent-chip-clear {
   line-height: 1 !important;
 }
 header.topbar .badge-row #activeAgentChip.agent-chip:hover {
-  border-color: rgba(245,215,122,0.62) !important;
+  border-color: rgba(94,236,196,0.62) !important;
   background:
-    linear-gradient(180deg, rgba(245,215,122,0.18), rgba(201,169,110,0.07)),
+    linear-gradient(180deg, rgba(94,236,196,0.18), rgba(255,255,255,0.07)),
     rgba(8,10,16,0.78) !important;
 }
 header.topbar .badge-row #activeAgentChip.agent-chip .clear:hover,
@@ -1347,7 +1337,7 @@ body.low-gpu .drone-a {
   opacity: 0.12 !important;
   animation: none !important;
   transform: none !important;
-  filter: drop-shadow(0 0 3px rgba(34,211,238,0.22)) !important;
+  filter: drop-shadow(0 0 3px rgba(255,255,255,0.22)) !important;
   will-change: auto !important;
   backface-visibility: visible !important;
 }
@@ -1363,7 +1353,7 @@ body.low-gpu .drone-inline,
 body.low-gpu .brand-drone {
   animation: none !important;
   transform: none !important;
-  filter: drop-shadow(0 0 3px rgba(34,211,238,0.20)) !important;
+  filter: drop-shadow(0 0 3px rgba(255,255,255,0.20)) !important;
   will-change: auto !important;
 }
 

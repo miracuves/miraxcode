@@ -1,0 +1,894 @@
+/* ================================================================
+   Aura IDE — Stealth theme (black · grey · white only)
+   Reference: monochromatic IDE — flat, crisp, dot-grid workspace
+   Loaded last. CSS-only — preserves all JS hooks.
+   ================================================================ */
+
+:root {
+  /* Aura tokens */
+  --aura-bg: #141414;
+  --aura-panel: #181818;
+  --aura-panel-2: #252526;
+  --aura-elevated: #1e1e1e;
+  --aura-border: #333333;
+  --aura-border-subtle: #2b2b2b;
+  --aura-text: #ffffff;
+  --aura-text-dim: #a1a1a1;
+  --aura-text-muted: #6b6b6b;
+  --aura-text-faint: #525252;
+
+  /* Bridge legacy vars */
+  --bg-0: var(--aura-bg) !important;
+  --bg-1: var(--aura-panel) !important;
+  --bg-2: var(--aura-panel-2) !important;
+  --bg-3: var(--aura-elevated) !important;
+  --line: var(--aura-border-subtle) !important;
+  --line-strong: var(--aura-border) !important;
+  --text: var(--aura-text) !important;
+  --text-dim: var(--aura-text-dim) !important;
+  --muted: var(--aura-text-muted) !important;
+  --gold: var(--aura-text-dim) !important;
+  --gold-2: var(--aura-text) !important;
+  --emerald: var(--aura-text-dim) !important;
+  --hc-bg: var(--aura-bg) !important;
+  --hc-bg-2: var(--aura-panel) !important;
+  --hc-bg-3: var(--aura-panel-2) !important;
+  --hc-bg-4: var(--aura-elevated) !important;
+  --hc-text: var(--aura-text) !important;
+  --hc-text-dim: var(--aura-text-dim) !important;
+  --hc-text-muted: var(--aura-text-muted) !important;
+  --hc-border: var(--aura-border-subtle) !important;
+  --hc-border-strong: var(--aura-border) !important;
+  --hc-accent: var(--aura-text) !important;
+  --hc-accent-border: var(--aura-border) !important;
+  --radius: 6px !important;
+  --radius-lg: 8px !important;
+  --shadow-lg: none !important;
+  --shadow-sm: none !important;
+  --shadow-glow: none !important;
+  --glass-blur: none !important;
+}
+
+/* ── Global canvas + dot grid ────────────────────────────────── */
+html,
+body {
+  background: var(--aura-bg) !important;
+  color: var(--aura-text) !important;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  letter-spacing: -0.01em !important;
+  -webkit-font-smoothing: antialiased !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+body::before {
+  background-color: var(--aura-bg) !important;
+  background-image: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.045) 0.6px,
+    transparent 0.6px
+  ) !important;
+  background-size: 22px 22px !important;
+  opacity: 1 !important;
+}
+
+.pcb-traces,
+.circuit-spot {
+  display: none !important;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #fff !important;
+}
+
+::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+::-webkit-scrollbar-track {
+  background: var(--aura-bg) !important;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a2a !important;
+  border-radius: 4px !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a3a !important;
+}
+
+/* ── Toolbar (top chrome) ────────────────────────────────────── */
+.hc-toolbar {
+  height: 40px !important;
+  background: var(--aura-bg) !important;
+  border-bottom: 1px solid var(--aura-border) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+
+.hc-toolbar-title {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--aura-text-dim) !important;
+  letter-spacing: -0.02em !important;
+}
+
+.hc-toolbar-logo {
+  width: 20px !important;
+  height: 20px !important;
+  opacity: 0.9 !important;
+  filter: none !important;
+}
+
+.hc-toolbar-btn,
+.hc-safe-exit-mode {
+  height: 28px !important;
+  padding: 0 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text) !important;
+  box-shadow: none !important;
+}
+
+.hc-toolbar-btn:hover,
+.hc-safe-exit-mode:hover {
+  background: var(--aura-panel) !important;
+  border-color: #3a3a3a !important;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+aside {
+  background: var(--aura-panel) !important;
+  border-right: 1px solid var(--aura-border) !important;
+  box-shadow: none !important;
+}
+
+.brand,
+.sidebar-brand {
+  border-bottom: 1px solid var(--aura-border) !important;
+  padding: 14px 16px !important;
+}
+
+.brand-logo-img {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.hc-toolbar-logo {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+/* Mode tabs — Aura underline style */
+.tabs {
+  background: transparent !important;
+  border: none !important;
+  gap: 2px !important;
+  padding: 8px 10px !important;
+}
+
+.tab {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: var(--aura-text-muted) !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  padding: 10px 8px !important;
+  box-shadow: none !important;
+}
+
+.tab:hover {
+  color: var(--aura-text-dim) !important;
+  background: transparent !important;
+}
+
+.tab.active {
+  color: var(--aura-text) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tab.active::before {
+  display: none !important;
+}
+
+.tab.active::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 8px !important;
+  right: 8px !important;
+  bottom: 0 !important;
+  height: 2px !important;
+  background: var(--aura-text) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.chat-item,
+.agent-card {
+  border-radius: 4px !important;
+  border: 1px solid transparent !important;
+  margin-bottom: 2px !important;
+}
+
+.chat-item:hover,
+.agent-card:hover {
+  background: var(--aura-panel-2) !important;
+}
+
+.chat-item.active {
+  background: var(--aura-panel-2) !important;
+  border-color: var(--aura-border) !important;
+}
+
+/* ── Main workspace ──────────────────────────────────────────── */
+main,
+.messages-wrap,
+#messages {
+  background: transparent !important;
+}
+
+.topbar {
+  background: var(--aura-bg) !important;
+  border-bottom: 1px solid var(--aura-border) !important;
+  backdrop-filter: none !important;
+  min-height: 40px !important;
+}
+
+.topbar .badge,
+.crumbs .badge {
+  background: var(--aura-panel) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+  font-size: 11px !important;
+  border-radius: 4px !important;
+}
+
+.msg .bubble {
+  background: var(--aura-panel) !important;
+  border: 1px solid var(--aura-border) !important;
+  border-radius: 6px !important;
+  color: var(--aura-text) !important;
+  box-shadow: none !important;
+}
+
+.msg.user .bubble {
+  background: var(--aura-panel-2) !important;
+}
+
+.composer-wrap,
+.composer {
+  background: var(--aura-panel) !important;
+  border-top: 1px solid var(--aura-border) !important;
+}
+
+#input,
+.composer textarea {
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-border) !important;
+  border-radius: 6px !important;
+  color: var(--aura-text) !important;
+  font-size: 13px !important;
+}
+
+#input:focus,
+.composer textarea:focus {
+  border-color: #3a3a3a !important;
+  box-shadow: none !important;
+}
+
+/* Primary = BUILD (white), secondary = RUN (outline) */
+#send {
+  background: var(--aura-text) !important;
+  border: 1px solid var(--aura-text) !important;
+  color: var(--aura-bg) !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  min-width: 72px !important;
+  box-shadow: none !important;
+}
+
+#send:hover {
+  background: #e5e5e5 !important;
+  border-color: #e5e5e5 !important;
+  color: #141414 !important;
+}
+
+/* ── Buttons — Aura RUN / BUILD pattern ──────────────────────── */
+.cdr-btn,
+.cdr-back-btn,
+.frg-btn,
+.fin-hdr-btn,
+.sbx-scan-btn,
+.sbx-back-btn,
+.amk-btn,
+.sys-btn,
+.void-btn,
+.chips button,
+.modal-actions button:not(.primary) {
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-text) !important;
+  color: var(--aura-text) !important;
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.cdr-btn:hover,
+.frg-btn:hover,
+.fin-hdr-btn:hover,
+.amk-btn:hover {
+  background: var(--aura-panel) !important;
+}
+
+.cdr-run-btn,
+.cdr-btn.primary,
+.frg-btn.primary,
+.sbx-scan-btn,
+.amk-btn.primary,
+.sys-btn.primary,
+.void-btn.primary,
+#finSend,
+.fin-hdr-btn.primary {
+  background: var(--aura-text) !important;
+  border: 1px solid var(--aura-text) !important;
+  color: var(--aura-bg) !important;
+  font-weight: 600 !important;
+}
+
+.cdr-btn--danger,
+.cdr-back-btn {
+  border-color: var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+}
+
+/* ── Coder mode — Aura workspace layout ──────────────────────── */
+#coder-mode-wrap {
+  background: var(--aura-bg) !important;
+  color: var(--aura-text) !important;
+}
+
+.cdr-header {
+  background: var(--aura-bg) !important;
+  border-bottom: 1px solid var(--aura-border) !important;
+  min-height: 44px !important;
+  backdrop-filter: none !important;
+}
+
+.cdr-title {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--aura-text) !important;
+}
+
+.cdr-sub {
+  color: var(--aura-text-muted) !important;
+  font-size: 11px !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+}
+
+.cdr-tab-bar {
+  background: var(--aura-bg) !important;
+  border-bottom: 1px solid var(--aura-border) !important;
+  padding: 0 12px !important;
+}
+
+.cdr-tab {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  color: var(--aura-text-muted) !important;
+  border-bottom: 2px solid transparent !important;
+  margin-bottom: -1px !important;
+}
+
+.cdr-tab.active {
+  color: var(--aura-text) !important;
+  background: transparent !important;
+  border-bottom-color: var(--aura-text) !important;
+}
+
+.cdr-tab-dot {
+  background: var(--aura-text-muted) !important;
+}
+
+.cdr-tab.active .cdr-tab-dot {
+  background: var(--aura-text) !important;
+}
+
+.cdr-sidebar,
+.cdr-right {
+  background: var(--aura-panel) !important;
+  border-color: var(--aura-border) !important;
+}
+
+.cdr-sidebar-hd,
+.cdr-sessions-hd {
+  border-bottom: 1px solid var(--aura-border) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.12em !important;
+  color: var(--aura-text-muted) !important;
+}
+
+.cdr-chat-area {
+  background: var(--aura-bg) !important;
+  background-image: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.04) 0.6px,
+    transparent 0.6px
+  ) !important;
+  background-size: 22px 22px !important;
+}
+
+.cdr-chat-area::before,
+.cdr-chat-area::after {
+  display: none !important;
+}
+
+.cdr-messages {
+  background: transparent !important;
+}
+
+.cdr-welcome-title {
+  color: var(--aura-text) !important;
+  font-size: clamp(22px, 3vw, 32px) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.04em !important;
+  -webkit-text-fill-color: var(--aura-text) !important;
+}
+
+.cdr-welcome-sub {
+  color: var(--aura-text-dim) !important;
+}
+
+.cdr-welcome-chip {
+  background: var(--aura-panel) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+  border-radius: 4px !important;
+}
+
+.cdr-welcome-chip:hover {
+  color: var(--aura-text) !important;
+  border-color: #3a3a3a !important;
+  background: var(--aura-panel-2) !important;
+}
+
+.cdr-composer-toolbar,
+.cdr-agents-bar,
+.cdr-input-wrap {
+  background: var(--aura-panel) !important;
+  border-color: var(--aura-border) !important;
+}
+
+.cdr-task-input {
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text) !important;
+  border-radius: 6px !important;
+}
+
+.cdr-run-btn {
+  background: var(--aura-text) !important;
+  border-color: var(--aura-text) !important;
+  color: var(--aura-bg) !important;
+  border-radius: 4px !important;
+}
+
+.cdr-agent-btn {
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+}
+
+.cdr-agent-btn.active {
+  border-color: var(--aura-text) !important;
+  color: var(--aura-text) !important;
+  background: var(--aura-panel-2) !important;
+}
+
+/* Terminal — Aura TERMINAL panel */
+.cdr-terminal-panel {
+  background: var(--aura-bg) !important;
+  border-top: 1px solid var(--aura-border) !important;
+}
+
+.cdr-terminal-hd {
+  background: var(--aura-panel) !important;
+  border-bottom: 1px solid var(--aura-border) !important;
+  min-height: 32px !important;
+}
+
+.cdr-terminal-title {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.14em !important;
+  color: var(--aura-text-muted) !important;
+}
+
+.cdr-terminal-body,
+.cdr-terminal-input,
+.cdr-terminal-input input,
+#cdrTerminalOutput {
+  font-family: "JetBrains Mono", Menlo, monospace !important;
+  font-size: 12px !important;
+  color: var(--aura-text-dim) !important;
+  background: var(--aura-bg) !important;
+}
+
+.cdr-terminal-input input {
+  caret-color: var(--aura-text) !important;
+}
+
+.cdr-status-bar,
+.cdr-stats-widget,
+.cdr-router-chip {
+  background: var(--aura-panel) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+  border-radius: 4px !important;
+}
+
+/* ── All fullscreen modes ────────────────────────────────────── */
+#forge-mode-wrap,
+#finance-wrap,
+#sandbox-wrap,
+#agent-maker-wrap,
+#system-maker-wrap,
+#virtual-os-wrap {
+  background: var(--aura-bg) !important;
+}
+
+.frg-header,
+.fin-header,
+.sbx-header,
+.amk-header,
+.sys-header,
+.void-header {
+  background: var(--aura-bg) !important;
+  border-bottom: 1px solid var(--aura-border) !important;
+  backdrop-filter: none !important;
+}
+
+.frg-viewport,
+.fin-panel,
+.sbx-code-input,
+.sbx-log,
+.amk-inspector,
+.sys-preview-shell,
+.void-desktop {
+  background: var(--aura-bg) !important;
+  border-color: var(--aura-border) !important;
+}
+
+/* ── Modals ──────────────────────────────────────────────────── */
+.modal-overlay {
+  background: rgba(0, 0, 0, 0.72) !important;
+  backdrop-filter: none !important;
+}
+
+.modal,
+.settings-modal,
+#settingsOverlay .settings-inner,
+.agent-modal-inner {
+  background: var(--aura-panel) !important;
+  border: 1px solid var(--aura-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8) !important;
+}
+
+.settings-tab {
+  border-radius: 4px !important;
+  color: var(--aura-text-muted) !important;
+}
+
+.settings-tab.active {
+  background: var(--aura-panel-2) !important;
+  color: var(--aura-text) !important;
+  border: 1px solid var(--aura-border) !important;
+}
+
+/* ── Intro — stealth boot (no color) ─────────────────────────── */
+#intro-screen {
+  background: var(--aura-bg) !important;
+}
+
+#intro-screen::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background-image: radial-gradient(
+    circle at center,
+    rgba(255, 255, 255, 0.04) 0.6px,
+    transparent 0.6px
+  ) !important;
+  background-size: 22px 22px !important;
+  pointer-events: none !important;
+}
+
+#intro-loading-bar {
+  background: var(--aura-panel) !important;
+  border: 1px solid var(--aura-border) !important;
+  height: 3px !important;
+}
+
+#intro-loading-fill {
+  background: var(--aura-text) !important;
+}
+
+#intro-screen .logo-glow {
+  display: none !important;
+}
+
+/* ── Syntax highlighting — monochrome ─────────────────────────── */
+.hljs,
+.bubble pre,
+.bubble code,
+.cdr-msg-body pre,
+.cdr-msg-body code,
+.cdr-msg-content .hljs-keyword,
+.cdr-msg-content .hljs-built_in,
+.cdr-msg-content .hljs-title,
+.cdr-msg-content .hljs-function {
+  color: var(--aura-text) !important;
+}
+
+.hljs-comment,
+.hljs-quote,
+.cdr-msg-content .hljs-comment {
+  color: var(--aura-text-muted) !important;
+  font-style: italic !important;
+}
+
+.hljs-string,
+.hljs-number,
+.hljs-literal {
+  color: var(--aura-text-dim) !important;
+}
+
+/* ── Inputs global ───────────────────────────────────────────── */
+input,
+textarea,
+select,
+.cdr-model-picker,
+#model,
+.fin-input,
+#finInput {
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text) !important;
+  border-radius: 4px !important;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: #3a3a3a !important;
+  box-shadow: none !important;
+}
+
+/* Hide decorative drones on intro for clean stealth */
+#intro-screen .drone-wrap,
+.drone-hud {
+  opacity: 0.25 !important;
+}
+
+/* ================================================================
+   MAIN SHELL — remove every green accent (sidebar, topbar, drones)
+   ================================================================ */
+
+/* Brand mark — no filters; watermark stays subtle */
+.brand-drone {
+  display: none !important;
+}
+
+.brand-logo-img,
+.hc-toolbar-logo,
+.hc-logo-full,
+.about-logo-img,
+.mode-logo-img,
+.crest-logo-img,
+.cdr-welcome-mark,
+.amk-empty-logo {
+  filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.12)) !important;
+  opacity: 1 !important;
+}
+
+.brand-watermark img {
+  filter: none !important;
+}
+
+/* Sidebar */
+aside {
+  background: var(--aura-panel) !important;
+  border-right: 1px solid var(--aura-border) !important;
+  box-shadow: none !important;
+}
+
+.brand h1,
+.brand .brand-title {
+  color: var(--aura-text) !important;
+  text-shadow: none !important;
+}
+
+/* Memory slider + search — no teal */
+.memory-row svg,
+.search-wrap > svg,
+.new-chat svg {
+  color: var(--aura-text-muted) !important;
+}
+
+.memory-row input[type="range"] {
+  background: linear-gradient(90deg, #525252 var(--fill, 50%), #1a1a1a var(--fill, 50%)) !important;
+}
+
+.memory-row input[type="range"]::-webkit-slider-thumb {
+  background: #a1a1a1 !important;
+  box-shadow: none !important;
+  border: 1px solid #2a2a2a !important;
+}
+
+.memory-row .mem-val {
+  color: var(--aura-text-dim) !important;
+}
+
+.search-wrap > svg {
+  color: var(--aura-text-muted) !important;
+}
+
+.search,
+.search:focus {
+  border-color: var(--aura-border) !important;
+  color: var(--aura-text) !important;
+  box-shadow: none !important;
+}
+
+.search::placeholder {
+  color: var(--aura-text-muted) !important;
+}
+
+.new-chat {
+  border-color: var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+  background: var(--aura-bg) !important;
+}
+
+.new-chat:hover {
+  color: var(--aura-text) !important;
+  border-color: #3a3a3a !important;
+  background: var(--aura-panel-2) !important;
+}
+
+/* All mode tabs including Sandbox — same neutral chrome */
+.tab,
+.tab[data-tab="sandbox"],
+.tab:hover,
+.tab.active {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.tab svg {
+  color: var(--aura-text-muted) !important;
+}
+
+.tab:hover,
+.tab:hover svg,
+.tab.active svg {
+  color: var(--aura-text) !important;
+}
+
+.tab:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.tab[data-tab="sandbox"] {
+  border: 1px solid transparent !important;
+  background: transparent !important;
+}
+
+/* Topbar pills — t/s, ping, RAM (no green glow) */
+.ping-btn,
+.tps-btn,
+#tpsBtn,
+#pingBtn,
+#ramBtn,
+.temp-btn,
+.fan-btn,
+.power-btn {
+  background: var(--aura-bg) !important;
+  border: 1px solid var(--aura-border) !important;
+  color: var(--aura-text-dim) !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.ping-btn svg,
+.tps-btn svg,
+#tpsBtn svg {
+  color: var(--aura-text-muted) !important;
+  filter: none !important;
+}
+
+.ping-btn:hover,
+.tps-btn:hover {
+  border-color: #3a3a3a !important;
+  color: var(--aura-text) !important;
+  background: var(--aura-panel) !important;
+}
+
+.ping-btn.ok,
+.ping-btn.pinging,
+.tps-btn.streaming,
+.tps-btn.tps-fast,
+.tps-btn.tps-mid {
+  color: var(--aura-text-dim) !important;
+  border-color: var(--aura-border) !important;
+  background: var(--aura-panel) !important;
+}
+
+.ping-btn.ok svg,
+.tps-btn.tps-fast svg,
+.tps-btn.tps-mid svg {
+  color: var(--aura-text-muted) !important;
+}
+
+.crumbs .sub {
+  color: var(--aura-text-muted) !important;
+}
+
+.topbar-project-wrap {
+  border-color: var(--aura-border) !important;
+  background: var(--aura-panel) !important;
+}
+
+/* Composer chips + Free RAM */
+.composer-chips button,
+.composer-chips button.accent,
+.composer-chips button[data-preset="freeRam"] {
+  color: var(--aura-text-dim) !important;
+  border-color: var(--aura-border) !important;
+  background: var(--aura-bg) !important;
+}
+
+.composer-chips button:hover,
+.composer-chips button.accent:hover {
+  color: var(--aura-text) !important;
+  border-color: #3a3a3a !important;
+  background: var(--aura-panel) !important;
+}
+
+.composer-chips button.accent svg {
+  color: var(--aura-text-muted) !important;
+}
+
+/* Status dot — grey when ok, keep red only for error */
+.status .dot.ok {
+  background: #737373 !important;
+  box-shadow: none !important;
+}
+
+/* RAG toggle thumb */
+.rag-toggle.on::after {
+  background: #ffffff !important;
+}
+
+/* Hide green from inline SVG fills in main workspace */
+#app svg [fill="#39ff81"],
+#app svg [fill="#6fffaa"],
+#app svg [stroke="#39ff81"] {
+  fill: #737373 !important;
+  stroke: #737373 !important;
+}

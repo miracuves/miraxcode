@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
 
-  "productName": "HashCortx",
+  "productName": "MiraXcode",
   "version": "2.0.0",
 
   // ── Bundle identifier ──────────────────────────────────────────
@@ -14,15 +14,14 @@
   //
   // ⚠ NEVER change this after shipping to real users.
   //   Changing it breaks Keychain access and update signatures.
-  //   If you buy hashcortx.com later, you can note the domain in
+  //   If you buy miraxcode.com later, you can note the domain in
   //   the README but do NOT change this identifier.
-  "identifier": "com.hashcortx.app",
+  "identifier": "com.miraxcode.app",
 
   "build": {
     // ── Frontend source ────────────────────────────────────────
-    // Phase 0–2: served directly from /src (no build step needed).
-    // Phase 3+: switch to "../dist" and add Vite if complexity grows.
-    "frontendDist": "../src"
+    // Served from /src. Main shell is bundled: npm run build:js → src/js/app.bundle.js
+    "frontendDist": "./src"
   },
 
   "app": {
@@ -33,7 +32,7 @@
 
     "windows": [
       {
-        "title": "HashCortx",
+        "title": "MiraXcode",
         "width": 1380,
         "height": 860,
 
@@ -56,7 +55,7 @@
         // Open centered on first launch. The window starts hidden so JS can
         // restore the saved size/position before the first visible paint.
         "center": true,
-        "visible": false
+        "visible": true
       }
     ],
 
@@ -73,7 +72,7 @@
       //
       // ipc: and http://ipc.localhost are required by Tauri internals.
       // 'unsafe-inline' on style-src is needed for our dynamic theme tokens.
-      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.anthropic.com https://api.openai.com https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://api.together.xyz https://api.mistral.ai https://generativelanguage.googleapis.com https://api.sambanova.ai https://api.kimi.com https://api.kimi.ai https://api.moonshot.ai https://api.moonshot.cn https://api.deepseek.com https://integrate.api.nvidia.com https://api.tavily.com https://customsearch.googleapis.com https://en.wikipedia.org https://eutils.ncbi.nlm.nih.gov https://api.duckduckgo.com http://localhost:11434 http://127.0.0.1:11434 http://*:11434 http://*:11435 http://*:1234 http://*:8080 https://cdn.sheetjs.com"
+      "csp": "default-src 'self' ipc: http://ipc.localhost; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://cdn.sheetjs.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.anthropic.com https://api.openai.com https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://api.together.xyz https://api.mistral.ai https://generativelanguage.googleapis.com https://api.sambanova.ai https://api.kimi.com https://api.kimi.ai https://api.moonshot.ai https://api.moonshot.cn https://api.deepseek.com https://integrate.api.nvidia.com https://api.tavily.com https://customsearch.googleapis.com https://en.wikipedia.org https://eutils.ncbi.nlm.nih.gov https://api.duckduckgo.com https://api.minimax.chat https://api.minimax.io https://api.minimaxi.com https://api.z.ai https://openrouter.ai https://*.openrouter.ai http://localhost:11434 http://127.0.0.1:11434 http://*:11434 http://*:11435 http://*:1234 http://*:8080 https://cdn.sheetjs.com"
     }
   },
 
@@ -91,7 +90,7 @@
     // These are auto-generated from a master 1024×1024 PNG.
     // To regenerate after changing the logo:
     //   1. Place your new logo at src/assets/icon-master.png
-    //   2. Run: npm run tauri icon src/assets/icon-master.png
+    //   2. Run: npm run icons
     //   3. Tauri will overwrite all sizes here automatically.
     "icon": [
       "icons/32x32.png",
@@ -105,7 +104,7 @@
     "category": "DeveloperTool",
 
     "shortDescription": "Local-first AI coding agents",
-    "longDescription": "HashCortx — 100% local AI coding agents. No cloud, no tracking. Your API keys stay in your keychain. Your files never leave your machine.",
+    "longDescription": "MiraXcode — 100% local AI coding agents. No cloud, no tracking. Your API keys stay in your keychain. Your files never leave your machine.",
 
     "macOS": {
       // Minimum macOS version. 10.15 (Catalina) supports all Tauri features.
@@ -142,7 +141,7 @@
   //   "updater": {
   //     "pubkey": "YOUR_PUBLIC_KEY_HERE",
   //     "endpoints": [
-  //       "https://github.com/YOUR_USERNAME/HashCortx/releases/latest/download/latest.json"
+  //       "https://github.com/YOUR_USERNAME/MiraXcode/releases/latest/download/latest.json"
   //     ]
   //   }
   // }

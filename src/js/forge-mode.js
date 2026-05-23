@@ -77,7 +77,7 @@
     "x.com",
     "twitter.com",
   ];
-  const FORGE_ALLOWED_MODEL_PROVIDERS = new Set(["groq", "gemini", "cerebras", "samba", "sambanova", "openrouter", "local"]);
+  const FORGE_ALLOWED_MODEL_PROVIDERS = new Set(["groq", "gemini", "cerebras", "samba", "sambanova", "openrouter", "minimax", "glm", "nvidia", "local"]);
   const FORGE_PROVIDER_COOLDOWNS = new Map();
   let forgeProjects = [];
   let activeProjectId = null;
@@ -909,7 +909,7 @@
   function makeImageLogoMaterial(node) {
     const p = node.params || {};
     const loader = new THREE.TextureLoader();
-    const texture = loader.load(p.src || "/assets/hashcortx-logo.png");
+    const texture = loader.load(p.src || "/assets/miraxcode-logo.png");
     texture.colorSpace = THREE.SRGBColorSpace;
     return new THREE.MeshBasicMaterial({
       map: texture,
@@ -1026,6 +1026,7 @@
     }
     clearScene();
     activePlan = normalizePlan(plan);
+    window.ForgeEditor?.setPlanJson?.(activePlan);
     const nodes = renderableNodes(activePlan.nodes);
     nodes.forEach((node, i) => addNodeMesh(node, i, nodes.length));
     updatePlanList(activePlan);
@@ -3456,20 +3457,20 @@ Do not add floating decorations or abstract markers. Structure must add load-bea
 
   function hLogoPlan() {
     return {
-      name: "HashCortx intro mark",
+      name: "MiraXcode intro mark",
       _introLogo: true,
       nodes: [
         { id: "hcx_teal_halo", name: "Teal halo layer", role: "structure", type: "logo_img",
           position: [0.06, 0.2, -0.08], rotation: [0, 0, 0], scale: [1, 1, 1],
-          params: { width: 4.4, height: 2.86, src: "/assets/hashcortx-logo.png" },
+          params: { width: 4.4, height: 2.86, src: "/assets/miraxcode-logo.png" },
           color: "#4bd2be", opacity: 0.26 },
-        { id: "hcx_main", name: "HashCortx logo", role: "surface", type: "logo_img",
+        { id: "hcx_main", name: "MiraXcode logo", role: "surface", type: "logo_img",
           position: [0, 0.2, 0], rotation: [0, 0, 0], scale: [1, 1, 1],
-          params: { width: 4.0, height: 2.6, src: "/assets/hashcortx-logo.png" },
+          params: { width: 4.0, height: 2.6, src: "/assets/miraxcode-logo.png" },
           color: "#ffffff", opacity: 0.98 },
         { id: "hcx_gold_sheen", name: "Gold sheen overlay", role: "detail", type: "logo_img",
           position: [-0.03, 0.22, 0.04], rotation: [0, 0, 0], scale: [1, 1, 1],
-          params: { width: 4.05, height: 2.63, src: "/assets/hashcortx-logo.png" },
+          params: { width: 4.05, height: 2.63, src: "/assets/miraxcode-logo.png" },
           color: "#c9a96e", opacity: 0.22 },
       ],
     };
@@ -3644,6 +3645,7 @@ Do not add floating decorations or abstract markers. Structure must add load-bea
     eventsWired = true;
     $("frgGodBtn")?.addEventListener("click", () => runGodAgent(false));
     $("frgMockBtn")?.addEventListener("click", () => runGodAgent(true));
+    $("frgBtnCode")?.addEventListener("click", () => window.ForgeEditor?.toggle?.());
     $("frgResetViewBtn")?.addEventListener("click", resetView);
     $("frgBackBtn")?.addEventListener("click", () => {
       const back = window._H?.state?._preForgeTab || "chats";
@@ -3785,6 +3787,7 @@ Do not add floating decorations or abstract markers. Structure must add load-bea
   function destroy() {
     mounted = false;
     if (abortCtrl) abortCtrl.abort();
+    window.ForgeEditor?.destroy?.();
   }
 
   function debugState() {
