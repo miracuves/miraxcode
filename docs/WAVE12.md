@@ -4,30 +4,19 @@
 
 Split remaining monoliths using `create*Api(ctx)` factories (same pattern as Wave 10 router and Wave 11 `coder-mode.js`).
 
-## Completed in this wave
+## Modules
 
-| Agent / slice | Module | Status |
-|---------------|--------|--------|
-| Tabs | `modes/code/tabs.js` | `createTabManager` + `tabHooks` wiring |
-| Terminal | `modes/code/terminal.js` | `createTerminalApi` (ANSI, trace, shell) |
-| Void storage | `modes/virtual-os/storage.js` | `createVoidStorage` + `state` bag in void-studio |
+| Slice | Module | Exports |
+|-------|--------|---------|
+| Tabs | `modes/code/tabs.js` | `createTabManager` |
+| Terminal | `modes/code/terminal.js` | `createTerminalApi` |
+| Explorer | `modes/code/explorer.js` | `createExplorerApi` |
+| Agent run | `modes/code/agent-run.js` | `createAgentRunApi` |
+| Router (add-on) | `modes/code/router.js` | `buildRouterChain` for vote/chain modes |
+| Void storage | `modes/virtual-os/storage.js` | `createVoidStorage` |
+| Void chat | `modes/virtual-os/chat.js` | `createVoidChatApi` |
 
-## In progress
-
-| Slice | Target module |
-|-------|----------------|
-| Explorer | `modes/code/explorer.js` |
-| Agent run | `modes/code/agent-run.js` |
-| Void chat | `modes/virtual-os/chat.js` |
-
-## Wiring pattern
-
-```javascript
-const tabHooks = {};
-const { _tabMgr, renderTabBar, ... } = createTabManager({ ..., hooks: tabHooks });
-// ... define functions ...
-Object.assign(tabHooks, { abortActiveRun, renderConversation, ... });
-```
+`coder-mode.js` and `void-studio.js` remain orchestrators (mount/DOM wiring).
 
 ## Verify
 

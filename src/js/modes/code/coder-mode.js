@@ -3,10 +3,11 @@
  */
 import { $, esc, baseName, setExplorerRootLabel, setRouterChip } from './dom-utils.js';
 import { injectAllToolBlocks } from './tool-blocks.js';
-import { callWithRouter } from './router.js';
+import { createAgentRunApi } from './agent-run.js';
 import { startStatsPolling } from './stats-poll.js';
 import { createTabManager } from './tabs.js';
 import { createTerminalApi } from './terminal.js';
+import { createExplorerApi } from './explorer.js';
 
 export function createCoderMode(deps) {
   const { sharedState, modelRef, relativeFromRoot } = deps;
@@ -29,6 +30,18 @@ export function createCoderMode(deps) {
     let _chatVirtual       = null;
     let _editorPane        = null;
     let _ideCtx            = null;
+    let _graphifyContext   = '';
+    let _skillsForPrompt   = [];
+    let buildTools;
+    let sysPrompt;
+    let agentLoop;
+    let expandTaskMentions;
+    let startRun;
+    let stopRun;
+    let runSingleTurn;
+    let runMultiTurn;
+    let runAllVote;
+    let runChainRefine;
 
     const {
       terminalPrompt,
@@ -49,8 +62,6 @@ export function createCoderMode(deps) {
       cdrTraceStartedAtRef,
     });
     let _lspDiagUnsub      = null;
-    let _symbolFilter      = '';
-    let _symbolKindFilter  = '';
     let _domScrollBatch    = 0;
     let _runGeneration     = 0;
     let _runTabId          = null;
@@ -187,6 +198,8 @@ export function createCoderMode(deps) {
         clearChatUI,
       }));
     }
+
+    wireTabManager();
 
     async function refreshGitStatus() {
       const list = $('cdrGitList');
@@ -932,771 +945,35 @@ export function createCoderMode(deps) {
       }
     }
 
-    // ── Explorer context menu (Cursor-style) ───────────────────
-    let _explorerCtxTarget = null;
-    let _explorerCtxMenu = null;
-
-    function explorerCtxMenuEl() {
-      if (_explorerCtxMenu) return _explorerCtxMenu;
-      const menu = document.createElement('div');
-      menu.id = 'cdrExplorerCtxMenu';
-      menu.className = 'cdr-ctx-menu';
-      menu.setAttribute('role', 'menu');
-      menu.hidden = true;
-      document.body.appendChild(menu);
-      menu.addEventListener('click', e => e.stopPropagation());
-      menu.addEventListener('contextmenu', e => e.stopPropagation());
-      _explorerCtxMenu = menu;
-      document.addEventListener('click', () => hideExplorerContextMenu());
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape') hideExplorerContextMenu();
-      });
-      window.addEventListener('blur', () => hideExplorerContextMenu());
-      window.addEventListener('resize', () => hideExplorerContextMenu());
-      return menu;
-    }
-
-    function hideExplorerContextMenu() {
-      const menu = _explorerCtxMenu;
-      if (!menu) return;
-      menu.classList.remove('open');
-      menu.hidden = true;
-      menu.innerHTML = '';
-      _explorerCtxTarget = null;
-    }
-
-    function ctxMenuItem(label, { shortcut, danger, disabled, onClick } = {}) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'cdr-ctx-item' + (danger ? ' danger' : '');
-      btn.setAttribute('role', 'menuitem');
-      btn.disabled = !!disabled;
-      const span = document.createElement('span');
-      span.textContent = label;
-      btn.appendChild(span);
-      if (shortcut) {
-        const sc = document.createElement('span');
-        sc.className = 'cdr-ctx-shortcut';
-        sc.textContent = shortcut;
-        btn.appendChild(sc);
-      }
-      if (!disabled && onClick) {
-        btn.addEventListener('click', e => {
-          e.stopPropagation();
-          hideExplorerContextMenu();
-          void onClick();
-        });
-      }
-      return btn;
-    }
-
-    function ctxMenuSep() {
-      const sep = document.createElement('div');
-      sep.className = 'cdr-ctx-sep';
-      sep.setAttribute('role', 'separator');
-      return sep;
-    }
-
-    function copyClipboard(text) {
-      const t = String(text || '');
-      if (!t) return;
-      navigator.clipboard?.writeText(t)?.catch(() => {});
-    }
-
-    function shellEscapePath(p) {
-      return String(p || '').replace(/'/g, "'\\''");
-    }
-
-    async function revealInFinder(path) {
-      if (!path || !HC?.isTauri) return;
-      try {
-        if (window.__TAURI__?.opener?.revealItemInDir) {
-          await window.__TAURI__.opener.revealItemInDir(path);
-          return;
-        }
-      } catch {}
-      await HC.invoke('shell_run', { command: 'open', args: ['-R', path], cwd: null });
-    }
-
-    async function openPathExternal(path) {
-      if (!path || !HC?.isTauri) return;
-      try {
-        if (window.__TAURI__?.opener?.openPath) {
-          await window.__TAURI__.opener.openPath(path);
-          return;
-        }
-      } catch {}
-      await HC.invoke('shell_run', { command: 'open', args: [path], cwd: null });
-    }
-
-    function focusIntegratedTerminal() {
-      const panel = $('cdrTerminalPanel');
-      const input = $('cdrTerminalInput');
-      if (panel) panel.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-      input?.focus();
-      return input;
-    }
-
-    async function openInIntegratedTerminal(path, isDir) {
-      const cwd = isDir ? path : (path.replace(/\/[^/]+$/, '') || path);
-      const input = focusIntegratedTerminal();
-      if (!cwd) return;
-      const cmd = `cd '${shellEscapePath(cwd)}' && pwd`;
-      if (input) {
-        input.value = `cd '${shellEscapePath(cwd)}'`;
-        input.focus();
-      }
-      if (!HC?.isTauri) {
-        terminalLog('Terminal requires Tauri backend.', 'cdr-terminal-error');
-        return;
-      }
-      terminalLog(`${terminalPrompt()} ${cmd}`, 'cdr-terminal-prompt');
-      try {
-        const result = await HC.invoke('shell_run', {
-          command: 'sh',
-          args: ['-c', cmd],
-          cwd: sharedState.projectRoot || undefined,
-        });
-        if (result?.stdout) result.stdout.split('\n').forEach(l => { if (l) terminalLog(l); });
-        if (result?.stderr) result.stderr.split('\n').forEach(l => { if (l) terminalLog(l, 'cdr-terminal-error'); });
-      } catch (err) {
-        terminalLog(String(err?.message || err), 'cdr-terminal-error');
-      }
-    }
-
-    function appendFileToComposer(path, { newSession = false, isDir = false } = {}) {
-      if (newSession) onTabNew();
-      const ti = $('cdrTaskInput');
-      if (!ti) return;
-      const rel = relativeFromRoot(path);
-      const block = isDir
-        ? `\n\n[Folder context: \`${rel}\`]\nFull path: ${path}\nPlease explore this folder and summarize its structure.\n`
-        : `\n\n[File context: \`${rel}\`]\nFull path: ${path}\nPlease read this file and use it in your response.\n`;
-      ti.value = (ti.value.trim() ? ti.value.trim() + '\n' : '') + block;
-      autoResize(ti);
-      ti.focus();
-      setActiveFile(path);
-      document.querySelectorAll('.cdr-tree-entry').forEach(el => {
-        el.classList.toggle('active', el.dataset.path === path);
-      });
-      HC?.guard?.notify?.(`Added ${rel} to Coder chat`, 'info');
-    }
-
-    async function copyFileContents(path) {
-      if (!HC?.code?.readFile) return;
-      try {
-        const content = await HC.code.readFile(path);
-        copyClipboard(typeof content === 'string' ? content : JSON.stringify(content, null, 2));
-        HC?.guard?.notify?.('File contents copied', 'info');
-      } catch (e) {
-        HC?.guard?.notify?.(String(e?.message || e), 'err');
-      }
-    }
-
-    async function renameExplorerPath(path, isDir) {
-      const base = path.split('/').filter(Boolean).pop() || path;
-      const next = window.prompt(isDir ? 'Rename folder to:' : 'Rename file to:', base);
-      if (!next || next === base) return;
-      if (next.includes('/') || next.includes('\\')) {
-        HC?.guard?.notify?.('Name cannot contain path separators', 'err');
-        return;
-      }
-      const parent = path.replace(/\/[^/]+$/, '') || '/';
-      const dest = `${parent}/${next}`;
-      const ok = await HC.guard.request('write', path, `Rename to ${next}`);
-      if (!ok) return;
-      try {
-        await HC.invoke('shell_run', { command: 'mv', args: [path, dest], cwd: null });
-        HC?.guard?.notify?.('Renamed', 'info');
-        if (sharedState.projectRoot) await renderExplorerTree(sharedState.projectRoot);
-        if (sharedState.activeFile === path) setActiveFile(dest);
-      } catch (e) {
-        HC?.guard?.notify?.(String(e?.message || e), 'err');
-      }
-    }
-
-    async function deleteExplorerPath(path, isDir) {
-      const label = isDir ? 'folder' : 'file';
-      if (!window.confirm(`Delete this ${label}?\n\n${path}\n\nThis cannot be undone.`)) return;
-      const ok = await HC.guard.request('delete', path, `Delete ${label}`);
-      if (!ok) return;
-      try {
-        if (isDir) {
-          await HC.invoke('shell_run', { command: 'rm', args: ['-rf', path], cwd: null });
-        } else {
-          await HC.code.deleteFile(path, `Delete ${label}`);
-        }
-        HC?.guard?.notify?.('Deleted', 'info');
-        if (sharedState.activeFile === path) sharedState.activeFile = null;
-        if (sharedState.projectRoot) await renderExplorerTree(sharedState.projectRoot);
-      } catch (e) {
-        HC?.guard?.notify?.(String(e?.message || e), 'err');
-      }
-    }
-
-    function toggleDirEntry(entryEl) {
-      entryEl?.click();
-    }
-
-    function showExplorerContextMenu(event, entryEl) {
-      const path = entryEl?.dataset?.path;
-      if (!path) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const isDir = entryEl.dataset.isDir === '1' || entryEl.classList.contains('dir');
-      _explorerCtxTarget = { path, isDir, el: entryEl };
-      const menu = explorerCtxMenuEl();
-      menu.innerHTML = '';
-
-      if (isDir) {
-        menu.appendChild(ctxMenuItem('Expand / Collapse', { onClick: () => toggleDirEntry(entryEl) }));
-      } else {
-        menu.appendChild(ctxMenuItem('Open', { onClick: () => {
-          document.querySelectorAll('.cdr-tree-entry').forEach(el => el.classList.remove('active'));
-          entryEl.classList.add('active');
-          setActiveFile(path);
-          void openPathExternal(path);
-        } }));
-      }
-
-      menu.appendChild(ctxMenuSep());
-      menu.appendChild(ctxMenuItem('Reveal in Finder', {
-        shortcut: '⌥⌘R',
-        disabled: !HC?.isTauri,
-        onClick: () => revealInFinder(path),
-      }));
-      menu.appendChild(ctxMenuItem('Open in Integrated Terminal', {
-        disabled: !HC?.isTauri,
-        onClick: () => openInIntegratedTerminal(path, isDir),
-      }));
-
-      menu.appendChild(ctxMenuSep());
-      menu.appendChild(ctxMenuItem('Add to Coder Chat', {
-        onClick: () => appendFileToComposer(path, { newSession: false, isDir }),
-      }));
-      menu.appendChild(ctxMenuItem('Add to New Coder Session', {
-        onClick: () => appendFileToComposer(path, { newSession: true, isDir }),
-      }));
-
-      menu.appendChild(ctxMenuSep());
-      menu.appendChild(ctxMenuItem('Copy Path', {
-        shortcut: '⌥⌘C',
-        onClick: () => { copyClipboard(path); HC?.guard?.notify?.('Path copied', 'info'); },
-      }));
-      menu.appendChild(ctxMenuItem('Copy Relative Path', {
-        shortcut: '⌥⇧⌘C',
-        onClick: () => {
-          copyClipboard(relativeFromRoot(path));
-          HC?.guard?.notify?.('Relative path copied', 'info');
-        },
-      }));
-      if (!isDir) {
-        menu.appendChild(ctxMenuItem('Copy File Contents', {
-          shortcut: '⌘C',
-          disabled: !HC?.isTauri,
-          onClick: () => copyFileContents(path),
-        }));
-      }
-
-      menu.appendChild(ctxMenuSep());
-      menu.appendChild(ctxMenuItem('Rename…', {
-        disabled: !HC?.isTauri,
-        onClick: () => renameExplorerPath(path, isDir),
-      }));
-      menu.appendChild(ctxMenuItem('Delete', {
-        shortcut: '⌘⌫',
-        danger: true,
-        disabled: !HC?.isTauri,
-        onClick: () => deleteExplorerPath(path, isDir),
-      }));
-
-      menu.hidden = false;
-      menu.classList.add('open');
-      const pad = 8;
-      const mw = menu.offsetWidth || 248;
-      const mh = menu.offsetHeight || 200;
-      let x = event.clientX;
-      let y = event.clientY;
-      if (x + mw > window.innerWidth - pad) x = window.innerWidth - mw - pad;
-      if (y + mh > window.innerHeight - pad) y = window.innerHeight - mh - pad;
-      menu.style.left = `${Math.max(pad, x)}px`;
-      menu.style.top = `${Math.max(pad, y)}px`;
-    }
-
-    function initExplorerContextMenu() {
-      const body = $('cdrExplorerBody');
-      if (!body || body.dataset.ctxWired === '1') return;
-      body.dataset.ctxWired = '1';
-      body.addEventListener('contextmenu', e => {
-        const entry = e.target.closest('.cdr-tree-entry[data-path]');
-        if (!entry) return;
-        showExplorerContextMenu(e, entry);
-      });
-    }
-
-    // ── Explorer ──────────────────────────────────────────────
-    function toggleExplorer() {
-      const sidebar = $('cdrSidebar');
-      const body = $('cdrBody');
-      if (!sidebar) return;
-      const opening = !sidebar.classList.contains('open');
-      sidebar.classList.toggle('open', opening);
-      if (body) body.classList.toggle('has-sidebar', opening);
-      if (opening && sharedState.projectRoot) {
-        renderExplorerTree(sharedState.projectRoot);
-      }
-    }
-
-    // Open native file/folder pickers. Order of preference:
-    //   1. Tauri 2 plugin-dialog (requires dialog:default in capabilities + new build)
-    //   2. macOS AppleScript fallback via shell_run (works in EVERY build)
-    //   3. Web showDirectoryPicker / showOpenFilePicker (browser dev mode)
-    //
-    // CRITICAL: distinguish between "plugin errored" (fall back) and
-    // "user pressed Cancel" (return null IMMEDIATELY, do NOT reopen picker).
-    async function pickFolder() {
-      if (window.HC?.isTauri && window.HC?.invoke) {
-        // 1) Tauri plugin-dialog
-        let pluginAvailable = true;
-        try {
-          const folder = await window.HC.invoke('plugin:dialog|open', {
-            options: { directory: true, multiple: false, title: 'Open Project Folder' }
-          });
-          // Success path — user either picked or cancelled. Both end here.
-          return (typeof folder === 'string' && folder) ? folder : null;
-        } catch (e) {
-          // Genuine plugin failure (e.g. capability missing). Fall through.
-          pluginAvailable = false;
-          console.warn('[CoderMode] dialog plugin unavailable, using AppleScript fallback:', e?.message || e);
-        }
-        // 2) AppleScript fallback
-        if (!pluginAvailable) {
-          try {
-            const out = await window.HC.invoke('shell_run', {
-              command: 'osascript',
-              args: ['-e', 'POSIX path of (choose folder with prompt "Open Project Folder")']
-            });
-            // osascript exits non-zero on user cancel → check `code` and stdout
-            if (out?.code === 0) {
-              const stdout = (out?.stdout || '').trim();
-              return stdout ? stdout.replace(/\/$/, '') : null;
-            }
-            // Non-zero exit = user cancelled or osascript failed → return null
-            return null;
-          } catch (e) { console.warn('[CoderMode] osascript folder:', e); return null; }
-        }
-        return null;
-      }
-      // 3) Web fallback
-      if (window.showDirectoryPicker) {
-        try { const dirHandle = await window.showDirectoryPicker(); return dirHandle.name; }
-        catch { return null; }
-      }
-      return null;
-    }
-
-    async function pickFile() {
-      if (window.HC?.isTauri && window.HC?.invoke) {
-        let pluginAvailable = true;
-        try {
-          const file = await window.HC.invoke('plugin:dialog|open', {
-            options: { multiple: false, title: 'Open File' }
-          });
-          return (typeof file === 'string' && file) ? file : null;
-        } catch (e) {
-          pluginAvailable = false;
-          console.warn('[CoderMode] dialog plugin unavailable, using AppleScript fallback:', e?.message || e);
-        }
-        if (!pluginAvailable) {
-          try {
-            const out = await window.HC.invoke('shell_run', {
-              command: 'osascript',
-              args: ['-e', 'POSIX path of (choose file with prompt "Open File")']
-            });
-            if (out?.code === 0) {
-              const stdout = (out?.stdout || '').trim();
-              return stdout || null;
-            }
-            return null;
-          } catch (e) { console.warn('[CoderMode] osascript file:', e); return null; }
-        }
-        return null;
-      }
-      if (window.showOpenFilePicker) {
-        try { const [fh] = await window.showOpenFilePicker(); return fh.name; }
-        catch { return null; }
-      }
-      return null;
-    }
-
-    async function openProject() {
-      const folder = await pickFolder();
-      if (!folder || typeof folder !== 'string') return;
-      sharedState.projectRoot = folder;
-      HC?.guard?.setProjectRoot?.(folder);
-      if (HC?.code) HC.code.getProjectRoot = () => sharedState.projectRoot;
-      void refreshGraphifyForProject({ force: false });
-      // Keep system prompt current so the model always sees the real project root.
-      if (_conversationMsgs.length && _conversationMsgs[0]?.role === 'system') {
-        _conversationMsgs[0].content = sysPrompt();
-      } else if (!_conversationMsgs.length) {
-        _graphifyContext = '';
-        void (async () => {
-          await loadGraphifyContextForTask('project structure overview');
-          if (!_conversationMsgs.length) {
-            _conversationMsgs.push({ role: 'system', content: sysPrompt() });
-          }
-        })();
-      }
-      syncProjectLabel();
-      syncTerminalPrompt();
-      setExplorerRootLabel(folder);
-      await renderExplorerTree(folder);
-      refreshGitStatus();
-      _ideCtx?.updateTrustChip?.();
-      scanProjectSymbols(folder);
-      void ingestProjectRag(folder);
-      void runProjectLintChecks(folder);
-      try {
-        const top = await HC.code.listDir(folder);
-        const hint = (top || []).map((e) => ({ path: e.name, name: e.name }));
-        const langs = await window.CdrLspClient?.startForProject?.(folder, hint);
-        if (langs?.length) {
-          HC?.guard?.notify?.(`LSP: ${langs.join(', ')}`, 'ok');
-        }
-      } catch (e) {
-        console.warn('[CoderMode] LSP start:', e);
-      }
-      const sidebar = $('cdrSidebar');
-      const body = $('cdrBody');
-      if (sidebar) sidebar.classList.add('open');
-      if (body) body.classList.add('has-sidebar');
-      saveCoderState();
-    }
-
-    async function openFile() {
-      const file = await pickFile();
-      if (!file || typeof file !== 'string') return;
-      setActiveFile(file);
-      const ti = $('cdrTaskInput');
-      if (ti && !ti.value.trim()) ti.value = `Read and summarize: ${file}`;
-    }
-
-    // ── AI session files — auto-add any file the AI creates/modifies to the left panel
-    const _aiSessionFiles = new Set();
-    function clearFilesPanel() {
-      _aiSessionFiles.clear();
-      sharedState.projectRoot = null;
-      sharedState.activeFile = null;
-      sharedState.projectSymbols = {};
-      window.CdrLspClient?.stopAll?.();
-      HC?.guard?.clearProjectRoot?.();
-      syncProjectLabel();
-      syncTerminalPrompt();
-      setExplorerRootLabel(null);
-      const body = $('cdrExplorerBody');
-      if (body) body.innerHTML = '<div class="cdr-tree-empty">Open a project or file to start.</div>';
-      saveCoderState();
-      setStatus('Files cleared', 'ok');
-    }
-
-    function addAIFileToExplorer(filePath, kind) {
-      if (!filePath || typeof filePath !== 'string') return;
-      if (_aiSessionFiles.has(filePath)) return;
-      _aiSessionFiles.add(filePath);
-      const body = $('cdrExplorerBody');
-      if (!body) return;
-      // Find or create the "Session files" section at the top of the tree
-      let section = document.getElementById('cdrAISessionSection');
-      if (!section) {
-        section = document.createElement('div');
-        section.id = 'cdrAISessionSection';
-        section.className = 'cdr-ai-session-section';
-        section.innerHTML = `
-          <div class="cdr-ai-session-hd">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 1.5"/></svg>
-            <span>SESSION FILES</span>
-          </div>
-          <div class="cdr-ai-session-list" id="cdrAISessionList"></div>`;
-        body.prepend(section);
-      }
-      const list = document.getElementById('cdrAISessionList');
-      if (!list) return;
-      // Clear empty-state placeholder if present
-      const empty = body.querySelector('.cdr-tree-empty');
-      if (empty) empty.remove();
-      const row = document.createElement('div');
-      row.className = 'cdr-tree-entry cdr-ai-file' + (kind === 'delete' ? ' deleted' : '');
-      const name = baseName(filePath);
-      const displayPath = relativeFromRoot(filePath);
-      const icon = kind === 'delete'
-        ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>`
-        : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
-      row.innerHTML = `${icon}<span class="cdr-tree-text"><span class="cdr-tree-name">${esc(name)}</span><span class="cdr-tree-path">${esc(displayPath)}</span></span>`;
-      row.title = filePath;
-      row.dataset.path = filePath;
-      row.dataset.isDir = '0';
-      row.addEventListener('click', () => {
-        setActiveFile(filePath);
-        const ti = $('cdrTaskInput');
-        if (ti && !ti.value.trim()) ti.value = `Review changes in: ${filePath}`;
-      });
-      list.appendChild(row);
-    }
-
-    async function renderExplorerTree(dir, parentEl, depth) {
-      if (!window.HC?.isTauri) return;
-      const container = parentEl || $('cdrExplorerBody');
-      if (!container) return;
-      if (!parentEl) container.innerHTML = '<div class="cdr-tree-empty">Loading…</div>';
-      try {
-        // Use HC.code.listDir so the guard can log the access in the audit trail.
-        // The permission dialog is suppressed because the user explicitly opened this
-        // project folder, so the guard treats it as session-trusted.
-        const entries = await HC.code.listDir(dir);
-        if (!parentEl) container.innerHTML = '';
-        if (!entries?.length) {
-          if (!parentEl) container.innerHTML = '<div class="cdr-tree-empty">Empty directory</div>';
-          return;
-        }
-        const sorted = [...entries].sort((a, b) => {
-          if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
-          return a.name.localeCompare(b.name);
-        });
-        for (const entry of sorted) {
-          if (entry.name.startsWith('.') && !entry.name.match(/^\.env/)) continue;
-          const item = document.createElement('div');
-          item.className = 'cdr-tree-entry' + (entry.is_dir ? ' dir' : '');
-          item.style.paddingLeft = `${7 + (depth || 0) * 12}px`;
-          const fullPath = entry.path || `${dir.endsWith('/') ? dir : dir + '/'}${entry.name}`;
-          const en = esc(entry.name);
-          item.dataset.path = fullPath;
-          item.dataset.isDir = entry.is_dir ? '1' : '0';
-          item.innerHTML = entry.is_dir
-            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span class="cdr-tree-name">${en}</span>`
-            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span class="cdr-tree-name">${en}</span>`;
-          item.title = fullPath;
-          window.CdrComposerAttachments?.wireExplorerEntry?.(item, fullPath, entry.is_dir);
-          item.addEventListener('click', async e => {
-            e.stopPropagation();
-            if (entry.is_dir) {
-              const existing = item.nextElementSibling;
-              if (existing?.classList.contains('cdr-tree-subtree')) {
-                existing.remove(); item.classList.remove('open');
-              } else {
-                item.classList.add('open');
-                const sub = document.createElement('div');
-                sub.className = 'cdr-tree-subtree';
-                item.after(sub);
-                await renderExplorerTree(fullPath, sub, (depth || 0) + 1);
-              }
-            } else {
-              document.querySelectorAll('.cdr-tree-entry').forEach(el => el.classList.remove('active'));
-              item.classList.add('active');
-              setActiveFile(fullPath);
-              _editorPane?.openFile(fullPath).catch(() => {});
-              const ti = $('cdrTaskInput');
-              if (ti && !ti.value.trim()) ti.value = `Read and summarize: ${fullPath}`;
-            }
-          });
-          container.appendChild(item);
-        }
-      } catch (e) {
-        if (!parentEl) container.innerHTML = `<div class="cdr-tree-empty">Error: ${esc(String(e?.message || e))}</div>`;
-      }
-    }
-
-    // ── Project symbol index ──────────────────────────────────
-    const SYMBOL_PATTERNS = {
-      js:  /(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function|class|const|let|var)\s+(\w+)|(?:export\s+(?:default\s+)?)?class\s+(\w+)/g,
-      ts:  /(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function|class|const|let|var|interface|type)\s+(\w+)|(?:export\s+(?:default\s+)?)?class\s+(\w+)/g,
-      py:  /^(?:async\s+)?def\s+(\w+)|^class\s+(\w+)/gm,
-      rs:  /(?:pub\s+)?(?:async\s+)?fn\s+(\w+)|(?:pub\s+)?struct\s+(\w+)|(?:pub\s+)?enum\s+(\w+)|(?:pub\s+)?trait\s+(\w+)|impl(?:\s+<[^>]+>)?\s+(?:\w+\s+for\s+)?(\w+)/g,
-      go:  /^func\s+(?:\([^)]+\)\s+)?(\w+)|^type\s+(\w+)/gm,
-      java:/(?:public|private|protected)\s+(?:static\s+)?(?:<[^>]+>\s+)?\w+(?:<[^>]+>)?(?:\[\])?\s+(\w+)\s*\(|^\s*(?:public\s+)?class\s+(\w+)/gm,
-      c:   /^\s*(?:\w+\s+)+(\w+)\s*\([^)]*\)\s*\{/gm,
-      cpp: /^\s*(?:\w+(?:\s*::\s*\w+)?\s+)+(\w+)\s*\([^)]*\)\s*(?:const\s*)?\{|^\s*class\s+(\w+)/gm,
-      rb:  /^(?:def\s+(?:self\.)?(\w+)|class\s+(\w+)|module\s+(\w+))/gm,
-    };
-    const SYMBOL_EXT_MAP = {
-      js:'js', ts:'ts', tsx:'ts', jsx:'js',
-      py:'py', rs:'rs', go:'go',
-      java:'java', c:'c', cpp:'cpp', h:'c', hpp:'cpp',
-      rb:'rb', rake:'rb',
-    };
-
-    async function scanProjectSymbols(root) {
-      if (!window.HC?.isTauri || !root) return;
-      const symbols = {}; // path → [{name, kind}]
-      try {
-        const entries = await HC.code.listDir(root);
-        if (!entries) return;
-        const files = entries.filter(e => !e.is_dir && !e.name.startsWith('.') && !e.name.match(/\.(png|jpg|jpeg|gif|svg|ico|woff|ttf|eot|mp3|mp4|pdf|zip|tar|gz|bin|exe|dll|so|dylib)$/i));
-        for (const f of files) {
-          const ext = f.name.split('.').pop()?.toLowerCase() || '';
-          const lang = SYMBOL_EXT_MAP[ext];
-          if (!lang) continue;
-          try {
-            const content = await HC.code.readFile(f.path);
-            const text = typeof content === 'string' ? content : JSON.stringify(content);
-            const pat = SYMBOL_PATTERNS[lang];
-            if (!pat) continue;
-            pat.lastIndex = 0;
-            const matches = [];
-            let m;
-            while ((m = pat.exec(text)) !== null) {
-              const name = m[1] || m[2] || m[3] || m[4] || m[5];
-              if (name && name.length < 80 && !name.match(/^(if|else|for|while|switch|catch|return|throw|try|new|this|self|super)$/)) {
-                const line = text.slice(0, m.index).split('\n').length;
-                const kind = m[0].includes('class') ? 'class' : m[0].includes('struct') ? 'struct' : m[0].includes('enum') ? 'enum' : m[0].includes('interface') ? 'interface' : m[0].includes('trait') ? 'trait' : m[0].includes('type') ? 'type' : 'fn';
-                matches.push({ name, kind, line });
-              }
-            }
-            if (matches.length) symbols[f.path] = matches.slice(0, 30);
-          } catch {}
-        }
-      } catch (e) { console.warn('[CoderMode] scan symbols:', e); }
-      sharedState.projectSymbols = symbols;
-      renderSymbolTree();
-    }
-
-    async function ingestProjectRag(folder) {
-      try {
-        const r = await window.CdrProjectRag?.ingestProject?.(folder);
-        if (r?.ingested > 0) {
-          HC?.guard?.notify?.(`Indexed ${r.ingested} project files for RAG (@codebase)`, 'info');
-        } else if (r?.skipped === 'rag_disabled') {
-          HC?.guard?.notify?.('Enable RAG in Agents tab to index this project', 'info');
-        }
-      } catch (e) {
-        console.warn('[CoderMode] RAG ingest:', e);
-      }
-    }
-
-    async function runProjectLintChecks(folder) {
-      if (!_ideCtx?.reportProblems) return;
-      try {
-        await window.CdrProjectLint?.runProjectChecks?.(folder, (items) => {
-          if (items?.length) _ideCtx.reportProblems(items);
-        });
-      } catch (e) {
-        console.warn('[CoderMode] project lint:', e);
-      }
-    }
-
-    async function goToDefinition(symbol, fromPath) {
-      if (fromPath && window.CdrLspClient?.sessionForPath?.(fromPath)) {
-        const line = _editorPane?.editor?.getPosition?.()?.lineNumber || 1;
-        const col = _editorPane?.editor?.getPosition?.()?.column || 1;
-        const lspLoc = await window.CdrLspClient.definition(fromPath, line, col);
-        if (lspLoc?.path) {
-          setActiveFile(lspLoc.path);
-          _editorPane?.openFile(lspLoc.path, lspLoc.line, lspLoc.column).catch(() => {});
-          return;
-        }
-      }
-      if (!window.CdrGoto?.findDefinition) return;
-      const loc = await window.CdrGoto.findDefinition({
-        symbol,
-        path: fromPath,
-        projectRoot: sharedState.projectRoot,
-        projectSymbols: sharedState.projectSymbols,
-        readFile: (p) => HC.code.readFile(p),
-        grepCode: (dir, pat, ext) => HC.code.grepCode(dir, pat, ext),
-      });
-      if (!loc?.path) {
-        HC?.guard?.notify?.(`No definition found for "${symbol}"`, 'info');
-        return;
-      }
-      setActiveFile(loc.path);
-      _editorPane?.openFile(loc.path, loc.line, loc.col).catch(() => {});
-    }
-
-    function symbolMatchesFilter(s, fileName, q) {
-      if (_symbolKindFilter && s.kind !== _symbolKindFilter) return false;
-      if (!q) return true;
-      const hay = `${s.name} ${s.kind} ${fileName}`.toLowerCase();
-      return hay.includes(q);
-    }
-
-    function renderSymbolTree() {
-      const container = $('cdrExplorerBody');
-      if (!container) return;
-      const syms = sharedState.projectSymbols || {};
-      let section = container.querySelector('.cdr-symbols-section');
-      if (!Object.keys(syms).length) {
-        section?.remove();
-        return;
-      }
-      const q = _symbolFilter.trim().toLowerCase();
-      if (!section) {
-        section = document.createElement('div');
-        section.className = 'cdr-symbols-section';
-        section.innerHTML = `
-          <div class="cdr-symbol-filter-bar">
-            <div class="cdr-sidebar-title">Symbols</div>
-            <input type="search" class="cdr-symbol-filter-input" id="cdrSymbolFilter" placeholder="Filter symbols…" spellcheck="false" autocomplete="off"/>
-            <div class="cdr-symbol-kinds" id="cdrSymbolKinds">
-              <button type="button" class="cdr-symbol-kind active" data-kind="">all</button>
-              <button type="button" class="cdr-symbol-kind" data-kind="fn">fn</button>
-              <button type="button" class="cdr-symbol-kind" data-kind="class">class</button>
-              <button type="button" class="cdr-symbol-kind" data-kind="type">type</button>
-              <button type="button" class="cdr-symbol-kind" data-kind="interface">iface</button>
-            </div>
-          </div>
-          <div class="cdr-symbol-list" id="cdrSymbolList"></div>`;
-        container.appendChild(section);
-        const filterInput = section.querySelector('#cdrSymbolFilter');
-        filterInput?.addEventListener('input', () => {
-          _symbolFilter = filterInput.value;
-          renderSymbolTree();
-        });
-        section.querySelector('#cdrSymbolKinds')?.addEventListener('click', (e) => {
-          const btn = e.target.closest('.cdr-symbol-kind');
-          if (!btn) return;
-          _symbolKindFilter = btn.dataset.kind || '';
-          section.querySelectorAll('.cdr-symbol-kind').forEach(b =>
-            b.classList.toggle('active', b === btn)
-          );
-          renderSymbolTree();
-        });
-      }
-      const filterInput = section.querySelector('#cdrSymbolFilter');
-      if (filterInput && filterInput.value !== _symbolFilter) filterInput.value = _symbolFilter;
-      const listRoot = section.querySelector('#cdrSymbolList');
-      if (!listRoot) return;
-      listRoot.innerHTML = '';
-      let total = 0;
-      for (const [path, items] of Object.entries(syms)) {
-        const fileName = path.split('/').pop();
-        const filtered = items.filter(s => symbolMatchesFilter(s, fileName, q));
-        if (!filtered.length) continue;
-        total += filtered.length;
-        const fileDiv = document.createElement('div');
-        fileDiv.className = 'cdr-symbol-file';
-        fileDiv.innerHTML = `<div class="cdr-symbol-file-name">${esc(fileName)}</div>`;
-        const list = document.createElement('div');
-        list.className = 'cdr-symbol-entries';
-        for (const s of filtered) {
-          const el = document.createElement('button');
-          el.type = 'button';
-          el.className = 'cdr-tree-entry cdr-symbol-entry';
-          const kindColor = { class:'var(--cdr-gold)', struct:'var(--cdr-gold)', enum:'var(--cdr-gold)', interface:'var(--cdr-gold)', trait:'var(--cdr-violet)', type:'var(--cdr-violet)', fn:'var(--cdr-cyan)' }[s.kind] || 'var(--cdr-text-dim)';
-          el.innerHTML = `<span class="cdr-symbol-kind-tag" style="color:${kindColor}">${esc(s.kind)}</span><span class="cdr-symbol-name">${esc(s.name)}</span><span class="cdr-symbol-line">:${s.line}</span>`;
-          el.title = `Go to ${s.kind} ${s.name} at line ${s.line}`;
-          el.addEventListener('click', () => {
-            setActiveFile(path);
-            _editorPane?.openFile(path, s.line, 1).catch(() => {});
-          });
-          list.appendChild(el);
-        }
-        fileDiv.appendChild(list);
-        listRoot.appendChild(fileDiv);
-      }
-      if (!total) {
-        listRoot.innerHTML = '<div class="cdr-git-empty">No symbols match filter</div>';
-      }
-    }
+    const {
+      initExplorerContextMenu,
+      openProject,
+      openFile,
+      clearFilesPanel,
+      addAIFileToExplorer,
+      renderExplorerTree,
+      goToDefinition,
+    } = createExplorerApi({
+      sharedState,
+      relativeFromRoot,
+      getConversationMsgs: () => _conversationMsgs,
+      getEditorPane: () => _editorPane,
+      getIdeCtx: () => _ideCtx,
+      setActiveFile,
+      syncProjectLabel,
+      onTabNew: () => onTabNew(),
+      autoResize,
+      terminalLog,
+      terminalPrompt,
+      syncTerminalPrompt,
+      getSysPrompt: () => sysPrompt(),
+      refreshGraphifyForProject,
+      loadGraphifyContextForTask,
+      clearGraphifyContext: () => { _graphifyContext = ''; },
+      refreshGitStatus,
+      saveCoderState,
+      setStatus,
+    });
 
     // ── Chat rendering ────────────────────────────────────────
     const MAX_RENDER_MSGS = 80;
@@ -2622,670 +1899,70 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
       scrollMessages();
     }
 
-    // ── Build tools + system ──────────────────────────────────
-    function buildTools() {
-      if (_ideCtx?.isPlanOnly?.()) return [];
-      return (HC?.code?.TOOL_DEFINITIONS || []).map(t => ({
-        type: 'function',
-        function: {
-          name: t.name,
-          description: t.description,
-          parameters: {
-            type: 'object',
-            properties: Object.fromEntries(
-              Object.entries(t.parameters).map(([k, v]) =>
-                [k, (v && typeof v === 'object' && v.type) ? v : { type: 'string', description: String(v) }]
-              )
-            ),
-            required: Object.keys(t.parameters).filter(k => !['reason', 'cwd', 'file_ext'].includes(k)),
-          }
-        }
-      }));
-    }
+    // ── Agent run loop (agent-run.js) ─────────────────────────
+    ({
+      buildTools,
+      sysPrompt,
+      agentLoop,
+      expandTaskMentions,
+      startRun,
+      stopRun,
+      runSingleTurn,
+      runMultiTurn,
+      runAllVote,
+      runChainRefine,
+    } = createAgentRunApi({
+      $,
+      esc,
+      sharedState,
+      modelRef,
+      conversationMsgs: _conversationMsgs,
+      fileChanges: _fileChanges,
+      tabMgr: _tabMgr,
+      getAgentCount: () => agentCount,
+      MAX_CONCURRENT,
+      getIdeCtx: () => _ideCtx,
+      getGraphifyContext: () => _graphifyContext,
+      getSkillsForPrompt: () => _skillsForPrompt,
+      getRunAbort: () => runAbort,
+      setRunAbort: (v) => { runAbort = v; },
+      getRunGeneration: () => _runGeneration,
+      bumpRunGeneration: () => ++_runGeneration,
+      getRunTabId: () => _runTabId,
+      setRunTabId: (v) => { _runTabId = v; },
+      getRunFileChanges: () => _runFileChanges,
+      setRunFileChanges: (v) => { _runFileChanges = v; },
+      getActiveContentEl: () => activeContentEl,
+      setActiveContentEl: (v) => { activeContentEl = v; },
+      incDomScrollBatch: () => { _domScrollBatch++; },
+      decDomScrollBatch: () => { _domScrollBatch--; },
+      setStatus,
+      cdrTraceAdd,
+      cdrTraceReset,
+      updateCoderContextChip,
+      activeModelValue,
+      appendThinking,
+      appendToolBlock,
+      finalizeToolBlock,
+      scrollMessages,
+      appendTextToBubble,
+      appendUserMsg,
+      appendAssistantBubble,
+      enterChatLiveMode,
+      autoResize,
+      loadGraphifyContextForTask,
+      renderTabBar,
+      saveCoderState,
+      enforceThreeWordName,
+      addChangeEntry,
+      addAIFileToExplorer,
+      setChangeRowState,
+      terminalLog,
+      activeFileChanges,
+      abortActiveRun,
+      setRouterChip,
+    }));
 
-    function sysPrompt(extra) {
-      // ── Surgical system prompt — Claude Code / Codex style ──
-      // Terse. No prose. One change at a time. Prefer tool calls over speech.
-      const root = sharedState.projectRoot;
-      let homeDir = sharedState.homeDir || '';
-      if (!homeDir && root) {
-        const parts = root.split('/').filter(Boolean);
-        if (parts[0] === 'Users' && parts[1]) homeDir = `/Users/${parts[1]}`;
-        else if (parts[0] === 'home' && parts[1]) homeDir = `/home/${parts[1]}`;
-      }
-
-      const lines = [
-        'You are MiraXcode Coder — a precise coding agent.',
-      ];
-      if (_ideCtx?.isPlanOnly?.()) {
-        lines.push(
-          'PLAN MODE (active): Do not use tools. Reply with a structured plan only — steps, files, risks, and verification.',
-          'Use markdown headings and numbered steps. No file writes until the user disables Plan mode.'
-        );
-      } else {
-        lines.push(
-        'Rules:',
-        '1. One change at a time. Use tool calls for any file/shell action — do not narrate plans.',
-        '2. Replies must be ≤3 short sentences unless the user asks for detail.',
-        '3. For code edits, return only the changed region. No surrounding context.',
-        '4. Never call tools for greetings or conversational questions — answer in plain text.',
-        '5. Blocked paths: /System, /etc, /private, /usr, /bin — refuse without asking.',
-        );
-      }
-      if (root) {
-        lines.push(`Project root: ${root}`);
-        lines.push(`6. If the project directory is empty or new, immediately start creating files — do NOT explore the filesystem first.`);
-        if (sharedState.activeFile) lines.push(`Active file: ${sharedState.activeFile}`);
-      } else {
-        lines.push(`No project open. Home: ${homeDir || 'unknown'}. Ask user to open a folder for write ops.`);
-      }
-
-      const task = _conversationMsgs.filter(m => m.role === 'user').slice(-1)[0]?.content || '';
-      try {
-        const memBlock = HC?.coderMemory?.formatMergedForPrompt?.(root, task);
-        if (memBlock) lines.push(memBlock.trim());
-        else if (window._H?.memRecall) {
-          const scored = window._H.memRecall(task, 8);
-          if (scored?.length) {
-            lines.push('Memory (silent context, do not recite):');
-            scored.forEach(f => lines.push(`  - ${f.key}: ${String(f.value).slice(0, 160)}`));
-          }
-        }
-      } catch {}
-
-      if (_graphifyContext) {
-        lines.push(HC?.coderGraphify?.formatPromptBlock?.(root, _graphifyContext) || _graphifyContext);
-      } else if (root && HC?.coderGraphify) {
-        lines.push(
-          'Graphify: graphify-out/ will be used when available. Call graphify_report or graphify_query before blind repo search.'
-        );
-      }
-
-      if (HC?.guard?.isYolo?.()) {
-        lines.push('YOLO mode: run tools and shell without permission prompts (hard-blocked paths/commands still denied).');
-      } else if (HC?.guard?.isBypassPermissions?.()) {
-        lines.push('Bypass permissions: approve tool/shell actions without prompts (hard-blocked still denied).');
-      }
-
-      const skList = _skillsForPrompt?.length
-        ? _skillsForPrompt
-        : (HC?.coderSkills?.getCached?.() || []);
-      const skBlock = HC?.coderSkills?.formatSkillsForPrompt?.(skList);
-      if (skBlock) lines.push(skBlock);
-
-      const richBase = HC?.code?.SYSTEM_PROMPT || '';
-      const out = (richBase ? richBase + '\n' : '') + lines.join('\n');
-      return out + (extra ? '\n' + extra : '');
-    }
-
-    /** Model-aware compaction — preserves WORKING_STATE ledger on the tab. */
-    async function prepareMessagesForModel(msgs, signal) {
-      const tab = _tabMgr.active();
-      const modelValue = activeModelValue();
-      if (!HC?.contextCompactor?.prepareForApi) {
-        return HC?.contextCompactor?.trimAllTools?.(msgs, 1200) || msgs;
-      }
-      const prepared = await HC.contextCompactor.prepareForApi(msgs, {
-        modelValue,
-        signal,
-        ledger: tab?.compactionLedger || "",
-        cacheKey: tab?.id || "coder",
-        onStatus: (t) => { if (t) setStatus(t, 'thinking'); },
-        onLedgerUpdate: (ledger) => {
-          if (tab) {
-            tab.compactionLedger = ledger;
-            _tabMgr.save();
-          }
-        },
-      });
-      updateCoderContextChip(prepared);
-      return prepared;
-    }
-
-    // ── Core agent loop — renders inline into a bubble ────────
-    async function agentLoop(messages, tools, contentEl, label, signal) {
-      const H = window._H;
-      const temperature = H?.selectedTemperature ? Math.min(H.selectedTemperature(), 0.35) : 0.15;
-      activeContentEl = contentEl;
-      const runTabId = _runTabId;
-      const yolo = !!HC?.guard?.isYolo?.();
-      const MAX_ITER = yolo ? 40 : 16;
-      let iter = 0;
-      let thinkEl = appendThinking(contentEl);
-      let reasoningEl = null; // real-time reasoning display
-
-      try {
-      while (iter < MAX_ITER) {
-        iter++;
-
-        setStatus(`${label ? label + ' · ' : ''}Thinking…`, 'thinking');
-        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-        // On the final iteration pass a copy with a wrap-up nudge so the model
-        // stops calling tools. We use a copy so the nudge never persists into
-        // _conversationMsgs on the next user turn.
-        // Also compress older turns to keep the prompt small (Claude-Code style).
-        const baseMsgs = iter === MAX_ITER
-          ? [...messages, { role: 'user', content: 'Stop calling tools now. Write a 2-sentence summary of what was done and any leftover.' }]
-          : messages;
-        const callMessages = await prepareMessagesForModel(baseMsgs, signal);
-        if (callMessages.length < baseMsgs.length) {
-          const ctxU = HC?.contextCompactor?.usageRatio?.(callMessages, activeModelValue());
-          cdrTraceAdd('Context', `Compacted · ~${ctxU?.estimated || '?'} tok`, 'run');
-        }
-
-        cdrTraceAdd('Step', `Iter ${iter}${label ? ' · ' + label : ''} · calling model`, 'run');
-        let turn;
-        let liveStreamActive = false;
-        const onToken = (_delta, full) => {
-          if (signal?.aborted || _runTabId !== runTabId) return;
-          if (!liveStreamActive) {
-            _ideCtx?.beginStreamBubble?.(contentEl);
-            liveStreamActive = true;
-          }
-          _ideCtx?.updateStreamBubble?.(full);
-          scrollMessages();
-        };
-        try {
-          turn = await callWithRouter(callMessages, tools, temperature, signal, modelRef.current, onToken);
-        } catch (e) {
-          if (liveStreamActive) _ideCtx?.cancelStreamBubble?.();
-          thinkEl?.remove(); thinkEl = null;
-          reasoningEl?.remove(); reasoningEl = null;
-          cdrTraceAdd('Error', e?.message || String(e), 'err');
-          // Show error inline in the bubble
-          const errDiv = document.createElement('div');
-          errDiv.className = 'cdr-msg-text';
-          errDiv.style.color = 'var(--cdr-error)';
-          errDiv.style.borderLeft = '2px solid var(--cdr-error)';
-          errDiv.style.paddingLeft = '10px';
-          errDiv.style.margin = '8px 0';
-          errDiv.innerHTML = `<b>Error</b><br>${esc(e?.message || String(e))}`;
-          contentEl.appendChild(errDiv);
-          scrollMessages();
-          throw e;
-        }
-        thinkEl?.remove(); thinkEl = null;
-
-        if (turn.tool_calls?.length) {
-          if (liveStreamActive) {
-            _ideCtx?.cancelStreamBubble?.();
-            liveStreamActive = false;
-          }
-          if (turn.content) {
-            if (!reasoningEl) {
-              reasoningEl = document.createElement('div');
-              reasoningEl.className = 'cdr-thinking-stream';
-              contentEl.appendChild(reasoningEl);
-            }
-            reasoningEl.innerHTML = `<div class="cdr-thinking-hd">Reasoning</div>${esc(turn.content)}`;
-            reasoningEl.classList.remove('empty');
-            scrollMessages();
-          }
-        }
-
-        if (turn.tool_calls?.length) {
-          H.appendAssistantToolCallTurn(messages, turn.content, turn.tool_calls); // always append to real history
-          _domScrollBatch++;
-          try {
-          for (const call of turn.tool_calls) {
-            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-
-            // Bash preview: show shell_run commands in terminal before executing
-            if (call.name === 'shell_run') {
-              const cmd = call.arguments?.command || '';
-              const args = (call.arguments?.args || []).join(' ');
-              const cwd = call.arguments?.cwd || sharedState.projectRoot || '';
-              const preview = cwd ? `cd ${cwd} && ${cmd} ${args}` : `${cmd} ${args}`;
-              terminalLog('[' + call.name + ' preview] ' + preview, 'cdr-bash-preview');
-            }
-
-            const toolEl = appendToolBlock(contentEl, call.name, call.arguments);
-            setStatus(`${call.name}…`, 'run');
-            const pathHint = call.arguments?.path || call.arguments?.dir || call.arguments?.command || '';
-            cdrTraceAdd('Tool', call.name + (pathHint ? ' · ' + String(pathHint).split('/').pop() : ''), 'run');
-            const t0 = performance.now();
-            let resultStr, ok = true;
-            try {
-              if ((call.name === 'write_file' || call.name === 'patch_file') && window.CdrFileStage) {
-                const staged = await window.CdrFileStage.computeProposed(call, (p) => HC.code.readFile(p));
-                const stored = staged.proposedContent.length > 80_000
-                  ? staged.proposedContent.slice(0, 80_000) + '\n… (stored truncated)'
-                  : staged.proposedContent;
-                const entry = {
-                  name: baseName(staged.path),
-                  path: staged.path,
-                  kind: staged.kind,
-                  content: stored,
-                  proposedContent: staged.proposedContent,
-                  previousContent: staged.previousContent,
-                  status: 'pending',
-                  applied: false,
-                  tool: staged.tool,
-                };
-                const fcRun = activeFileChanges();
-                const changeIdx = fcRun.length;
-                addChangeEntry(entry.name, entry.path, entry.kind, stored, entry);
-                resultStr = window.CdrFileStage.stagedResult(staged.path, staged.proposedContent.length);
-                if (yolo && ok) {
-                  const entry = fcRun[changeIdx];
-                  try {
-                    await window.CdrFileStage.applyEntry(entry, (p, c, r) => HC.code.writeFile(p, c, r));
-                    addAIFileToExplorer(entry.path, entry.kind || 'write');
-                    const row = contentEl?.querySelector(
-                      `.cdr-change-row[data-change-idx="${changeIdx}"]`
-                    );
-                    if (row) await setChangeRowState(row, 'accepted');
-                    resultStr = JSON.stringify({
-                      ok: true,
-                      applied: true,
-                      path: entry.path,
-                      message: 'YOLO: change written to disk immediately (revert still available).',
-                    });
-                  } catch (applyErr) {
-                    ok = false;
-                    resultStr = JSON.stringify({ error: String(applyErr?.message || applyErr) });
-                  }
-                }
-              } else {
-                const def = (HC?.code?.TOOL_DEFINITIONS || []).find(t => t.name === call.name);
-                if (!def) throw new Error('Unknown tool: ' + call.name);
-                const raw = await def.fn(call.arguments || {});
-                resultStr = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
-              }
-            } catch (e) {
-              resultStr = JSON.stringify({ error: String(e?.message || e) }); ok = false;
-            }
-            const ms = Math.round(performance.now() - t0);
-            cdrTraceAdd('Tool', call.name + ' · ' + ms + 'ms', ok ? 'ok' : 'err');
-            finalizeToolBlock(toolEl, resultStr, ok, ms);
-            if (!ok && _ideCtx?.reportProblems && window.CdrDiagnostics?.parseOutput) {
-              const parsed = window.CdrDiagnostics.parseOutput(resultStr);
-              if (parsed.length) _ideCtx.reportProblems(parsed);
-            }
-
-            if (call.name === 'delete_file') {
-              const fp = call.arguments?.path || '';
-              addChangeEntry(fp.split('/').slice(-1)[0] || fp, fp, 'delete', '(file deleted)');
-              if (ok && fp) addAIFileToExplorer(fp, 'delete');
-            }
-            H.appendToolResult(messages, call, resultStr);
-          }
-          } finally {
-            _domScrollBatch--;
-          }
-          scrollMessages();
-          thinkEl = appendThinking(contentEl);
-          continue;
-        }
-
-        // Final answer — hide reasoning, show result
-        reasoningEl?.remove(); reasoningEl = null;
-        const finalText = turn.content || '';
-        if (!finalText.trim()) {
-          cdrTraceAdd('Done', 'Empty response from model', 'warn');
-          appendTextToBubble(contentEl, '*No response from model. Try again or check your model settings.*');
-        } else {
-          cdrTraceAdd('Done', (label || 'Agent') + ' · ' + finalText.length + ' chars', 'ok');
-          if (liveStreamActive) {
-            _ideCtx?.endStreamBubble?.(contentEl, finalText);
-          } else {
-            appendTextToBubble(contentEl, finalText);
-          }
-        }
-        return finalText;
-      }
-      // Fallback if the model kept calling tools even on the final iteration.
-      // Strip any dangling tool turns so the next user message doesn't produce
-      // an invalid sequence like [tool, user] which most APIs reject.
-      reasoningEl?.remove(); reasoningEl = null;
-      while (messages.length && messages[messages.length - 1].role === 'tool') messages.pop();
-      while (messages.length && messages[messages.length - 1].role === 'assistant' &&
-             Array.isArray(messages[messages.length - 1].tool_calls)) messages.pop();
-      cdrTraceAdd('Done', 'Max iterations reached', 'warn');
-      if (yolo && !signal?.aborted) {
-        messages.push({
-          role: 'user',
-          content: 'Continue from where you left off. Finish remaining work with tool calls as needed, then summarize.',
-        });
-        cdrTraceAdd('YOLO', 'Auto-continuing after max iterations', 'run');
-        return agentLoop(messages, tools, contentEl, label, signal);
-      }
-      appendTextToBubble(contentEl, '*Task paused — reply to continue or click regen to retry.*');
-      return '';
-      } finally {
-        if (activeContentEl === contentEl) activeContentEl = null;
-      }
-    }
-
-    async function expandTaskMentions(task) {
-      let t = task;
-      if (_ideCtx?.expandCodebase) {
-        t = await _ideCtx.expandCodebase(t);
-      }
-      const root = sharedState.projectRoot;
-      if (!root || !t.includes('@')) return t;
-      task = t;
-      const re = /@([^\s@]+)/g;
-      let extra = '';
-      let m;
-      while ((m = re.exec(task)) !== null) {
-        const rel = m[1].replace(/\/$/, '');
-        const full = rel.startsWith('/') ? rel : `${root.replace(/\/$/, '')}/${rel}`;
-        try {
-          const content = await HC.code.readFile(full);
-          extra += `\n\n--- @${rel} ---\n${String(content).slice(0, 12_000)}`;
-        } catch { /* skip missing paths */ }
-      }
-      return extra ? task + extra : task;
-    }
-
-    // ── Main send ─────────────────────────────────────────────
-    async function startRun() {
-      const taskInput = $('cdrTaskInput');
-      const task = taskInput?.value?.trim();
-      const hasAttach = window.CdrComposerAttachments?.hasPending?.();
-      if (!task && !hasAttach) { taskInput?.focus(); return; }
-
-      const attachHtml = window.CdrComposerAttachments?.renderUserAttachmentHtml?.() || '';
-      const userPayload = window.CdrComposerAttachments?.buildUserMessagePayload?.(task || '(see attached files)') || { role: 'user', content: task || '(see attached files)' };
-
-      // Clear input and resize
-      taskInput.value = '';
-      autoResize(taskInput);
-
-      enterChatLiveMode();
-      // Show user message
-      appendUserMsg(task || '(see attached files)', attachHtml);
-
-      // Memory + Graphify context before model call
-      try { window._H?.memAutoExtract?.(task); } catch {}
-      try { HC?.coderMemory?.extractFromUserMessage?.(sharedState.projectRoot, task); } catch {}
-      await loadGraphifyContextForTask(task);
-
-      // Bootstrap conversation on first message
-      if (!_conversationMsgs.length) {
-        _conversationMsgs.push({ role: 'system', content: sysPrompt() });
-      } else if (_conversationMsgs[0]?.role === 'system') {
-        _conversationMsgs[0].content = sysPrompt();
-      }
-      const modelTask = await expandTaskMentions(userPayload.content);
-      const userMsg = { ...userPayload, content: modelTask };
-      _conversationMsgs.push(userMsg);
-      window.CdrComposerAttachments?.clear?.();
-      updateCoderContextChip(_conversationMsgs);
-
-      // Update tab title from first user message
-      const tab = _tabMgr.active();
-      if (tab && (!tab.title || tab.title.startsWith('Session'))) {
-        tab.title = enforceThreeWordName(task);
-        renderTabBar();
-      }
-
-      const runBtn  = $('cdrRunBtn');
-      const stopBtn = $('cdrStopBtn');
-      if (runBtn)  runBtn.style.display = 'none';
-      if (stopBtn) stopBtn.style.display = '';
-
-      const gen = ++_runGeneration;
-      if (runAbort) abortActiveRun('New run');
-      runAbort = new AbortController();
-      const { signal } = runAbort;
-      _runTabId = tab?.id || _tabMgr.activeId || null;
-      _runFileChanges = _fileChanges;
-
-      setStatus('Thinking…', 'thinking');
-      cdrTraceReset('Run started');
-
-      // Mark tab as running
-      if (tab) { tab.running = true; renderTabBar(); }
-
-      try {
-        const swarmMode = (document.getElementById('cdrSwarmMode')?.value || 'boss');
-        if (agentCount === 1) {
-          await runSingleTurn(signal);
-        } else if (swarmMode === 'vote') {
-          await runAllVote(task, agentCount, signal);
-        } else if (swarmMode === 'chain') {
-          await runChainRefine(task, agentCount, signal);
-        } else {
-          await runMultiTurn(task, agentCount, signal);
-        }
-      } catch (e) {
-        if (e.name === 'AbortError') {
-          const c = appendAssistantBubble('MiraXCode Coder');
-          if (c) appendTextToBubble(c, '*Stopped.*');
-          setStatus('Stopped', '');
-        } else {
-          // Error already shown in bubble by agentLoop, just update status
-          setStatus(e?.message || 'Error', 'err');
-          console.error('[CoderMode] run failed:', e);
-        }
-      } finally {
-        if (gen !== _runGeneration) return;
-        if (runBtn)  runBtn.style.display = '';
-        if (stopBtn) stopBtn.style.display = 'none';
-        runAbort = null;
-        _runTabId = null;
-        _runFileChanges = null;
-        setRouterChip('Auto', '');
-        const at = _tabMgr.active();
-        if (at) { at.running = false; renderTabBar(); }
-      }
-    }
-
-    async function runSingleTurn(signal) {
-      const tools     = buildTools();
-      const contentEl = appendAssistantBubble('MiraXCode Coder');
-      const finalText = await agentLoop(_conversationMsgs, tools, contentEl, '', signal);
-      if (finalText) {
-        _conversationMsgs.push({ role: 'assistant', content: finalText });
-        try { window._H?.memAutoExtractFromAssistant?.(finalText); } catch {}
-        try { HC?.coderMemory?.extractFromAssistant?.(sharedState.projectRoot, finalText); } catch {}
-      }
-      saveCoderState();
-      setStatus('Ready', '');
-    }
-
-    async function runMultiTurn(task, count, signal) {
-      const H = window._H;
-
-      // Multi-agent tasks need a project root to be useful — bail early otherwise
-      if (!sharedState.projectRoot) {
-        const el = appendAssistantBubble('MiraXCode Coder');
-        appendTextToBubble(el, 'Multi-agent mode works best with a project open. Click **Open Project** to select your project folder, then try again.');
-        setStatus('Ready', '');
-        return;
-      }
-
-      // Boss: decompose
-      const bossEl   = appendAssistantBubble('Boss');
-      const thinkEl  = appendThinking(bossEl);
-      const planMsgs = [
-        { role: 'system', content: `You are a task planner. Split the user's request into exactly ${count - 1} independent coding sub-tasks. Reply ONLY with a valid JSON array:\n[{"id":"1","task":"..."},...]` },
-        { role: 'user',   content: `Decompose for ${count - 1} parallel agents: ${task}` }
-      ];
-      let subTasks;
-      try {
-        const planTurn = await callWithRouter(planMsgs, [], 0.25, signal, modelRef.current);
-        thinkEl?.remove();
-        const m = (planTurn.content || '').match(/\[[\s\S]*?\]/);
-        subTasks = m ? JSON.parse(m[0]) : null;
-      } catch { thinkEl?.remove(); }
-
-      if (!subTasks?.length) {
-        subTasks = Array.from({ length: count - 1 }, (_, i) => ({
-          id: String(i + 1), task: `Part ${i + 1}: ${task}`
-        }));
-      }
-      appendTextToBubble(bossEl, `Coordinating **${count - 1} sub-agent${count - 1 > 1 ? 's' : ''}** for this task.`);
-      setStatus('Agents running…', 'thinking');
-
-      // Workers — each gets its own bubble and independent message history
-      // Run max 2 agents concurrently to avoid overwhelming the app
-      cdrTraceAdd('Boss', `Decomposed into ${subTasks.length} sub-task${subTasks.length !== 1 ? 's' : ''}`, 'ok');
-      const results = [];
-      for (let batch = 0; batch < subTasks.length; batch += MAX_CONCURRENT) {
-        if (signal?.aborted) break;
-        const batchTasks = subTasks.slice(batch, batch + MAX_CONCURRENT);
-        const batchResults = await Promise.all(batchTasks.map(async (st, j) => {
-          const idx = batch + j + 2;
-          cdrTraceAdd(`Agent ${idx}`, (st.task || task).slice(0, 60), 'run');
-          const wEl   = appendAssistantBubble(`Agent ${idx}`);
-          const wMsgs = [
-            { role: 'system', content: sysPrompt(`You are sub-agent ${idx} of ${count}. Focus only on your assigned task.`) },
-            { role: 'user',   content: st.task || task }
-          ];
-          try {
-            const result = await agentLoop(wMsgs, buildTools(), wEl, `Agent ${idx}`, signal);
-            cdrTraceAdd(`Agent ${idx}`, 'Finished', 'ok');
-            return result;
-          } catch (e) {
-            cdrTraceAdd(`Agent ${idx}`, e?.message || 'Failed', 'err');
-            appendTextToBubble(wEl, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
-            return '';
-          }
-        }));
-        results.push(...batchResults);
-        setStatus(`Agents ${Math.min(batch + MAX_CONCURRENT, subTasks.length)}/${subTasks.length} done…`, 'thinking');
-      }
-
-      // Synthesis — boss combines all agent output into a final answer
-      const synthEl   = appendAssistantBubble('Boss — Synthesis');
-      const agentSummary = results
-        .map((r, i) => `### Agent ${i + 2}\n${(r || '(no output)').slice(0, 1200)}`)
-        .join('\n\n');
-      const synthMsgs = [
-        { role: 'system', content: sysPrompt('You are the synthesis boss. Your job is to combine the sub-agent results into one clear, complete final answer. Do NOT call any tools — write your synthesis directly.') },
-        {
-          role: 'user',
-          content: `Original task: ${task}\n\nProject: ${sharedState.projectRoot}\n\nSub-agent results:\n${agentSummary}\n\nWrite a clear synthesis: what was done, what changed, and what (if anything) still needs attention.`
-        }
-      ];
-      setStatus('Synthesizing…', 'thinking');
-      const finalText = await agentLoop(synthMsgs, [], synthEl, 'Boss', signal);
-      if (finalText) _conversationMsgs.push({ role: 'assistant', content: finalText });
-      saveCoderState();
-      setStatus('Ready', '');
-    }
-
-    async function runAllVote(task, count, signal) {
-      const H = window._H;
-      cdrTraceAdd('AllVote', `Sending to ${count} model(s) simultaneously`, 'run');
-
-      const chain = buildRouterChain(modelRef.current);
-      const voterAdapters = chain.slice(0, count);
-      if (!voterAdapters.length) {
-        const el = appendAssistantBubble('AllVote');
-        appendTextToBubble(el, 'No models available. Add API keys in Settings.');
-        setStatus('Ready', '');
-        return;
-      }
-
-      const votes = [];
-      for (let batch = 0; batch < voterAdapters.length; batch += MAX_CONCURRENT) {
-        if (signal?.aborted) break;
-        const batchAdapters = voterAdapters.slice(batch, batch + MAX_CONCURRENT);
-        const batchVotes = await Promise.all(batchAdapters.map(async (adapter, j) => {
-          const idx = batch + j + 1;
-          const label = adapter.label || `Model ${idx}`;
-          const vEl = appendAssistantBubble(`Vote ${idx} — ${label}`);
-          cdrTraceAdd(label, 'Answering…', 'run');
-          setStatus(`Vote ${idx}/${voterAdapters.length}…`, 'thinking');
-          try {
-            const msgs = [
-              { role: 'system', content: sysPrompt('Answer the user request directly and thoroughly.') },
-              { role: 'user', content: task }
-            ];
-            const result = await callWithRouter(msgs, buildTools(), 0.7, signal, adapter.kind === 'ollama' ? adapter.model : null);
-            const text = result?.content || '';
-            appendTextToBubble(vEl, text);
-            cdrTraceAdd(label, 'Done', 'ok');
-            return { label, text };
-          } catch (e) {
-            if (e.name === 'AbortError') throw e;
-            cdrTraceAdd(label, e?.message || 'Failed', 'err');
-            appendTextToBubble(vEl, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
-            return { label, text: '' };
-          }
-        }));
-        votes.push(...batchVotes);
-      }
-
-      const judgeEl = appendAssistantBubble('Judge — Best Answer');
-      setStatus('Judging…', 'thinking');
-      cdrTraceAdd('Judge', 'Picking best answer', 'run');
-
-      const judgePrompt = `Original task: ${task.slice(0, 500)}
-
-${votes.map((v, i) => `### Response ${i + 1} (${v.label}):\n${v.text.slice(0, 1500)}`).join('\n---\n')}
-
-Pick the best response or merge them into one final answer. Provide the complete answer.`;
-
-      const judgeMsgs = [
-        { role: 'system', content: sysPrompt('You are a judge. Pick or merge the best response into one clear, complete answer. Write the full answer, not just which one you picked.') },
-        { role: 'user', content: judgePrompt }
-      ];
-      const finalText = await agentLoop(judgeMsgs, [], judgeEl, 'Judge', signal);
-      if (finalText) _conversationMsgs.push({ role: 'assistant', content: finalText });
-      saveCoderState();
-      cdrTraceAdd('Judge', 'Verdict ready', 'ok');
-      setStatus('Ready', '');
-    }
-
-    async function runChainRefine(task, steps, signal) {
-      cdrTraceAdd('Chain', `Starting ${steps}-step refinement`, 'run');
-
-      const chain = buildRouterChain(modelRef.current);
-      const stages = [
-        'Write an initial answer',
-        'Review and improve — fix errors, add depth',
-        'Polish — clearer structure, better formatting',
-        'Final pass — concise, complete, well-formatted',
-        'Ultimate refinement — production quality output'
-      ];
-
-      let current = task;
-
-      for (let i = 0; i < steps; i++) {
-        if (signal?.aborted) break;
-        const adapter = chain[i % chain.length];
-        const label = adapter?.label || `Step ${i + 1}`;
-        const stage = stages[i] || 'Improve and refine the previous output';
-        const el = appendAssistantBubble(`Step ${i + 1} — ${label}`);
-        setStatus(`Chain step ${i + 1}/${steps}…`, 'thinking');
-        cdrTraceAdd(label, stage.slice(0, 50), 'run');
-
-        const prompt = i === 0 ? task : `${stage}:\n\n${current.slice(0, 2000)}`;
-        const msgs = [
-          { role: 'system', content: sysPrompt(`You are step ${i + 1} in a refinement chain. ${stage}.`) },
-          { role: 'user', content: prompt }
-        ];
-        try {
-          const result = await callWithRouter(msgs, buildTools(), 0.5, signal, adapter?.kind === 'ollama' ? adapter?.model : null);
-          current = result?.content || current;
-          appendTextToBubble(el, current);
-          cdrTraceAdd(label, 'Done', 'ok');
-        } catch (e) {
-          if (e.name === 'AbortError') throw e;
-          cdrTraceAdd(label, e?.message || 'Failed', 'err');
-          appendTextToBubble(el, `**Error:** ${esc((e.message || '').slice(0, 80))}`);
-        }
-      }
-
-      if (current && current !== task) {
-        _conversationMsgs.push({ role: 'assistant', content: current });
-      }
-      saveCoderState();
-      cdrTraceAdd('Chain', 'Complete', 'ok');
-      setStatus('Ready', '');
-    }
-
-    function stopRun() {
-      _runGeneration++;
-      abortActiveRun('Stopped');
-      setStatus('Stopped', '');
-    }
 
     // ── Audit log ─────────────────────────────────────────────
     async function showAuditLog() {
@@ -3315,8 +1992,6 @@ Pick the best response or merge them into one final answer. Provide the complete
         body.innerHTML = `<div class="hc-audit-empty">Error: ${esc(String(e?.message || e))}</div>`;
       }
     }
-
-    wireTabManager();
 
     return { mount, destroy, remount };
   })();

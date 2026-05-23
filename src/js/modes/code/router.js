@@ -32,6 +32,54 @@ function resolveCoderAdapter(rawModel) {
   return { kind: 'ollama', model: rawModel || 'llama3' };
 }
 
+/** Ordered model adapters for vote/chain swarm modes (Coder picker + main #model). */
+export function buildRouterChain(preferredModel) {
+  const chain = [];
+  const seen = new Set();
+
+  function add(value, label) {
+    if (!value || seen.has(value)) return;
+    seen.add(value);
+    try {
+      const adapter = resolveCoderAdapter(value);
+      chain.push({ ...adapter, label: label || value });
+    } catch { /* skip unsupported entries */ }
+  }
+
+  const cdrPicker = document.getElementById('cdrModelPicker');
+  if (preferredModel) {
+    let label = preferredModel;
+    if (cdrPicker) {
+      for (const opt of cdrPicker.options) {
+        if (opt.value === preferredModel) {
+          label = opt.textContent || preferredModel;
+          break;
+        }
+      }
+    }
+    add(preferredModel, label);
+  }
+
+  if (cdrPicker) {
+    for (const opt of cdrPicker.options) {
+      if (opt.value) add(opt.value, opt.textContent);
+    }
+  }
+
+  const mainPicker = document.getElementById('model');
+  if (mainPicker) {
+    for (const opt of mainPicker.options) {
+      if (opt.value) add(opt.value, opt.textContent);
+    }
+  }
+
+  if (!chain.length) {
+    chain.push({ kind: 'ollama', model: 'llama3', label: 'llama3' });
+  }
+
+  return sortChainByQuality(chain);
+}
+
 export async function callWithRouter(messages, tools, temperature, signal, modelOverride, onToken) {
   const H = window._H;
   if (!H) throw new Error('window._H bridge not available');
