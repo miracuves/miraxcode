@@ -12,6 +12,13 @@ export function startStatsPolling() {
   _statsInterval = setInterval(updateStats, 2000);
 }
 
+export function stopStatsPolling() {
+  if (_statsInterval) {
+    clearInterval(_statsInterval);
+    _statsInterval = null;
+  }
+}
+
 async function updateStats() {
   if (!window.__TAURI__) return;
   try {

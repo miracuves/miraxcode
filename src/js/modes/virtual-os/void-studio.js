@@ -3,13 +3,11 @@ import { $, esc, uid, nowIso } from './utils.js';
 import { makeZip } from './zip.js';
 import { createVoidStorage, ROOT_ID, TRASH_ID } from './storage.js';
 import { createVoidChatApi } from './chat.js';
+import { createVoidGenerateApi, createVoidWireEventsApi } from './generate.js';
+import { createVoidDesktopApi, clampDesktopPosition as clampDesktopPos } from './desktop.js';
 
 
 const VoidStudio = (() => {
-  const SYSTEM_ICON_FINDER = "__system_finder__";
-  const SYSTEM_ICON_SETTINGS = "__system_settings__";
-  const SYSTEM_ICON_TRASH = "__system_trash__";
-
   const state = {
     dbPromise: null,
     projects: [],
@@ -36,7 +34,12 @@ const VoidStudio = (() => {
   let termHistory   = [];
   let termHistIdx   = -1;
   let voidChatApi = null;
+  let voidGenerateApi = null;
+  let voidWireEventsApi = null;
+  let voidDesktopApi = null;
   let _traceStartTime = Date.now();
+
+  const clampDesktopPosition = (pos) => clampDesktopPos($, pos);
 
   const _TRACE_ICONS = {
     ok:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="20 6 9 17 4 12"/></svg>`,
@@ -87,16 +90,6 @@ const VoidStudio = (() => {
       else if (kind === "done")  dot.className = "void-trace-dot done";
       else if (kind === "error") dot.className = "void-trace-dot error";
     }
-  }
-
-  function clampDesktopPosition(pos) {
-    const desktop = $("voidDesktop");
-    const maxX = Math.max(8, (desktop?.clientWidth || window.innerWidth || 640) - 98);
-    const maxY = Math.max(8, (desktop?.clientHeight || window.innerHeight || 480) - 96);
-    return {
-      x: Math.max(8, Math.min(maxX, Number(pos?.x) || 8)),
-      y: Math.max(8, Math.min(maxY, Number(pos?.y) || 8)),
-    };
   }
 
   const {
@@ -275,79 +268,18 @@ const VoidStudio = (() => {
 
   function renderAll() {
     if (!mounted || !state.activeProject) return;
-    renderHeader();
-    renderModelSelect();
-    renderDesktop();
+    const desktop = initVoidDesktopApi();
+    desktop.renderHeader();
+    desktop.renderModelSelect();
+    desktop.renderDesktop();
     renderTree();
     renderFileList();
     renderBreadcrumb();
     renderFinderBar();
     updateNavBtns();
     renderFinderToggle();
-    renderDock();
-    renderEditMode();
-  }
-
-  function renderDock() {
-    const dlBtn = $("voidDownloadFolderBtn");
-    if (!dlBtn) return;
-    const sel = selectedId ? getItem(selectedId) : null;
-    const inTrash = state.activeFolderId === TRASH_ID || !!getItem(state.activeFolderId)?.deletedAt;
-    const isFolder = sel?.type === "folder" && !sel.deletedAt;
-    dlBtn.disabled = !isFolder;
-    dlBtn.title = isFolder
-      ? `Download "${sel.name}" as ZIP`
-      : "Select a folder to download it as ZIP";
-    const deleteBtn = $("voidDeleteSelectedBtn");
-    if (deleteBtn) {
-      deleteBtn.textContent = sel?.deletedAt ? "Delete Forever" : "Delete";
-      deleteBtn.title = sel?.deletedAt ? "Permanently delete selected item" : "Move selected file or folder to Trash";
-    }
-    const deleteAllBtn = $("voidDeleteAllBtn");
-    if (deleteAllBtn) {
-      deleteAllBtn.textContent = inTrash ? "Empty Trash" : "Delete All";
-      deleteAllBtn.title = inTrash ? "Permanently delete every item in Trash" : "Move all files and folders to Trash";
-    }
-    ["voidCreateFileBtn", "voidCreateFolderBtn", "voidUploadFolderBtn"].forEach(id => {
-      const btn = $(id);
-      if (btn) btn.disabled = inTrash;
-    });
-  }
-
-  function renderEditMode() {
-    const btn = $("voidEditModeBtn");
-    if (!btn) return;
-    const target = selectedId ? getItem(selectedId) : (state.activeFolderId !== ROOT_ID ? getItem(state.activeFolderId) : null);
-    btn.classList.toggle("active", forceEditMode);
-    btn.textContent = forceEditMode ? "Editing" : "Edit";
-    btn.title = forceEditMode
-      ? target
-        ? `Edit Mode on: sending context for /${target.path}`
-        : "Edit Mode on: sending existing project context"
-      : "Turn on to send existing project context for edits";
-  }
-
-  function renderHeader() {
-    const activeItems = visibleProjectFiles();
-    const fileCount   = activeItems.filter(f => f.type === "file").length;
-    const folderCount = activeItems.filter(f => f.type === "folder").length;
-    const stats = $("voidDesktopStats");
-    if (stats) {
-      stats.textContent = fileCount || folderCount
-        ? `${fileCount} file${fileCount !== 1 ? "s" : ""} · ${folderCount} folder${folderCount !== 1 ? "s" : ""}`
-        : "";
-    }
-    const folder = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? null : getItem(state.activeFolderId);
-    const pathEl = $("voidPath");
-    if (pathEl) pathEl.textContent = state.activeFolderId === TRASH_ID ? "/Trash" : "/" + (folder?.path || "");
-    updateVoidClock();
-  }
-
-  function updateVoidClock() {
-    const clock = $("voidClock");
-    if (clock) clock.textContent = new Date()
-      .toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })
-      .toUpperCase();
+    desktop.renderDock();
+    desktop.renderEditMode();
   }
 
   function renderFinderToggle() {
@@ -573,99 +505,6 @@ const VoidStudio = (() => {
     });
   }
 
-  function renderModelSelect() {
-    const src = document.getElementById("model");
-    const selects = [$("voidGodModelSelect"), $("voidChatModelSelect")].filter(Boolean);
-    if (!src || !selects.length) return;
-    const options = Array.from(src.options)
-      .map(o => `<option value="${esc(o.value)}"${o.disabled ? " disabled" : ""}>${esc(o.textContent)}</option>`)
-      .join("");
-    selects.forEach(sel => {
-      const current = sel.value || src.value;
-      sel.innerHTML = options || `<option value="">No agent models available</option>`;
-      if (current) sel.value = current;
-      if (!sel.value && src.value) sel.value = src.value;
-    });
-  }
-
-  function availableModelOptions() {
-    const src = document.getElementById("model");
-    return Array.from(src?.options || [])
-      .map(o => ({ value: o.value, label: o.textContent || o.value, disabled: o.disabled || !o.value }))
-      .filter(o => !o.disabled && o.value && !/^[-—]/.test(o.label));
-  }
-
-  function modelStrengthScore(opt, role = "worker") {
-    const text = `${opt.value} ${opt.label}`.toLowerCase();
-    let score = 0;
-    const add = (rx, n) => { if (rx.test(text)) score += n; };
-    add(/qwen.*(480b|235b|230b|coder|max|plus)|qwen3.*(235b|230b|30b|coder)|qwq/i, 170);
-    add(/480b|235b|230b|405b/i, 120);
-    add(/405b|480b|235b|230b|120b|70b|large|pro|r1|deepseek|qwen3 coder|gpt oss 120|nemotron 3 super|maverick|hermes/i, 80);
-    add(/llama.*70b|deepseek.*llama.*70b/i, -35);
-    add(/32b|30b|26b|17b|scout|versatile/i, 38);
-    add(/8b|9b|12b|20b|flash|instant|lite|nano|small/i, -12);
-    add(/embedding|rerank|moderation|vision|image|tts|whisper/i, -1000);
-    if (opt.value.startsWith("cloud:")) score += role === "god" ? 18 : 10;
-    if (/gemini.*pro|openrouter|samba|cerebras|groq|minimax|glm|nvidia/i.test(text)) score += 12;
-    return score;
-  }
-
-  function isSmallModelOption(opt) {
-    const text = `${opt?.value || ""} ${opt?.label || ""}`.toLowerCase();
-    if (/embedding|rerank|moderation|vision|image|tts|whisper/i.test(text)) return true;
-    if (/llama.*70b|deepseek.*llama.*70b/i.test(text)) return true;
-    return /(?:^|[^0-9])(8b|9b|12b|17b|20b|26b|30b|32b)(?:[^0-9]|$)|flash|instant|lite|nano|small|mini|scout|versatile/i.test(text);
-  }
-
-  function isLargeFallbackModel(opt, role = "worker") {
-    if (!opt?.value || isSmallModelOption(opt)) return false;
-    const text = `${opt.value} ${opt.label}`.toLowerCase();
-    return modelStrengthScore(opt, role) >= 90 ||
-      /qwen.*(480b|235b|230b|coder|max|plus)|480b|235b|230b|405b|120b|gpt[-_\s]*oss[-_\s]*120|deepseek.*r1|gemini.*pro/i.test(text);
-  }
-
-  function autoAssignModels() {
-    const opts = availableModelOptions();
-    if (!opts.length) {
-      log("No model options available to auto assign.", "warn");
-      return;
-    }
-    const largeOpts = opts.filter(o => isLargeFallbackModel(o, "god"));
-    if (!largeOpts.length) {
-      log("No large God Agent model is available; refusing to auto-route to small models.", "warn");
-      return;
-    }
-    const godPick = largeOpts.slice().sort((a, b) => modelStrengthScore(b, "god") - modelStrengthScore(a, "god"))[0];
-    if ($("voidGodModelSelect")) $("voidGodModelSelect").value = godPick.value;
-    log(`God Agent assigned ${godPick.label}`, "ok");
-  }
-
-  function chooseWorkerModel() {
-    const opts = availableModelOptions();
-    if (!opts.length) return $("voidGodModelSelect")?.value || "";
-    const largeOpts = opts.filter(o => isLargeFallbackModel(o, "worker"));
-    if (!largeOpts.length) {
-      log("No large worker model is available; refusing to auto-route to small models.", "warn");
-      return "";
-    }
-    const godValue = $("voidGodModelSelect")?.value || "";
-    return largeOpts
-      .slice()
-      .sort((a, b) => {
-        const aScore = modelStrengthScore(a, "worker") + (a.value === godValue ? -6 : 0);
-        const bScore = modelStrengthScore(b, "worker") + (b.value === godValue ? -6 : 0);
-        return bScore - aScore;
-      })[0]?.value || godValue;
-  }
-
-  function fileIcon(item) {
-    if (item.type === "folder") return "folder";
-    const ext = item.name.split(".").pop().toLowerCase();
-    if (/^(html|css|js|ts|tsx|jsx|json|md|py|sql|env|yml|yaml)$/.test(ext)) return ext;
-    return "file";
-  }
-
   function byteSize(item) {
     return item?.type === "file" ? new Blob([item.content || ""]).size : 0;
   }
@@ -716,214 +555,6 @@ const VoidStudio = (() => {
       webp: "WebP image",
     };
     return labels[ext] || "Document";
-  }
-
-  function systemDesktopIcons() {
-    const trashCount = trashedProjectFiles().filter(f => f.trashRoot).length;
-    return [
-      { id: SYSTEM_ICON_FINDER, name: "Finder", glyph: finderSvg(), action: openFinderTool },
-      { id: SYSTEM_ICON_SETTINGS, name: "Settings", glyph: settingsSvg(), action: openVoidSettings },
-      { id: SYSTEM_ICON_TRASH, name: trashCount ? `Trash (${trashCount})` : "Trash", glyph: trashSvg(trashCount > 0), action: openTrash },
-    ].map((icon, index) => ({ ...icon, ...systemIconPosition(icon.id, index) }));
-  }
-
-  function defaultSystemIconPosition(index) {
-    return { x: 26 + index * 92, y: 30 };
-  }
-
-  function systemIconPosition(id, index = 0) {
-    return state.activeProject?.systemIconPositions?.[id] || defaultSystemIconPosition(index);
-  }
-
-  function setSystemIconDrag(e, iconId) {
-    e.dataTransfer.setData("application/x-void-system-icon", iconId);
-    e.dataTransfer.setData("application/x-void-drag-origin", "desktop");
-    setDragOffset(e, e.currentTarget);
-    e.dataTransfer.effectAllowed = "move";
-  }
-
-  function getSystemIconDrag(e) {
-    return e.dataTransfer.getData("application/x-void-system-icon") || "";
-  }
-
-  async function moveSystemIcon(iconId, desktopPosition) {
-    if (!state.activeProject || ![SYSTEM_ICON_FINDER, SYSTEM_ICON_SETTINGS, SYSTEM_ICON_TRASH].includes(iconId)) return false;
-    state.activeProject.systemIconPositions = state.activeProject.systemIconPositions || {};
-    state.activeProject.systemIconPositions[iconId] = clampDesktopPosition(desktopPosition);
-    await saveProject();
-    selectedSystemIconId = iconId;
-    selectedId = "";
-    return true;
-  }
-
-  // Pointer-event drag for desktop icons — reliable in WebKit where HTML5 drag fails on <button>.
-  function setupDesktopIconDrag(el, onDropFn) {
-    el.addEventListener("pointerdown", e => {
-      if (e.button !== 0) return;
-      e.stopPropagation();
-      el.setPointerCapture(e.pointerId);
-      const desktop = $("voidDesktop");
-      const box = desktop.getBoundingClientRect();
-      const startX = e.clientX, startY = e.clientY;
-      const startL = parseFloat(el.style.left) || 0;
-      const startT = parseFloat(el.style.top)  || 0;
-      let moved = false;
-
-      function onMove(me) {
-        const dx = me.clientX - startX, dy = me.clientY - startY;
-        if (!moved && Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
-        moved = true;
-        el.classList.add("void-icon-dragging");
-        el.style.left = Math.max(8, Math.min(box.width  - 88, startL + dx)) + "px";
-        el.style.top  = Math.max(8, Math.min(box.height - 88, startT + dy)) + "px";
-      }
-
-      async function onUp(ue) {
-        el.removeEventListener("pointermove",   onMove);
-        el.removeEventListener("pointerup",     onUp);
-        el.removeEventListener("pointercancel", onUp);
-        el.classList.remove("void-icon-dragging");
-        if (!moved) return;
-        el._didDrag = true;
-        const finalX = parseFloat(el.style.left) || startL;
-        const finalY = parseFloat(el.style.top)  || startT;
-        el.style.pointerEvents = "none";
-        const under = document.elementFromPoint(ue.clientX, ue.clientY);
-        el.style.pointerEvents = "";
-        await onDropFn(under, finalX, finalY);
-      }
-
-      el.addEventListener("pointermove",   onMove);
-      el.addEventListener("pointerup",     onUp);
-      el.addEventListener("pointercancel", onUp);
-    });
-  }
-
-  function renderDesktop() {
-    const host = $("voidDesktop");
-    if (!host) return;
-    const visibleItems = childrenOf(ROOT_ID);
-    $("voidEmptyDesktop").style.display = "none";
-    host.querySelectorAll(".void-desktop-icon").forEach(n => n.remove());
-    systemDesktopIcons().forEach(icon => {
-      const el = document.createElement("button");
-      el.className = `void-desktop-icon system ${selectedSystemIconId === icon.id ? "selected" : ""}`;
-      el.style.left = `${icon.x}px`;
-      el.style.top = `${icon.y}px`;
-      el.dataset.systemIcon = icon.id;
-      el.innerHTML = `<span class="void-file-glyph system">${icon.glyph}</span><b>${esc(icon.name)}</b>`;
-      el.addEventListener("click", e => {
-        e.stopPropagation();
-        if (el._didDrag) { el._didDrag = false; return; }
-        selectSystemIcon(icon.id);
-      });
-      el.addEventListener("dblclick", icon.action);
-      setupDesktopIconDrag(el, async (under, finalX, finalY) => {
-        if (await moveSystemIcon(icon.id, { x: finalX, y: finalY })) renderAll();
-      });
-      if (icon.id === SYSTEM_ICON_TRASH) {
-        el.addEventListener("dragover", e => {
-          const dragged = getDragItem(e);
-          if (dragged && !dragged.deletedAt) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = "move";
-            el.classList.add("drop-target");
-          }
-        });
-        el.addEventListener("dragleave", () => el.classList.remove("drop-target"));
-        el.addEventListener("drop", async e => {
-          const dragged = getDragItem(e);
-          if (!dragged || dragged.deletedAt) return;
-          e.preventDefault();
-          e.stopPropagation();
-          el.classList.remove("drop-target");
-          await deleteItemDirect(dragged.id);
-          log(`Moved ${dragged.name} to Trash`, "warn");
-          renderAll();
-        });
-      }
-      host.appendChild(el);
-    });
-    visibleItems.forEach((item, index) => {
-      const pos = item.desktopPosition || { x: 26 + (index % 4) * 92, y: 132 + Math.floor(index / 4) * 96 };
-      const el = document.createElement("button");
-      el.className = `void-desktop-icon ${selectedId === item.id ? "selected" : ""}`;
-      el.style.left = `${Math.max(8, pos.x)}px`;
-      el.style.top = `${Math.max(8, pos.y)}px`;
-      el.dataset.id = item.id;
-      el.innerHTML = `<span class="void-file-glyph ${esc(fileIcon(item))}">${item.type === "folder" ? folderSvg() : fileSvg()}</span><b>${esc(item.name)}</b>`;
-      el.addEventListener("click", e => {
-        e.stopPropagation();
-        if (el._didDrag) { el._didDrag = false; return; }
-        selectItem(item.id);
-      });
-      el.addEventListener("dblclick", () => item.type === "folder" ? openFolder(item.id) : openEditor(item.id));
-      setupDesktopIconDrag(el, async (under, finalX, finalY) => {
-        // Dropped on trash system icon
-        const trashEl = under?.closest(`[data-system-icon="${SYSTEM_ICON_TRASH}"]`);
-        if (trashEl) {
-          await deleteItemDirect(item.id);
-          log(`Moved ${item.name} to Trash`, "warn");
-          renderAll();
-          return;
-        }
-        // Dropped on another folder icon
-        const folderBtn = under?.closest("[data-id]");
-        if (folderBtn && folderBtn !== el) {
-          const target = getItem(folderBtn.dataset.id);
-          if (target?.type === "folder" && canMoveToParent(item, target.id)) {
-            if (await moveItemToParent(item.id, target.id)) {
-              state.activeFolderId = target.id;
-              log(`Moved ${item.name} into /${target.path}`, "ok");
-              renderAll();
-              return;
-            }
-          }
-        }
-        // Dropped on desktop — update position
-        item.desktopPosition = clampDesktopPosition({ x: finalX, y: finalY });
-        item.updatedAt = nowIso();
-        rebuildPaths();
-        await saveProject();
-        renderAll();
-      });
-      if (item.type === "folder") {
-        el.addEventListener("dragover", e => {
-          const dragged = getDragItem(e);
-          if (getDragOrigin(e) === "desktop") return;
-          if (hasDragType(e, "Files") || (dragged && dragged.id !== item.id && canMoveToParent(dragged, item.id))) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.dataTransfer.dropEffect = hasDragType(e, "Files") ? "copy" : "move";
-            el.classList.add("drop-target");
-          }
-        });
-        el.addEventListener("dragleave", () => el.classList.remove("drop-target"));
-        el.addEventListener("drop", async e => {
-          if (e.dataTransfer.files?.length) {
-            e.preventDefault();
-            e.stopPropagation();
-            el.classList.remove("drop-target");
-            state.activeFolderId = item.id;
-            await handleUpload(e.dataTransfer.files, false, item.id);
-            return;
-          }
-          const dragged = getDragItem(e);
-          if (getDragOrigin(e) === "desktop") return;
-          if (!dragged || dragged.id === item.id) return;
-          e.preventDefault();
-          e.stopPropagation();
-          el.classList.remove("drop-target");
-          if (await moveItemToParent(dragged.id, item.id)) {
-            state.activeFolderId = item.id;
-            log(`Moved ${dragged.name} into /${getItem(item.id)?.path || item.name}`, "ok");
-            renderAll();
-          }
-        });
-      }
-      host.appendChild(el);
-    });
   }
 
   function renderTree() {
@@ -1081,19 +712,6 @@ const VoidStudio = (() => {
 
   function selectItem(id) {
     selectedId = id;
-    selectedSystemIconId = "";
-    renderAll();
-  }
-
-  function selectSystemIcon(id) {
-    selectedSystemIconId = id;
-    selectedId = "";
-    renderAll();
-  }
-
-  function clearDesktopSelection() {
-    if (!selectedId && !selectedSystemIconId) return;
-    selectedId = "";
     selectedSystemIconId = "";
     renderAll();
   }
@@ -1471,46 +1089,6 @@ const VoidStudio = (() => {
     return "text/plain";
   }
 
-  function buildFileContext({
-    includeContents = true,
-    maxFullFiles = 12,
-    maxFullBytes = 6000,
-    maxPreviewBytes = 500,
-    focusId = "",
-  } = {}) {
-    const activeItems = visibleProjectFiles();
-    if (!activeItems.length) return "(empty project — no files yet)";
-    const focusItem = focusId ? getItem(focusId) : null;
-    const allowedIds = focusItem && !focusItem.deletedAt ? descendantIds(focusItem.id) : null;
-    const contextItems = allowedIds ? activeItems.filter(f => allowedIds.has(f.id)) : activeItems;
-    const folders = contextItems.filter(f => f.type === "folder");
-    const files   = contextItems.filter(f => f.type === "file");
-
-    // Compact tree
-    const tree = [
-      ...folders.map(f => `  📁 /${f.path}/`),
-      ...files.map(f => {
-        const bytes = new Blob([f.content || ""]).size;
-        return `  📄 /${f.path}  (${bytes} B)`;
-      })
-    ].join("\n");
-
-    if (!includeContents) {
-      return `--- Project tree${focusItem ? ` for selected ${focusItem.type}: /${focusItem.path}` : ""} ---\n${tree}\n\n--- File contents ---\n(omitted to keep model request small; request exact existing paths from the tree if editing is needed)`;
-    }
-
-    // Full content for files that fit; truncate large ones
-    const fileBlocks = files.slice(0, maxFullFiles).map(f => {
-      const bytes = new Blob([f.content || ""]).size;
-      if (bytes === 0) return `=== FILE: /${f.path} (empty) ===`;
-      if (bytes <= maxFullBytes) return `=== FILE: /${f.path} ===\n${f.content}\n=== END FILE ===`;
-      const preview = (f.content || "").slice(0, maxPreviewBytes);
-      return `=== FILE: /${f.path} (${bytes} B — showing first ${maxPreviewBytes} chars) ===\n${preview}\n... (truncated)\n=== END FILE ===`;
-    }).join("\n\n");
-
-    return `--- Project tree${focusItem ? ` for selected ${focusItem.type}: /${focusItem.path}` : ""} ---\n${tree}\n\n--- File contents ---\n${fileBlocks}`;
-  }
-
   function isEditRequest(prompt) {
     const text = String(prompt || "").toLowerCase();
     return /\b(edit|update|change|modify|fix|repair|revise|adjust|tweak|improve|refactor|rename|replace|remove)\b/.test(text) ||
@@ -1528,228 +1106,6 @@ const VoidStudio = (() => {
     const text = String(prompt || "").toLowerCase();
     return /\b(new|another|separate|different|fresh)\b/.test(text) ||
       /\b(make|create|build|generate|code|develop|design)\b[\s\S]{0,80}\b(website|site|webpage|web page|web app|app|application|game|tool|dashboard|landing page|portfolio|store|shop)\b/.test(text);
-  }
-
-  function buildDynamicImageInstruction(userPrompt) {
-    const topic = String(userPrompt || "").slice(0, 140);
-    const fallbackSeed = Math.floor(Math.random() * 9000) + 1000;
-    return `IMAGES — use Unsplash Source for real, high-quality topic photos (no API key needed).
-
-PRIMARY format (always use this first):
-  https://source.unsplash.com/{W}x{H}/?{keyword1},{keyword2}
-
-  Derive keywords directly from the topic "${topic}":
-  – pizza/food site        → /?pizza,italian  · /?chef,cooking  · /?restaurant,dining
-  – tech/SaaS site         → /?laptop,code    · /?startup,office · /?server,technology
-  – fashion/clothing store → /?fashion,model  · /?clothing,style · /?runway,designer
-  – fitness/gym app        → /?gym,workout    · /?athlete,sport  · /?fitness,training
-  – travel/hotel site      → /?travel,city    · /?hotel,luxury   · /?landscape,destination
-  – real estate            → /?house,interior · /?architecture,modern · /?property,home
-  – e-commerce/shop        → use the product noun directly, e.g. /?sneakers,shoes
-
-Hard rules:
-• Pick keywords directly from the topic — 1-2 concrete nouns that describe the subject.
-• Every image must have DIFFERENT keywords to get visual variety.
-• Sizes: 1600x900 for hero/banner · 800x600 for cards · 600x400 for thumbnails.
-• NEVER use: "cat", "statue", "animal", "kitten", "dog", "placeholder", "lorem", "nature" (unless topic IS nature), or any unrelated term.
-• NEVER invent Unsplash photo IDs — only the /?keywords format above.
-• Use ≥ 3 distinct images per visual website.
-
-FALLBACK (only if Unsplash Source is unsuitable for the context):
-  https://loremflickr.com/{W}/{H}/{k1},{k2}?lock=${fallbackSeed}
-  Increment lock by 1 per additional image. Same keyword rules apply.`;
-  }
-
-  // keep alias for any legacy reference (should not be called, but avoids ReferenceError)
-  function realPhotoAssetBank() { return buildDynamicImageInstruction(""); }
-
-  function buildPrompt(userPrompt, repair = false) {
-    const rootFolder = inferProjectName(userPrompt);
-    const hasFiles = visibleProjectFiles().some(f => f.type === "file");
-    const isEdit = wantsEditContext(userPrompt);
-    const isNewBuild = shouldCreateSeparateProject(userPrompt);
-    const ctx = repair || isEdit
-      ? buildFileContext({
-          includeContents: true,
-          maxFullFiles: 10,
-          maxFullBytes: 4500,
-          maxPreviewBytes: 450,
-          focusId: selectedId || state.activeFolderId,
-        })
-      : "(existing workspace intentionally hidden; this is a new-build prompt, not an edit)";
-    return `You are Virtual OS, an AI coding agent with FULL file-system capabilities over a browser-local virtual filesystem.
-
-━━━ OUTPUT FORMAT ━━━
-Return complete files in fenced code blocks with the path on the opening fence line:
-
-\`\`\`language folder/path/to/file.ext
-full file content here
-\`\`\`
-
-━━━ FILE CAPABILITIES ━━━
-• CREATE a new file → output it with its new path.
-• EDIT / UPDATE an existing file → output it with the SAME path as shown in the project context. The full updated content replaces the old version.
-• DELETE a file → the local controller handles deletion commands; do not output a code block for it.
-• FIND a file or folder → search the project tree below, then reference it by exact path.
-• You can create, read (from context), and fully rewrite ANY file in the project.
-
-━━━ RULES ━━━
-- ${hasFiles
-  ? isEdit
-    ? `EDIT MODE — existing files are present and the user asked for a change. Preserve the existing folder structure. Output ONLY files that need changes, using their exact existing paths from the project context. Do not create a new root folder unless explicitly requested.`
-    : isNewBuild
-      ? `NEW BUILD MODE — existing files are present, but this is a new build request. Create a separate top-level folder named "${rootFolder}" unless that name already exists; never reuse or overwrite existing project files.`
-      : `Existing files are present — keep related additions under the same existing top-level folder. Only create a second root folder if the user asks for a new/separate/different project.`
-  : `New project — put EVERY file under ONE top-level folder. Name it "${rootFolder}" (short, lowercase, hyphens OK, NO spaces, NO full sentences, 1–3 words max). Never use the user's prompt text as a path.`}
-- Write complete, working file content. No placeholders, lorem ipsum, TODOs, or "rest of file" stubs.
-- Every generated project must be ready to run/deploy as written. Do not leave setup chores, missing assets, missing API keys, manual image steps, or comments telling the user what to add later.
-- For websites: polished, real UI with actual CSS (not bare HTML). No sample/fake data.
-- IMAGES — use the God Agent's chosen Unsplash Source URLs verbatim. Never invent new URLs and never use photo IDs. NEVER use "cat", "statue", "animal", "kitten", or any keyword unrelated to the project topic.
-- For visual designs: every <img> and background-image must use an Unsplash Source URL (https://source.unsplash.com/{W}x{H}/?{keywords}) with topic-specific keywords. No placeholders, no empty boxes, no base64 stubs.
-- Include at least 3 distinct images for any visual website — each with a different URL and different keywords.
-- Design standard: think like an editorial creative director, not a template factory. Every project must have a distinct visual identity: unique color palette, deliberate type hierarchy, original layout composition. No two builds should look the same. Avoid generic hero→features→CTA cookie-cutter layouts.
-- For apps: create all required frontend + backend + config files.
-- For edits: preserve all unrelated existing code, filenames, folders, assets, and structure. Change only what the user requested.
-- For new builds: do not overwrite existing files with common names like index.html, styles.css, app.js, or script.js. Use a new project root.
-- Do NOT add README, markdown docs, or test files unless explicitly asked.
-- VIRTUAL FILESYSTEM — all files are browser-local only. NEVER include npm install, pip install, cargo build, or any package-manager install step. Write correct package.json / requirements.txt / Cargo.toml content instead; the user runs installs themselves outside Virtual OS.
-- Do not claim to run servers or install packages; this stores files only.
-- Keep explanation text outside fences to a minimum — mostly just code fences.
-
-━━━ DYNAMIC IMAGE SEARCH ━━━
-${buildDynamicImageInstruction(userPrompt)}
-
-━━━ CURRENT PROJECT STATE ━━━
-${ctx}
-
-━━━ USER REQUEST ━━━
-${userPrompt}`;
-  }
-
-  function parseModelValue(value) {
-    if (String(value || "").startsWith("cloud:")) {
-      const parts = value.split(":");
-      return { cloud: true, provider: parts[1], model: parts.slice(2).join(":") };
-    }
-    return { cloud: false, model: value };
-  }
-
-  async function callModelValue(modelValue, messages, signal) {
-    const api = window._H || {};
-    const value = modelValue || api.selectedModel?.() || document.getElementById("model")?.value || "";
-    if (!value) throw new Error("No model selected.");
-    const route = parseModelValue(value);
-    if (route.cloud) {
-      if (route.provider === "gemini") {
-        const r = await api.agentTurnGemini({ model: route.model, messages, tools: [], temperature: 0.75, signal });
-        return r.content || "";
-      }
-      const r = await api.agentTurnOpenAI({ provider: route.provider, model: route.model, messages, tools: [], temperature: 0.75, signal });
-      return r.content || "";
-    }
-    const r = await api.agentTurnOllama({ model: route.model, messages, tools: [], temperature: 0.75, signal });
-    return r.content || "";
-  }
-
-  function fallbackModels(preferredValue, role) {
-    const opts = availableModelOptions();
-    const seen = new Set();
-    const ordered = [];
-    const addValue = (value) => {
-      const opt = opts.find(o => o.value === value) || { value, label: value };
-      if (value && !seen.has(value) && isLargeFallbackModel(opt, role)) {
-        seen.add(value);
-        ordered.push(opt);
-      }
-    };
-    addValue(preferredValue);
-    opts
-      .slice()
-      .filter(o => isLargeFallbackModel(o, role))
-      .sort((a, b) => modelStrengthScore(b, role) - modelStrengthScore(a, role))
-      .forEach(o => addValue(o.value));
-    return ordered.slice(0, 6);
-  }
-
-  function isRouteFailure(err) {
-    const msg = String(err?.message || err || "");
-    return /rate|limit|quota|413|429|503|502|504|timeout|busy|overload|temporar|failed|model.*not.*found|missing|key|unsupported|request.*too.*large|too.*large|payload.*large|context.*length/i.test(msg);
-  }
-
-  let _lastWorkedModel = null; // locked-in model after first successful call
-
-  async function callWithFailover(role, preferredValue, messages, signal) {
-    const candidates = fallbackModels(preferredValue, role);
-    if (!candidates.length) {
-      throw new Error(`${role === "god" ? "God Agent" : "Worker Agent"} has no large model route available. Small-model fallback is disabled.`);
-    }
-    let lastErr = null;
-    for (let i = 0; i < candidates.length; i++) {
-      const c = candidates[i];
-      try {
-        log(`${role === "god" ? "God Agent" : "Worker Agent"} using ${c.label}`, i ? "warn" : "run");
-        const content = await callModelValue(c.value, messages, signal);
-        if (role === "god" && $("voidGodModelSelect")) $("voidGodModelSelect").value = c.value;
-        if (role === "worker" && $("voidChatModelSelect")) $("voidChatModelSelect").value = c.value;
-        _lastWorkedModel = c.value;
-        return content;
-      } catch (err) {
-        lastErr = err;
-        log(`${role === "god" ? "God Agent" : "Worker Agent"} route failed: ${String(err.message || err).slice(0, 150)}`, "warn");
-        if (err?.name === "AbortError") throw err;
-        if (!isRouteFailure(err)) break;
-      }
-    }
-    throw lastErr || new Error(`${role} route failed`);
-  }
-
-  async function runGodAgent(userPrompt, repair, signal) {
-    const editMode = wantsEditContext(userPrompt);
-    const newBuildMode = shouldCreateSeparateProject(userPrompt);
-    const ctx = repair || editMode
-      ? buildFileContext({
-          includeContents: true,
-          maxFullFiles: 8,
-          maxFullBytes: 3500,
-          maxPreviewBytes: 350,
-          focusId: selectedId || state.activeFolderId,
-        })
-      : "(existing workspace intentionally hidden; create a new project and do not edit old files)";
-    const content = await callWithFailover("god", $("voidGodModelSelect")?.value, [
-      {
-        role: "system",
-        content: `You are Virtual OS God Agent and Creative Director. Your response has TWO sections.
-
-━━━ SECTION 1 — CREATIVE BRIEF ━━━
-Think deeply about the specific request. Then define a unique visual identity for this exact project:
-
-Style: [pick one: editorial, neo-brutalist, soft luxury, bold industrial, clean minimal, organic, retro-tech, maximalist, etc. — must fit the topic]
-Colors: [3–4 hex values with roles, e.g. "#0f172a primary · #f59e0b accent · #f8fafc bg · #334155 secondary"]
-Typography: [two Google Font pairs with roles, e.g. "'Playfair Display', serif for headings · 'DM Sans', sans-serif for body"]
-Layout: [describe the specific layout approach: asymmetric two-column, magazine editorial, full-bleed hero with floating cards, mosaic grid, etc.]
-Unique Angle: [one sentence on what makes this design NOT a generic template — must be specific to this topic]
-Images (use Unsplash Source, topic-specific keywords — DIFFERENT keywords per image):
-  [usage]: https://source.unsplash.com/{W}x{H}/?{keyword1},{keyword2}
-  [at least 4 image URLs, each with different dimensions and different topic-specific keywords]
-
-━━━ SECTION 2 — EXECUTION BRIEF ━━━
-- Mode: ${editMode ? "EDIT existing project" : newBuildMode ? "CREATE a separate new project" : "ADD related files or create project as requested"}.
-- List every file to CREATE (new path) or EDIT (existing path). Name each file and describe exactly what it must contain.
-- Worker must execute the Creative Brief above — use those exact colors, fonts, layout, and images.
-- For edits: confirm each path, describe specific changes. Preserve folder structure and unrelated files.
-- For new builds: all files under one top-level folder. Never reuse existing paths.
-- Require deploy-ready output: no TODOs, no placeholders, no manual steps for the user.
-- Do NOT output code fences — that is the worker's job.
-- No README, no docs, no tests unless explicitly requested.
-
-${buildDynamicImageInstruction(userPrompt)}`
-      },
-      {
-        role: "user",
-        content: `User request: ${userPrompt}\n\nCurrent project state:\n${ctx}\n\nOutput your Creative Brief first, then the Execution Brief with each file to create or edit.`
-      }
-    ], signal);
-    return content.trim() || userPrompt;
   }
 
   // ============================================================================
@@ -2021,6 +1377,182 @@ ${buildDynamicImageInstruction(userPrompt)}`
     });
   }
 
+
+  function initVoidDesktopApi() {
+    if (voidDesktopApi) return voidDesktopApi;
+    voidDesktopApi = createVoidDesktopApi({
+      $,
+      nowIso,
+      log,
+      state,
+      ROOT_ID,
+      TRASH_ID,
+      getSelectedId: () => selectedId,
+      setSelectedId: (id) => { selectedId = id; },
+      getSelectedSystemIconId: () => selectedSystemIconId,
+      setSelectedSystemIconId: (id) => { selectedSystemIconId = id; },
+      getForceEditMode: () => forceEditMode,
+      getItem,
+      childrenOf,
+      visibleProjectFiles,
+      trashedProjectFiles,
+      saveProject,
+      rebuildPaths,
+      canMoveToParent,
+      moveItemToParent,
+      getDragItem,
+      getDragOrigin,
+      hasDragType,
+      getDragOffset,
+      setDragOffset,
+      deleteItemDirect,
+      openFinderTool,
+      openVoidSettings,
+      openTrash,
+      openFolder,
+      openEditor,
+      selectItem,
+      handleUpload,
+      renderAll,
+    });
+    return voidDesktopApi;
+  }
+
+  function initVoidGenerateApi() {
+    if (voidGenerateApi) return voidGenerateApi;
+    voidGenerateApi = createVoidGenerateApi({
+      $,
+      log,
+      setStatus,
+      safeName,
+      visibleProjectFiles,
+      getItem,
+      descendantIds,
+      rebuildPaths,
+      saveProject,
+      renderAll,
+      getSelectedId: () => selectedId,
+      getActiveFolderId: () => state.activeFolderId,
+      getForceEditMode: () => forceEditMode,
+      wantsEditContext,
+      shouldCreateSeparateProject,
+      tryApplyWorkspaceInstruction,
+      initVoidChatApi: () => initVoidChatApi(),
+      getAgentOSMode: () => agentOSMode,
+      getRunAbort: () => runAbort,
+      setRunAbort: (v) => { runAbort = v; },
+    });
+    return voidGenerateApi;
+  }
+
+  function initVoidWireEventsApi() {
+    if (voidWireEventsApi) return voidWireEventsApi;
+    voidWireEventsApi = createVoidWireEventsApi({
+      $,
+      log,
+      ROOT_ID,
+      initVoidChatApi: () => initVoidChatApi(),
+      wireFinderEvents: () => {
+        $("voidFinderTrashBtn")?.addEventListener("click", finderTrashButtonAction);
+        $("voidFinderSettingsBtn")?.addEventListener("click", openVoidSettings);
+        $("voidFinderToggleBtn")?.addEventListener("click", () => setFinderCollapsed(!finderCollapsed));
+        $("voidFinderClose")?.addEventListener("click", () => setFinderCollapsed(true));
+        $("voidFinderBack")?.addEventListener("click", () => {
+          if (finderHistoryIdx > 0) {
+            finderHistoryIdx--;
+            state.activeFolderId = finderHistory[finderHistoryIdx];
+            selectedId = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? "" : state.activeFolderId;
+            renderAll();
+          }
+        });
+        $("voidFinderFwd")?.addEventListener("click", () => {
+          if (finderHistoryIdx < finderHistory.length - 1) {
+            finderHistoryIdx++;
+            state.activeFolderId = finderHistory[finderHistoryIdx];
+            selectedId = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? "" : state.activeFolderId;
+            renderAll();
+          }
+        });
+        $("voidFinderViewToggle")?.addEventListener("click", () => {
+          finderViewMode = finderViewMode === "list" ? "grid" : "list";
+          const icon = $("voidFinderViewToggle");
+          if (icon) icon.title = finderViewMode === "list" ? "Switch to grid view" : "Switch to list view";
+          renderAll();
+        });
+        initFinderInteract();
+      },
+      createFile,
+      createFolder,
+      renderAll,
+      renderEditMode: () => initVoidDesktopApi().renderEditMode(),
+      toggleForceEditMode: () => {
+        forceEditMode = !forceEditMode;
+        const target = selectedId ? getItem(selectedId) : (state.activeFolderId !== ROOT_ID ? getItem(state.activeFolderId) : null);
+        log(forceEditMode
+          ? target
+            ? `Edit Mode on. Sending context for /${target.path}.`
+            : "Edit Mode on. Existing project context will be sent."
+          : "Edit Mode off. Existing projects will be hidden from new prompts.",
+          forceEditMode ? "warn" : "ok"
+        );
+      },
+      initTerminalInteract,
+      getTermHistory: () => termHistory,
+      getTermHistIdx: () => termHistIdx,
+      setTermHistIdx: (v) => { termHistIdx = v; },
+      getTermLines: () => termLines,
+      setTermLines: (v) => { termLines = v; },
+      getTermCwd: () => termCwd,
+      appendTermLine,
+      termExec,
+      renderTermOutput,
+      renderTermPrompt,
+      openTerminal,
+      getRunAbort: () => runAbort,
+      abortRun: () => { if (runAbort) runAbort.abort(); },
+      saveWallpaperBlob,
+      applyWallpaper,
+      setWallpaperMenu,
+      deleteWallpaperBlob,
+      handleUpload,
+      deleteItem,
+      deleteAll,
+      exportZip,
+      closeEditor,
+      saveEditor,
+      downloadItem,
+      getItem,
+      getEditingId: () => editingId,
+      closeDialog,
+      clearDesktopSelection: () => initVoidDesktopApi().clearDesktopSelection(),
+      hasDragType,
+      getSystemIconDrag: (e) => initVoidDesktopApi().getSystemIconDrag(e),
+      moveSystemIcon: (...args) => initVoidDesktopApi().moveSystemIcon(...args),
+      getDragItem,
+      moveItemToParent,
+      getDragOffset,
+      downloadFolder,
+      setActiveFolderId: (id) => { state.activeFolderId = id; },
+      getSelectedId: () => selectedId,
+      setMounted: (v) => { mounted = v; },
+      getInitialized: () => initialized,
+      setInitialized: (v) => { initialized = v; },
+      getClockTimer: () => clockTimer,
+      setClockTimer: (v) => { clockTimer = v; },
+      updateVoidClock: () => initVoidDesktopApi().updateVoidClock(),
+      loadProjects,
+      logReady: () => log("Virtual OS ready. No files touch disk until export.", "ok"),
+      prepareMount: () => {
+        finderCollapsed = true;
+        const wrapEl = document.getElementById("virtual-os-wrap");
+        if (wrapEl) wrapEl.classList.add("finder-collapsed");
+        const finderEl = document.getElementById("voidFinder");
+        if (finderEl) { finderEl.style.width = ""; finderEl.style.height = ""; finderEl.style.left = ""; finderEl.style.top = ""; }
+      },
+    });
+    return voidWireEventsApi;
+  }
+
   function initVoidChatApi() {
     if (voidChatApi) return voidChatApi;
     voidChatApi = createVoidChatApi({
@@ -2030,7 +1562,7 @@ ${buildDynamicImageInstruction(userPrompt)}`
       ROOT_ID,
       getActiveProject: () => state.activeProject,
       setActiveFolderId: (id) => { state.activeFolderId = id; },
-      setFinderCollapsed: (v) => { finderCollapsed = v; },
+      setFinderCollapsed: (v) => setFinderCollapsed(v),
       visibleProjectFiles,
       rebuildPaths,
       saveProject,
@@ -2045,14 +1577,14 @@ ${buildDynamicImageInstruction(userPrompt)}`
       fmtBytes,
       uid,
       nowIso,
-      chooseWorkerModel,
-      callModelValue,
-      callWithFailover,
-      getLastWorkedModel: () => _lastWorkedModel,
-      setLastWorkedModel: (v) => { _lastWorkedModel = v; },
+      chooseWorkerModel: () => initVoidGenerateApi().chooseWorkerModel(),
+      callModelValue: (...args) => initVoidGenerateApi().callModelValue(...args),
+      callWithFailover: (...args) => initVoidGenerateApi().callWithFailover(...args),
+      getLastWorkedModel: () => initVoidGenerateApi().getLastWorkedModel(),
+      setLastWorkedModel: (v) => initVoidGenerateApi().setLastWorkedModel(v),
       getRunAbort: () => runAbort,
       setRunAbort: (v) => { runAbort = v; },
-      generate,
+      generate: (...args) => initVoidGenerateApi().generate(...args),
       termExec,
       appendTermLine,
       openTerminal,
@@ -2064,141 +1596,12 @@ ${buildDynamicImageInstruction(userPrompt)}`
     return voidChatApi;
   }
 
-  async function generate(repair = false, promptOverride = null) {
-    const chat = initVoidChatApi();
-    if (agentOSMode && !repair) return chat.generateAgentOS(promptOverride);
-    const prompt = promptOverride ?? $("voidPrompt")?.value?.trim() ?? "";
-    if (!prompt) {
-      log("Describe a file action or project to build first.", "warn");
-      return;
-    }
-    if (!repair && await tryApplyWorkspaceInstruction(prompt)) return;
-    if (runAbort) runAbort.abort();
-    runAbort = new AbortController();
-    setStatus("Running", "running");
-    log(repair ? "Repairing project from prompt" : "No file-control command detected; generating project files", "run");
-    const stopBtn = $("voidStopBtn");
-    if (stopBtn) { stopBtn.classList.add("running"); stopBtn.disabled = false; }
-    try {
-      const workerBrief = await runGodAgent(prompt, repair, runAbort.signal);
-      const workerModel = chooseWorkerModel();
-      const workerLabel = availableModelOptions().find(o => o.value === workerModel)?.label || workerModel || "selected model";
-      log(`God Agent assigned one Worker Agent: ${workerLabel}`, "ok");
-      const content = await callWithFailover("worker", workerModel, [
-        {
-          role: "system",
-          content: `You are Virtual OS Worker Agent — a full-stack coding agent that writes complete project files.
-
-════ OUTPUT FORMAT — THIS IS THE ONLY ACCEPTABLE FORMAT ════
-
-Every file MUST be wrapped in a fenced code block where the FIRST LINE contains the language AND the file path separated by a space:
-
-\`\`\`html apple-clone/index.html
-<!DOCTYPE html>
-...
-\`\`\`
-
-\`\`\`css apple-clone/styles.css
-body { margin: 0; }
-\`\`\`
-
-\`\`\`js apple-clone/app.js
-console.log("hello");
-\`\`\`
-
-CRITICAL RULES:
-1. The opening fence line format is EXACTLY:  backtick backtick backtick + language + ONE SPACE + path
-2. Do NOT put the path inside the file as a comment. Put it on the opening fence line.
-3. Do NOT use a fence like \`\`\`html alone with no path — that will BREAK the system.
-4. All files MUST share ONE short root folder (1–3 words, lowercase, hyphens). Example root: apple-clone
-5. NEVER name the root folder after the user's prompt text.
-6. Write COMPLETE file contents — no "// ... rest of code", no TODO placeholders.
-7. If editing existing files, use the exact existing paths from context and preserve unrelated code and folder structure.
-8. If creating a new website/app/tool/game while files already exist, use a new top-level folder and do not overwrite existing paths.
-9. IMAGES: Use ONLY the Unsplash Source URLs specified in the God Agent's Creative Brief. Construct each URL as https://source.unsplash.com/{W}x{H}/?{keyword1},{keyword2} where keywords match exactly what the image shows. Never reuse the same keywords twice.
-10. Visual websites must use at least 3 distinct Unsplash Source images with different keywords and sizes.
-11. DESIGN: Execute the God Agent's Creative Brief exactly — use the specified colors, fonts, and layout style. Every project must feel like a bespoke design, not a template. No two builds should look alike.
-12. Make the project fully working and ready for deployment. All referenced files must be generated, and there must be no manual steps inside comments or UI.
-13. No README or test files unless explicitly requested.
-
-DYNAMIC IMAGE INSTRUCTION:
-${buildDynamicImageInstruction(prompt)}`
-        },
-        { role: "user", content: `${buildPrompt(prompt, repair)}\n\n--- God Agent execution brief ---\n${workerBrief}` }
-      ], runAbort.signal);
-      let files = chat.extractFiles(content);
-      // ── Auto-retry: model responded but didn't use path-labeled fences ──
-      if (!files.length && content.trim().length > 80) {
-        log("Model output had no path-labeled fences — retrying with format reminder…", "warn");
-        const retryContent = await callWithFailover("worker", workerModel, [
-          {
-            role: "system",
-            content: `You are a code formatter. The user will give you code that was output WITHOUT file paths on the code fence lines. Your ONLY job is to reformat it so every fence looks like:\n\`\`\`html project-name/index.html\ncontent\n\`\`\`\nDo not change the code. Just add the correct path to every opening fence line. Use a short project folder name (1-3 words, lowercase, hyphens).`
-          },
-          { role: "user", content: `Reformat this output by adding paths to all code fences:\n\n${content}` }
-        ], runAbort.signal);
-        files = chat.extractFiles(retryContent);
-      }
-      if (!files.length) throw new Error("Model did not produce any code files. Try a different model or rephrase your prompt.");
-      if (chat.needsDeploymentRewrite(files, prompt)) {
-        log("Model left placeholders/manual steps — retrying for deployment-ready files…", "warn");
-        const rewriteContent = await callWithFailover("worker", workerModel, [
-          {
-            role: "system",
-            content: `You are fixing generated project files so they are fully working, deployment-ready, and visually polished. Rewrite the provided files so there are no TODOs, placeholders, missing assets, fake local image filenames, manual setup comments, or instructions telling the user to add/replace/provide anything later. For images, use Unsplash Source URLs with topic-specific keywords: https://source.unsplash.com/{W}x{H}/?{keyword1},{keyword2} — use at least 3 distinct URLs with different keywords and sizes. Elevate naive/basic design into premium responsive production UI. Keep all code complete and return ONLY path-labeled fenced code blocks.\n\n${buildDynamicImageInstruction(prompt)}`
-          },
-          {
-            role: "user",
-            content: `Original user request:\n${prompt}\n\nRewrite these files so they are ready for deployment with all images/assets/references already wired:\n\n${chat.dumpFilesForRewrite(files)}`
-          }
-        ], runAbort.signal);
-        const rewritten = chat.extractFiles(rewriteContent);
-        if (rewritten.length) files = rewritten;
-      }
-      log(`Parsing ${files.length} file(s) from model output…`, "run");
-      // log each file being written
-      files.forEach(f => log(`Writing /${f.path}`, "ok"));
-      const materialized = chat.materializeGeneratedFiles(files, prompt);
-      await saveProject();
-      setStatus("Done", "done");
-      log(`✓ ${materialized.count} file(s) written to /${materialized.folderName}`, "ok");
-      renderAll();
-    } catch (err) {
-      if (err?.name === "AbortError") log("Generation stopped", "warn");
-      else {
-        setStatus("Error", "error");
-        log(err.message || String(err), "error");
-      }
-    } finally {
-      if (stopBtn) { stopBtn.classList.remove("running"); stopBtn.disabled = true; }
-      runAbort = null;
-      setTimeout(() => setStatus("Idle"), 2000);
-    }
-  }
-
   function folderSvg() {
     return `<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#69b7ff" d="M6 18.5c0-4 3.2-7.2 7.2-7.2h12.5c2 0 3.5.6 5 2.1l3.1 3.1h17c4 0 7.2 3.2 7.2 7.2v2.1H6v-7.3Z"/><path fill="#4aa3ff" d="M6 24.5h52v22.3c0 4-3.2 7.2-7.2 7.2H13.2c-4 0-7.2-3.2-7.2-7.2V24.5Z"/><path fill="rgba(255,255,255,.34)" d="M10 25h44v3H10z"/></svg>`;
   }
 
   function fileSvg() {
     return `<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="#f7fbff" d="M15 5h24l13 13v36.5A4.5 4.5 0 0 1 47.5 59h-33a4.5 4.5 0 0 1-4.5-4.5v-45A4.5 4.5 0 0 1 15 5Z"/><path fill="#d8e8f7" d="M39 5v12.5c0 2.5 2 4.5 4.5 4.5H52L39 5Z"/><path fill="#58c7e8" d="M20 32h24v4H20zm0 9h24v4H20zm0 9h15v4H20z"/></svg>`;
-  }
-
-  function finderSvg() {
-    return `<svg viewBox="0 0 64 64" aria-hidden="true">
-      <ellipse cx="32" cy="57" rx="21" ry="4.5" fill="#000000" opacity=".34"/>
-      <rect x="8" y="9" width="48" height="44" rx="8" fill="#162337"/>
-      <path d="M16 9h32a8 8 0 0 1 8 8v4H8v-4a8 8 0 0 1 8-8Z" fill="#c7d0da"/>
-      <path d="M16 9h32a8 8 0 0 1 7.2 4.5H8.8A8 8 0 0 1 16 9Z" fill="#f7f9fb" opacity=".72"/>
-      <rect x="11" y="19" width="42" height="31" rx="5" fill="#0a0f18"/>
-      <path d="M12 19h40v7H12z" fill="#253145"/>
-      <circle cx="17" cy="15" r="1.7" fill="#ff5f57"/><circle cx="22.5" cy="15" r="1.7" fill="#ffbd2e"/><circle cx="28" cy="15" r="1.7" fill="#28c840"/>
-      <rect x="16" y="28" width="32" height="4" rx="2" fill="#dbe8f3" opacity=".9"/>
-      <rect x="16" y="35" width="25" height="3.1" rx="1.55" fill="#8fa4ba" opacity=".78"/>
-      <rect x="16" y="41" width="29" height="3.1" rx="1.55" fill="#61758a" opacity=".72"/>
-      <path d="M12 49c8-2.1 21-2.1 40-1" stroke="#ffffff" stroke-width="1.1" opacity=".16" stroke-linecap="round"/>
-      <path d="M11 11.5h40" stroke="#ffffff" stroke-width="1.2" opacity=".7" stroke-linecap="round"/>
-    </svg>`;
   }
 
   function settingsSvg() {
@@ -2229,245 +1632,6 @@ ${buildDynamicImageInstruction(prompt)}`
       <path d="M21.7 21.8h20.6" stroke="#ffffff" stroke-width="1.4" opacity=".78" stroke-linecap="round"/>
       <path d="M23.4 25c1.6 8.8 1.8 17.1.8 25.8" stroke="#ffffff" stroke-width="1.2" opacity=".25" stroke-linecap="round"/>
     </svg>`;
-  }
-
-  function wireEvents() {
-    $("voidBackBtn")?.addEventListener("click", () => window._H?.setTab?.("chats"));
-    $("voidCreateFileBtn")?.addEventListener("click", createFile);
-    $("voidCreateFolderBtn")?.addEventListener("click", createFolder);
-    $("voidRefreshBtn")?.addEventListener("click", renderAll);
-    $("voidFinderTrashBtn")?.addEventListener("click", finderTrashButtonAction);
-    $("voidFinderSettingsBtn")?.addEventListener("click", openVoidSettings);
-    $("voidFinderToggleBtn")?.addEventListener("click", () => setFinderCollapsed(!finderCollapsed));
-    $("voidFinderClose")?.addEventListener("click", () => setFinderCollapsed(true));
-    $("voidEditModeBtn")?.addEventListener("click", () => {
-      forceEditMode = !forceEditMode;
-      const target = selectedId ? getItem(selectedId) : (state.activeFolderId !== ROOT_ID ? getItem(state.activeFolderId) : null);
-      log(forceEditMode
-        ? target
-          ? `Edit Mode on. Sending context for /${target.path}.`
-          : "Edit Mode on. Existing project context will be sent."
-        : "Edit Mode off. Existing projects will be hidden from new prompts.",
-        forceEditMode ? "warn" : "ok"
-      );
-      renderEditMode();
-    });
-    $("voidFinderBack")?.addEventListener("click", () => {
-      if (finderHistoryIdx > 0) {
-        finderHistoryIdx--;
-        state.activeFolderId = finderHistory[finderHistoryIdx];
-        selectedId = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? "" : state.activeFolderId;
-        renderAll();
-      }
-    });
-    $("voidFinderFwd")?.addEventListener("click", () => {
-      if (finderHistoryIdx < finderHistory.length - 1) {
-        finderHistoryIdx++;
-        state.activeFolderId = finderHistory[finderHistoryIdx];
-        selectedId = state.activeFolderId === ROOT_ID || state.activeFolderId === TRASH_ID ? "" : state.activeFolderId;
-        renderAll();
-      }
-    });
-    $("voidFinderViewToggle")?.addEventListener("click", () => {
-      finderViewMode = finderViewMode === "list" ? "grid" : "list";
-      const icon = $("voidFinderViewToggle");
-      if (icon) icon.title = finderViewMode === "list" ? "Switch to grid view" : "Switch to list view";
-      renderAll();
-    });
-    initFinderInteract();
-    initTerminalInteract();
-
-    // Chat input
-    const chatInput = $("voidChatInput");
-    function resizeChatInput() {
-      if (!chatInput) return;
-      chatInput.style.height = "auto";
-      chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
-    }
-    chatInput?.addEventListener("input", resizeChatInput);
-    chatInput?.addEventListener("keydown", e => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        initVoidChatApi().sendChatMessage(e.currentTarget.value);
-        // reset height after send
-        setTimeout(() => { if (chatInput) { chatInput.style.height = "auto"; } }, 0);
-      }
-    });
-    $("voidChatSend")?.addEventListener("click", () => {
-      initVoidChatApi().sendChatMessage($("voidChatInput")?.value || "");
-      if (chatInput) chatInput.style.height = "auto";
-    });
-    $("voidChatModelSelect")?.addEventListener("change", e => {
-      const chat = initVoidChatApi();
-      chat.setLockedModel(e.currentTarget.value || null);
-      log(e.currentTarget.value ? `Virtual OS agent route selected: ${e.currentTarget.selectedOptions?.[0]?.textContent || e.currentTarget.value}` : "Virtual OS agent route reset.", e.currentTarget.value ? "ok" : "warn");
-    });
-
-    // Terminal open/close/clear
-    $("voidTermOpenBtn")?.addEventListener("click", openTerminal);
-    $("voidTermClose")?.addEventListener("click", () => {
-      $("voidTerminal")?.classList.add("void-term-hidden");
-      const btn = $("voidTermOpenBtn");
-      if (btn) btn.style.display = "";
-    });
-    $("voidTermClearBtn")?.addEventListener("click", () => { termLines = []; renderTermOutput(); });
-
-    // Terminal keyboard input
-    $("voidTermInput")?.addEventListener("keydown", e => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const input = e.currentTarget;
-        const cmd   = input.value.trim();
-        input.value = "";
-        if (!cmd) return;
-        termHistory.unshift(cmd);
-        if (termHistory.length > 100) termHistory.pop();
-        termHistIdx = -1;
-        appendTermLine((termCwd === "/" ? "~" : "~" + termCwd) + " $ " + cmd, "cmd");
-        const result = termExec(cmd);
-        if (result === "__clear__") { termLines = []; renderTermOutput(); }
-        else if (result) appendTermLine(result, "out");
-        renderTermPrompt();
-      }
-      if (e.key === "ArrowUp") {
-        e.preventDefault();
-        if (termHistIdx < termHistory.length - 1) {
-          termHistIdx++;
-          e.currentTarget.value = termHistory[termHistIdx] || "";
-        }
-      }
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        if (termHistIdx > 0) { termHistIdx--; e.currentTarget.value = termHistory[termHistIdx] || ""; }
-        else { termHistIdx = -1; e.currentTarget.value = ""; }
-      }
-    });
-
-    // Stop button aborts both generation and chat
-    $("voidStopBtn")?.addEventListener("click", (e) => {
-      if (e.currentTarget.disabled) return;
-      let stopped = false;
-      if (runAbort)  { runAbort.abort();  stopped = true; }
-      const chat = initVoidChatApi();
-      if (chat.getChatAbort()) { chat.abortChat(); stopped = true; }
-      if (stopped) log("Stopped by user", "warn");
-    });
-    // Wallpaper
-    $("voidWallpaperBtn")?.addEventListener("click", e => {
-      e.stopPropagation();
-      const menu = $("voidWallpaperMenu");
-      if (!menu) return;
-      setWallpaperMenu(menu.hasAttribute("hidden"));
-    });
-    $("voidWallpaperUpload")?.addEventListener("click", () => {
-      setWallpaperMenu(false);
-      $("voidWallpaperInput")?.click();
-    });
-    $("voidWallpaperReset")?.addEventListener("click", () => {
-      setWallpaperMenu(false);
-      deleteWallpaperBlob().then(() => applyWallpaper());
-      log("Wallpaper reset to default", "ok");
-    });
-    $("voidWallpaperInput")?.addEventListener("change", e => {
-      const file = e.target.files?.[0];
-      if (!file || !file.type.startsWith("image/")) return;
-      saveWallpaperBlob(file).then(() => applyWallpaper());
-      log(`Wallpaper set to ${file.name}`, "ok");
-      e.target.value = "";
-    });
-    // Close wallpaper menu when clicking outside
-    document.addEventListener("click", e => {
-      if (!e.target.closest("#voidWallpaperWrap")) setWallpaperMenu(false);
-    });
-    $("voidImportBtn")?.addEventListener("click", () => $("voidFileInput")?.click());
-    $("voidDeleteSelectedBtn")?.addEventListener("click", () => {
-      if (!selectedId) {
-        log("Select a file or folder first.", "warn");
-        return;
-      }
-      deleteItem(selectedId);
-    });
-    $("voidUploadFolderBtn")?.addEventListener("click", () => $("voidFolderInput")?.click());
-    $("voidDownloadFolderBtn")?.addEventListener("click", () => {
-      const sel = selectedId ? getItem(selectedId) : null;
-      if (sel?.type === "folder") downloadFolder(sel.id);
-    });
-    $("voidDeleteAllBtn")?.addEventListener("click", deleteAll);
-    $("voidFileInput")?.addEventListener("change", e => handleUpload(e.target.files, false).then(() => { e.target.value = ""; }));
-    $("voidFolderInput")?.addEventListener("change", e => handleUpload(e.target.files, true).then(() => { e.target.value = ""; }));
-    $("voidExportZipBtn")?.addEventListener("click", exportZip);
-    $("voidEditorClose")?.addEventListener("click", closeEditor);
-    $("voidEditorSave")?.addEventListener("click", saveEditor);
-    $("voidEditorDownload")?.addEventListener("click", () => downloadItem(getItem(editingId)));
-    $("voidEditor")?.addEventListener("click", e => { if (e.target === $("voidEditor")) closeEditor(); });
-    $("voidDialogClose")?.addEventListener("click", () => closeDialog(null));
-    $("voidDialogCancel")?.addEventListener("click", () => closeDialog(null));
-    $("voidDialogOk")?.addEventListener("click", () => {
-      const input = $("voidDialogInput");
-      closeDialog(input.style.display === "none" ? true : input.value);
-    });
-    $("voidDialogInput")?.addEventListener("keydown", e => {
-      if (e.key === "Enter") closeDialog(e.currentTarget.value);
-      if (e.key === "Escape") closeDialog(null);
-    });
-    $("voidDialog")?.addEventListener("click", e => { if (e.target === $("voidDialog")) closeDialog(null); });
-
-    // Execution trace toggle
-    $("voidTraceToggle")?.addEventListener("click", e => {
-      e.stopPropagation();
-      const tc = $("voidTraceConsole");
-      if (!tc) return;
-      if (tc.classList.contains("collapsed")) tc.classList.replace("collapsed", "expanded");
-      else tc.classList.replace("expanded", "collapsed");
-    });
-
-    // Trace clear
-    $("voidTraceClearBtn")?.addEventListener("click", e => {
-      e.stopPropagation();
-      const entries = $("voidTraceEntries");
-      if (entries) entries.innerHTML = "";
-      const summary = $("voidTraceSummary");
-      if (summary) summary.textContent = "Cleared";
-      const dot = $("voidTraceDot");
-      if (dot) dot.className = "void-trace-dot";
-    });
-
-    const desktop = $("voidDesktop");
-    desktop?.addEventListener("click", e => {
-      if (e.target.closest(".void-desktop-icon")) return;
-      clearDesktopSelection();
-    });
-    desktop?.addEventListener("dragover", e => {
-      e.preventDefault();
-      if (hasDragType(e, "application/x-void-system-icon")) e.dataTransfer.dropEffect = "move";
-      else if (hasDragType(e, "Files")) e.dataTransfer.dropEffect = "copy";
-      else if (hasDragType(e, "text/plain")) e.dataTransfer.dropEffect = "move";
-    });
-    desktop?.addEventListener("drop", async e => {
-      e.preventDefault();
-      const box = desktop.getBoundingClientRect();
-      const dragOffset = getDragOffset(e);
-      const desktopPosition = {
-        x: e.clientX - box.left - dragOffset.x,
-        y: e.clientY - box.top - dragOffset.y,
-      };
-      const systemIconId = getSystemIconDrag(e);
-      if (systemIconId) {
-        if (await moveSystemIcon(systemIconId, desktopPosition)) renderAll();
-        return;
-      }
-      if (e.dataTransfer.files?.length) {
-        await handleUpload(e.dataTransfer.files, false, ROOT_ID);
-        return;
-      }
-      const item = getDragItem(e);
-      if (!item) return;
-      if (await moveItemToParent(item.id, ROOT_ID, desktopPosition)) {
-        state.activeFolderId = ROOT_ID;
-        log(`Moved to Virtual OS root`, "ok");
-        renderAll();
-      }
-    });
   }
 
   // ── Wallpaper ────────────────────────────────────────────────────
@@ -2581,35 +1745,7 @@ ${buildDynamicImageInstruction(prompt)}`
   }
 
   async function mount() {
-    mounted = true;
-    finderCollapsed = true;   // always start with Finder closed
-    initVoidChatApi().resetSession();
-    // Apply the hide class immediately — before wireEvents/clampFinder runs —
-    // so the finder never flashes visible during the gap before renderAll().
-    const wrapEl = document.getElementById("virtual-os-wrap");
-    if (wrapEl) wrapEl.classList.add("finder-collapsed");
-    // Clear stale inline position so clampFinder recalculates default placement
-    const finderEl = document.getElementById("voidFinder");
-    if (finderEl) { finderEl.style.width = ""; finderEl.style.height = ""; finderEl.style.left = ""; finderEl.style.top = ""; }
-    const term = $("voidTerminal");
-    const termBtn = $("voidTermOpenBtn");
-    if (term && termBtn) {
-      termBtn.style.display = term.classList.contains("void-term-hidden") ? "" : "none";
-    }
-    if (!initialized) {
-      initialized = true;
-      wireEvents();
-    }
-    if (!clockTimer) clockTimer = setInterval(updateVoidClock, 1000);
-    updateVoidClock();
-    try {
-      await loadProjects();
-      applyWallpaper();
-      renderAll();
-      log("Virtual OS ready. No files touch disk until export.", "ok");
-    } catch (err) {
-      log(err.message || String(err), "error");
-    }
+    return initVoidWireEventsApi().mount();
   }
 
   function destroy() {

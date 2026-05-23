@@ -4,16 +4,18 @@
 import { $, esc, baseName, setExplorerRootLabel, setRouterChip } from './dom-utils.js';
 import { injectAllToolBlocks } from './tool-blocks.js';
 import { createAgentRunApi } from './agent-run.js';
-import { startStatsPolling } from './stats-poll.js';
 import { createTabManager } from './tabs.js';
 import { createTerminalApi } from './terminal.js';
 import { createExplorerApi } from './explorer.js';
+import { createSessionsApi, SESSIONS_KEY, MAX_SESSION_MSG_CHARS } from './sessions.js';
+import { createChatUiApi } from './chat-ui.js';
+import { createDomWiringApi } from './dom-wiring.js';
+import { stopStatsPolling } from './stats-poll.js';
 
 export function createCoderMode(deps) {
   const { sharedState, modelRef, relativeFromRoot } = deps;
 
   return (() => {
-    let mounted            = false;
     let agentCount         = 1;
     const MAX_CONCURRENT   = 2;
     let runAbort           = null;
@@ -24,10 +26,8 @@ export function createCoderMode(deps) {
     const cdrTraceEntriesRef    = { current: [] };
     const cdrTraceStartedAtRef  = { current: Date.now() };
     const terminalBusyRef       = { current: false };
-    const SESSIONS_KEY     = 'hc-coder-sessions';
     const STATE_KEY        = 'hashui_coder_state';
     const TABS_KEY         = 'miraxcode_coder_tabs';
-    let _chatVirtual       = null;
     let _editorPane        = null;
     let _ideCtx            = null;
     let _graphifyContext   = '';
@@ -67,12 +67,14 @@ export function createCoderMode(deps) {
     let _runTabId          = null;
     /** File-change array pinned to the tab that started the current run. */
     let _runFileChanges    = null;
-    let _domWired          = false;
     let _powerWired        = false;
-    let _onTraceDocClick   = null;
-    let _onCoderKeydown    = null;
-    let _onSymbolKeydown   = null;
-    let _onModelsUpdated   = null;
+    const domListenerRefs  = {
+      onTraceDocClick: null,
+      onCoderKeydown: null,
+      onSymbolKeydown: null,
+      onModelsUpdated: null,
+    };
+    const domHooks         = {};
     const MAX_TAB_MSGS     = 120;
     const MAX_TAB_FC       = 40;
 
@@ -144,6 +146,25 @@ export function createCoderMode(deps) {
     let onTabSwitch;
     let onTabClose;
     let onTabNew;
+    let getChatVirtual;
+    let enterChatLiveMode;
+    let scrollMessages;
+    let renderMarkdown;
+    let renderConversation;
+    let appendUserMsg;
+    let appendAssistantBubble;
+    let appendThinking;
+    let appendToolBlock;
+    let finalizeToolBlock;
+    let appendTextToBubble;
+    let clearChatUI;
+    let saveCurrentSession;
+    let renderSessions;
+    let clearChat;
+    let showChangeOverlay;
+    let closeChangeOverlay;
+    let enforceThreeWordName;
+    let clearAllSessions;
 
     function abortActiveRun(reason) {
       if (!runAbort) return;
@@ -198,8 +219,6 @@ export function createCoderMode(deps) {
         clearChatUI,
       }));
     }
-
-    wireTabManager();
 
     async function refreshGitStatus() {
       const list = $('cdrGitList');
@@ -297,7 +316,7 @@ export function createCoderMode(deps) {
         if (panel) { panel.hidden = false; $('cdrSearchInput')?.focus(); }
       });
       $('cdrGitRefresh')?.addEventListener('click', () => refreshGitStatus());
-      _onSymbolKeydown = (e) => {
+      domListenerRefs.onSymbolKeydown = (e) => {
         if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.key.toLowerCase() !== 'o') return;
         if (!document.body.classList.contains('coder-mode')) return;
         e.preventDefault();
@@ -305,7 +324,7 @@ export function createCoderMode(deps) {
         if (inp) { inp.focus(); inp.select(); }
         else HC?.guard?.notify?.('Open a project to scan symbols first', 'info');
       };
-      document.addEventListener('keydown', _onSymbolKeydown);
+      document.addEventListener('keydown', domListenerRefs.onSymbolKeydown);
       if (window.CdrMentions) {
         window.CdrMentions.attach($('cdrTaskInput'), {
           getProjectRoot: () => sharedState.projectRoot,
@@ -364,40 +383,6 @@ export function createCoderMode(deps) {
         ]);
       }
       refreshGitStatus();
-    }
-
-    function clearChatUI() {
-      activeContentEl = null;
-      enterChatLiveMode();
-      const msgs = $('cdrMessages');
-      if (msgs) {
-        msgs.innerHTML = `<div class="cdr-welcome">
-          <div class="cdr-welcome-hero">
-            <img src="/assets/logo-mark.png" class="cdr-welcome-mark" draggable="false" alt=""/>
-            <div class="cdr-welcome-copy">
-              <h1 class="cdr-welcome-title">Coder Mode</h1>
-              <p class="cdr-welcome-sub">Surgical AI tasks · auto-routed · local-first</p>
-            </div>
-          </div>
-          <div class="cdr-welcome-chips">
-            <span class="cdr-welcome-chip" data-prompt="List all files in the project and give me a quick overview of the codebase structure">Explore codebase</span>
-            <span class="cdr-welcome-chip" data-prompt="Find all TODO and FIXME comments in the project">Find TODOs</span>
-            <span class="cdr-welcome-chip" data-prompt="Check for any obvious bugs or issues in the main source files">Debug &amp; audit</span>
-            <span class="cdr-welcome-chip" data-prompt="Write unit tests for the core functionality">Write tests</span>
-          </div>
-        </div>`;
-        msgs.querySelectorAll('.cdr-welcome-chip').forEach(chip => {
-          chip.addEventListener('click', () => {
-            const ti = $('cdrTaskInput');
-            if (!ti || !chip.dataset.prompt) return;
-            ti.value = chip.dataset.prompt;
-            autoResize(ti);
-            ti.focus();
-          });
-        });
-      }
-      setStatus('Ready', '');
-      setRouterChip('Auto', '');
     }
 
     function updatePendingChangesHeader() {
@@ -503,87 +488,6 @@ export function createCoderMode(deps) {
     }
     function clearCoderState() {
       try { localStorage.removeItem(STATE_KEY); } catch {}
-    }
-
-    // ── Mount / destroy ───────────────────────────────────────
-    function mount() {
-      if (mounted) return;
-      mounted = true;
-      // Init tabs: restore or create first
-      const loaded = _tabMgr.load();
-      if (!loaded) _initFirstTab();
-      wireDom();
-      window.CdrComposerAttachments?.loadFromTab?.(_tabMgr.active());
-      syncProjectLabel();
-      setRouterChip('Auto', '');
-      if (sharedState.projectRoot) {
-        HC?.guard?.setProjectRoot?.(sharedState.projectRoot);
-        if (HC?.code) HC.code.getProjectRoot = () => sharedState.projectRoot;
-      }
-      syncCoderGuardToggles();
-      refreshCoderSkills();
-      refreshGraphifyForProject();
-      if (HC?.isTauri && !sharedState.homeDir) {
-        HC.invoke('shell_run', { command: 'sh', args: ['-c', 'echo $HOME'], cwd: null })
-          .then(r => {
-            if (r?.stdout?.trim()) {
-              sharedState.homeDir = r.stdout.trim();
-              refreshCoderSkills();
-            }
-          })
-          .catch(() => {});
-      }
-      restoreCoderState();
-      initCoderPowerFeatures();
-      // Restore active tab conversation
-      if (_conversationMsgs.length) renderConversation();
-      renderTabBar();
-      renderFileChangePills();
-      syncTerminalPrompt();
-      updateCoderContextChip(_conversationMsgs);
-    }
-
-    function remount() {
-      populateModelPicker();
-      renderSessions();
-      renderTabBar();
-    }
-
-    function destroy() {
-      mounted = false;
-      _runGeneration++;
-      abortActiveRun('Coder unmounted');
-      if (_statsInterval) {
-        clearInterval(_statsInterval);
-        _statsInterval = null;
-      }
-      if (_onTraceDocClick) {
-        document.removeEventListener('click', _onTraceDocClick);
-        _onTraceDocClick = null;
-      }
-      if (_onCoderKeydown) {
-        document.removeEventListener('keydown', _onCoderKeydown);
-        _onCoderKeydown = null;
-      }
-      if (_onSymbolKeydown) {
-        document.removeEventListener('keydown', _onSymbolKeydown);
-        _onSymbolKeydown = null;
-      }
-      if (_onModelsUpdated) {
-        document.removeEventListener('miraxcode:models-updated', _onModelsUpdated);
-        _onModelsUpdated = null;
-      }
-      _domWired = false;
-      _powerWired = false;
-      const pane = $('cdrEditorPane');
-      if (pane) pane._wired = false;
-      _lspDiagUnsub?.();
-      _lspDiagUnsub = null;
-      _ideCtx = null;
-      window.CdrMarkdown?.terminate?.();
-      _editorPane?.dispose?.();
-      _editorPane = null;
-      activeContentEl = null;
     }
 
     function syncCoderGuardToggles() {
@@ -706,183 +610,6 @@ export function createCoderMode(deps) {
       }
     }
 
-    // ── DOM wiring ────────────────────────────────────────────
-    function wireDom() {
-      if (_domWired) return;
-      _domWired = true;
-      const runBtn            = $('cdrRunBtn');
-      const stopBtn           = $('cdrStopBtn');
-      const backBtn           = $('cdrBackBtn');
-      const auditBtn          = $('cdrAuditBtn');
-      const resetPermsBtn     = $('cdrResetPermsBtn');
-      const exportBtn         = $('cdrExportBtn');
-      const clearBtn          = $('cdrClearChatBtn');
-      const taskInput         = $('cdrTaskInput');
-      const leftAddFileBtn    = $('cdrLeftAddFileBtn');
-      const leftAddFolderBtn  = $('cdrLeftAddFolderBtn');
-      const clearFilesBtn     = $('cdrClearFilesBtn');
-      const sessionsClearAll  = $('cdrSessionsClearAllBtn');
-      const sessionsSearchEl  = $('cdrSessionsSearch');
-
-      if (runBtn)            runBtn.addEventListener('click', startRun);
-      if (stopBtn)           stopBtn.addEventListener('click', stopRun);
-      if (backBtn)           backBtn.addEventListener('click', goBack);
-      if (clearBtn)          clearBtn.addEventListener('click', clearChat);
-      if (leftAddFileBtn)    leftAddFileBtn.addEventListener('click', openFile);
-      if (leftAddFolderBtn)  leftAddFolderBtn.addEventListener('click', openProject);
-      if (clearFilesBtn)     clearFilesBtn.addEventListener('click', clearFilesPanel);
-      if (auditBtn)          auditBtn.addEventListener('click', showAuditLog);
-      if (resetPermsBtn)     resetPermsBtn.addEventListener('click', () => {
-        if (!window.confirm('Revoke all session permissions you granted this session? The agent will ask again before any write or shell operation.')) return;
-        HC.guard.clearSession?.();
-      });
-
-      const traceBtn   = $('cdrTraceBtn');
-      const tracePanel = $('cdrTracePanel');
-      const traceClear = $('cdrTraceClear');
-      if (traceBtn && tracePanel) {
-        traceBtn.addEventListener('click', e => {
-          e.stopPropagation();
-          tracePanel.classList.toggle('open');
-          renderCdrTrace();
-        });
-        tracePanel.addEventListener('click', e => e.stopPropagation());
-      }
-      if (traceClear) traceClear.addEventListener('click', () => cdrTraceReset('Trace cleared'));
-      _onTraceDocClick = () => $('cdrTracePanel')?.classList.remove('open');
-      document.addEventListener('click', _onTraceDocClick);
-      if (exportBtn)         exportBtn.addEventListener('click', exportChat);
-      if (sessionsClearAll)  sessionsClearAll.addEventListener('click', async () => {
-        try { localStorage.removeItem(SESSIONS_KEY); } catch {}
-        renderSessions();
-      });
-      if (sessionsSearchEl)  sessionsSearchEl.addEventListener('input', () => renderSessions(sessionsSearchEl.value));
-
-      const yoloEl = $('cdrYoloMode');
-      const bypassEl = $('cdrBypassPerms');
-      const skillsChip = $('cdrSkillsChip');
-      if (yoloEl) {
-        yoloEl.addEventListener('change', () => {
-          HC?.guard?.setYoloMode?.(yoloEl.checked);
-          syncCoderGuardToggles();
-          refreshSystemPromptInConversation();
-        });
-      }
-      if (bypassEl) {
-        bypassEl.addEventListener('change', () => {
-          if (yoloEl?.checked) return;
-          HC?.guard?.setBypassPermissions?.(bypassEl.checked);
-          syncCoderGuardToggles();
-          refreshSystemPromptInConversation();
-        });
-      }
-      if (skillsChip) {
-        skillsChip.addEventListener('click', () => {
-          refreshCoderSkills({ force: true });
-        });
-      }
-      const graphChip = $('cdrGraphChip');
-      if (graphChip) {
-        graphChip.addEventListener('click', () => {
-          if (!sharedState.projectRoot) {
-            HC?.guard?.notify?.('Open a project folder first', 'info');
-            return;
-          }
-          refreshGraphifyForProject({ force: true });
-        });
-      }
-
-      const mainModel = document.getElementById('model');
-      if (mainModel) {
-        mainModel.addEventListener('change', () => {
-          const mp = $('cdrModelPicker');
-          if (!mp || mp.value) return;
-          onCoderModelChanged(mainModel.options[mainModel.selectedIndex]?.text || 'Auto', false);
-        });
-      }
-
-      // Terminal wiring
-      const termInput = $('cdrTerminalInput');
-      const termClear = $('cdrTerminalClear');
-      if (termInput) termInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { onTerminalKey(e); return; }
-        if (navigateTermHistory(e, termInput)) return;
-      });
-      if (termClear) termClear.addEventListener('click', clearTerminal);
-
-      const sessionsClearBtn = $('cdrSessionsClearBtn');
-      if (sessionsClearBtn) sessionsClearBtn.addEventListener('click', () => {
-        try { localStorage.removeItem(SESSIONS_KEY); } catch {}
-        renderSessions();
-      });
-
-      const overlayClose = $('cdrChangeOverlayClose');
-      if (overlayClose) overlayClose.addEventListener('click', closeChangeOverlay);
-      const overlay = $('cdrChangeOverlay');
-      if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeChangeOverlay(); });
-
-      // Tab bar wiring
-      const tabAddBtn = document.getElementById('cdrTabAdd');
-      if (tabAddBtn) tabAddBtn.addEventListener('click', onTabNew);
-
-      // Ctrl+T for new tab
-      _onCoderKeydown = (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key === 't' && document.getElementById('coder-mode-wrap')?.style.display !== 'none') {
-          if (document.body.classList.contains('coder-mode')) {
-            e.preventDefault();
-            onTabNew();
-          }
-        }
-      };
-      document.addEventListener('keydown', _onCoderKeydown);
-
-      renderSessions();
-      initExplorerContextMenu();
-      wireChangeRowDelegation();
-
-      // Quick-action chips on welcome screen
-      document.querySelectorAll('.cdr-welcome-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          const prompt = chip.dataset.prompt;
-          if (!prompt || !taskInput) return;
-          taskInput.value = prompt;
-          autoResize(taskInput);
-          taskInput.focus();
-        });
-      });
-
-      document.querySelectorAll('.cdr-agent-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.querySelectorAll('.cdr-agent-btn').forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
-          agentCount = parseInt(btn.dataset.agents, 10) || 1;
-        });
-      });
-
-      if (taskInput) {
-        taskInput.addEventListener('keydown', e => {
-          if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); startRun(); }
-        });
-        taskInput.addEventListener('input', () => autoResize(taskInput));
-      }
-
-      populateModelPicker();
-      window.CdrComposerAttachments?.mount?.({
-        getTab: () => _tabMgr.active(),
-        onChange: () => _tabMgr.save(),
-      });
-      _onModelsUpdated = () => populateModelPicker();
-      document.addEventListener('miraxcode:models-updated', _onModelsUpdated);
-      const modelPicker = $('cdrModelPicker');
-      if (modelPicker) {
-        modelPicker.addEventListener('change', () => {
-          modelRef.current = modelPicker.value || null;
-          applyCoderModelToUi(true);
-        });
-      }
-      startStatsPolling();
-    }
-
     // Models known to reliably support structured tool/function calling.
     // Providers not listed here are excluded from the coder mode picker.
     function populateModelPicker() {
@@ -975,461 +702,68 @@ export function createCoderMode(deps) {
       setStatus,
     });
 
-    // ── Chat rendering ────────────────────────────────────────
-    const MAX_RENDER_MSGS = 80;
-    const MAX_SESSION_MSG_CHARS = 16_000;
-    let _scrollRaf = 0;
+    ({
+      getChatVirtual,
+      enterChatLiveMode,
+      scrollMessages,
+      renderMarkdown,
+      renderConversation,
+      appendUserMsg,
+      appendAssistantBubble,
+      appendThinking,
+      appendToolBlock,
+      finalizeToolBlock,
+      appendTextToBubble,
+      clearChatUI,
+      buildUserMsgElement,
+      buildAssistantMsgElement,
+    } = createChatUiApi({
+      getConversationMsgs: () => _conversationMsgs,
+      getDomScrollBatch: () => _domScrollBatch,
+      setActiveContentEl: (v) => { activeContentEl = v; },
+      setStatus,
+      autoResize,
+      getRunAbort: () => runAbort,
+      setRunAbort: (v) => { runAbort = v; },
+      getRunGeneration: () => _runGeneration,
+      bumpRunGeneration: () => ++_runGeneration,
+      getRunTabId: () => _runTabId,
+      setRunTabId: (v) => { _runTabId = v; },
+      getRunFileChanges: () => _runFileChanges,
+      setRunFileChanges: (v) => { _runFileChanges = v; },
+      getFileChanges: () => _fileChanges,
+      getTabMgr: () => _tabMgr,
+      renderTabBar: () => renderTabBar?.(),
+      getRunSingleTurn: () => runSingleTurn,
+      abortActiveRun,
+      incToolCallCounter: () => ++toolCallCounter,
+    }));
 
-    function getChatVirtual() {
-      if (!_chatVirtual && window.CdrChatVirtual) {
-        const el = $('cdrMessages');
-        if (el) _chatVirtual = new window.CdrChatVirtual(el);
-      }
-      return _chatVirtual;
-    }
+    ({
+      saveCurrentSession,
+      renderSessions,
+      clearChat,
+      showChangeOverlay,
+      closeChangeOverlay,
+      enforceThreeWordName,
+      clearAllSessions,
+    } = createSessionsApi({
+      modelRef,
+      getTabMgr: () => _tabMgr,
+      getConversationMsgs: () => _conversationMsgs,
+      getFileChanges: () => _fileChanges,
+      setActiveContentEl: (v) => { activeContentEl = v; },
+      shortModelLabel,
+      populateModelPicker,
+      applyCoderModelToUi,
+      renderTabBar: () => renderTabBar?.(),
+      renderConversation,
+      setStatus,
+      clearChatUI,
+      updateCoderContextChip,
+    }));
 
-    function enterChatLiveMode() {
-      getChatVirtual()?.enterLiveMode();
-    }
-
-    function scrollMessages(force = false) {
-      if (_domScrollBatch > 0 && !force) return;
-      const v = getChatVirtual();
-      if (v && !v.isLiveMode()) {
-        v.scrollToBottom(force);
-        return;
-      }
-      const el = $('cdrMessages');
-      if (!el) return;
-      if (force) {
-        if (_scrollRaf) cancelAnimationFrame(_scrollRaf);
-        _scrollRaf = 0;
-        el.scrollTop = el.scrollHeight;
-        return;
-      }
-      if (_scrollRaf) return;
-      _scrollRaf = requestAnimationFrame(() => {
-        _scrollRaf = 0;
-        el.scrollTop = el.scrollHeight;
-      });
-    }
-
-    function renderMarkdown(text) {
-      if (!text) return '';
-      if (window.marked) {
-        try {
-          const html = window.marked.parse(text, { breaks: true, gfm: true });
-          if (window.DOMPurify) return window.DOMPurify.sanitize(html);
-          // DOMPurify not available — fall through to safe plain-text render
-        } catch {}
-      }
-      return esc(text).replace(/\n/g, '<br>');
-    }
-
-    function scheduleMarkdownHtml(el, text) {
-      if (!el || !text || !window.CdrMarkdown?.renderAsync) return;
-      window.CdrMarkdown.renderAsync(text).then(html => {
-        if (html) el.innerHTML = html;
-      }).catch(() => {});
-    }
-
-    function buildUserMsgElement(text, attachHtml) {
-      const el = document.createElement('div');
-      el.className = 'cdr-msg user';
-      const svgCopy = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-      const att = attachHtml || '';
-      el.innerHTML = `
-        ${att}
-        <div class="cdr-user-bubble">${esc(text)}</div>
-        <div class="cdr-msg-actions">
-          <button class="cdr-action-btn cdr-act-copy">${svgCopy} copy</button>
-        </div>`;
-      el.querySelector('.cdr-act-copy').addEventListener('click', function () {
-        navigator.clipboard.writeText(text).then(() => {
-          this.classList.add('flash');
-          setTimeout(() => this.classList.remove('flash'), 1200);
-        }).catch(() => {});
-      });
-      return el;
-    }
-
-    function buildAssistantMsgElement(roleLabel, text) {
-      const el = document.createElement('div');
-      el.className = 'cdr-msg assistant';
-      const svgCopy = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-      el.innerHTML = `
-        <div class="cdr-msg-role">${esc(roleLabel || 'MiraXCode Coder')}</div>
-        <div class="cdr-msg-content"></div>
-        <div class="cdr-msg-actions">
-          <button class="cdr-action-btn cdr-act-copy">${svgCopy} copy</button>
-        </div>`;
-      const contentEl = el.querySelector('.cdr-msg-content');
-      if (text) {
-        const div = document.createElement('div');
-        div.className = 'cdr-msg-text';
-        const shown = text.length > 48_000 ? text.slice(0, 48_000) + '\n\n… (truncated for display)' : text;
-        div.innerHTML = renderMarkdown(shown);
-        scheduleMarkdownHtml(div, shown);
-        contentEl.appendChild(div);
-      }
-      el.querySelector('.cdr-act-copy')?.addEventListener('click', function () {
-        const txt = contentEl.innerText || contentEl.textContent || '';
-        navigator.clipboard.writeText(txt).then(() => {
-          this.classList.add('flash');
-          setTimeout(() => this.classList.remove('flash'), 1200);
-        }).catch(() => {});
-      });
-      return el;
-    }
-
-    function appendUserMsg(text, attachHtml) {
-      const msgs = $('cdrMessages');
-      if (!msgs) return;
-      enterChatLiveMode();
-      msgs.querySelector('.cdr-welcome')?.remove();
-      const el = buildUserMsgElement(text, attachHtml);
-      msgs.appendChild(el);
-      scrollMessages();
-    }
-
-    function appendAssistantBubble(roleLabel) {
-      const msgs = $('cdrMessages');
-      if (!msgs) return null;
-      enterChatLiveMode();
-      msgs.querySelector('.cdr-welcome')?.remove();
-      const el = document.createElement('div');
-      el.className = 'cdr-msg assistant' + (roleLabel && roleLabel !== 'MiraXCode Coder' ? ' boss' : '');
-
-      const svgCopy  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-      const svgReply = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>`;
-      const svgRegen = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.18"/></svg>`;
-
-      el.innerHTML = `
-        <div class="cdr-msg-role">${esc(roleLabel || 'MiraXCode Coder')}</div>
-        <div class="cdr-msg-content"></div>
-        <div class="cdr-msg-actions">
-          <button class="cdr-action-btn cdr-act-copy">${svgCopy} copy</button>
-          <button class="cdr-action-btn cdr-act-reply">${svgReply} reply</button>
-          <button class="cdr-action-btn cdr-act-regen">${svgRegen} regen</button>
-        </div>`;
-
-      const contentEl = el.querySelector('.cdr-msg-content');
-
-      el.querySelector('.cdr-act-copy').addEventListener('click', function () {
-        const txt = contentEl.innerText || contentEl.textContent || '';
-        navigator.clipboard.writeText(txt).then(() => {
-          this.classList.add('flash');
-          setTimeout(() => this.classList.remove('flash'), 1200);
-        }).catch(() => {});
-      });
-
-      el.querySelector('.cdr-act-reply').addEventListener('click', () => {
-        const ti = $('cdrTaskInput');
-        if (!ti) return;
-        const raw = (contentEl.innerText || contentEl.textContent || '').trim().slice(0, 300);
-        const quoted = raw.split('\n').map(l => '> ' + l).join('\n');
-        ti.value = quoted + '\n\n';
-        autoResize(ti);
-        ti.focus();
-        ti.setSelectionRange(ti.value.length, ti.value.length);
-      });
-
-      el.querySelector('.cdr-act-regen').addEventListener('click', async () => {
-        if (runAbort) return;
-        for (let i = _conversationMsgs.length - 1; i >= 0; i--) {
-          if (_conversationMsgs[i].role === 'assistant') { _conversationMsgs.splice(i, 1); break; }
-        }
-        el.remove();
-        const runBtn  = $('cdrRunBtn');
-        const stopBtn = $('cdrStopBtn');
-        if (runBtn)  runBtn.style.display = 'none';
-        if (stopBtn) stopBtn.style.display = '';
-        const gen = ++_runGeneration;
-        if (runAbort) abortActiveRun('Regen');
-        runAbort = new AbortController();
-        _runTabId = _tabMgr.active()?.id || null;
-        _runFileChanges = _fileChanges;
-        const tab = _tabMgr.active();
-        if (tab) { tab.running = true; renderTabBar(); }
-        try {
-          await runSingleTurn(runAbort.signal);
-        } catch (e) {
-          if (e?.name !== 'AbortError') {
-            setStatus(e?.message || 'Regen failed', 'err');
-            console.error('[CoderMode] regen failed:', e);
-          }
-        } finally {
-          if (gen !== _runGeneration) return;
-          if (runBtn)  runBtn.style.display = '';
-          if (stopBtn) stopBtn.style.display = 'none';
-          runAbort = null;
-          _runTabId = null;
-          _runFileChanges = null;
-          setRouterChip('Auto', '');
-          const at = _tabMgr.active();
-          if (at) { at.running = false; renderTabBar(); }
-        }
-      });
-
-      msgs.appendChild(el);
-      scrollMessages();
-      return contentEl;
-    }
-
-    function appendThinking(contentEl) {
-      if (!contentEl) return null;
-      const el = document.createElement('div');
-      el.className = 'cdr-thinking';
-      el.innerHTML = '<span></span><span></span><span></span>';
-      contentEl.appendChild(el);
-      scrollMessages();
-      return el;
-    }
-
-    function appendToolBlock(contentEl, name, args) {
-      if (!contentEl) return null;
-      const id = ++toolCallCounter;
-      const icon = TOOL_ICONS[name] || TOOL_ICON_DEFAULT;
-      const argStr = Object.entries(args || {})
-        .filter(([, v]) => v && String(v).length < 60)
-        .slice(0, 2).map(([k, v]) => `${k}=${String(v).slice(0, 38)}`).join(', ');
-
-      const el = document.createElement('details');
-      el.className = 'cdr-tool-call running';
-      el.open = true;
-      el.dataset.id = String(id);
-      el.innerHTML = `
-        <summary class="cdr-tool-summary">
-          <span class="cdr-tool-icon">${icon}</span>
-          <span class="cdr-tool-name">${esc(name)}</span>
-          ${argStr ? `<span class="cdr-tool-args">${esc(argStr)}</span>` : ''}
-          <span class="cdr-tool-status running">running…</span>
-        </summary>
-        <div class="cdr-tool-body">
-          <div class="cdr-tool-result">Working…</div>
-        </div>`;
-      contentEl.appendChild(el);
-      scrollMessages();
-      return el;
-    }
-
-    function finalizeToolBlock(el, result, ok, ms) {
-      if (!el) return;
-      el.classList.remove('running');
-      el.classList.add(ok ? 'ok' : 'err');
-      el.open = false;
-      const status = el.querySelector('.cdr-tool-status');
-      if (status) {
-        status.className = 'cdr-tool-status ' + (ok ? 'ok' : 'err');
-        const svgOk  = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
-        const svgErr = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
-        status.innerHTML = ok ? `${svgOk} ${ms}ms` : `${svgErr} error`;
-      }
-      const resultEl = el.querySelector('.cdr-tool-result');
-      if (resultEl) {
-        resultEl.textContent = (result || '').slice(0, 600) + ((result || '').length > 600 ? '\n…' : '');
-      }
-      scrollMessages();
-    }
-
-    function appendTextToBubble(contentEl, text) {
-      if (!contentEl || !text) return;
-      const el = document.createElement('div');
-      el.className = 'cdr-msg-text';
-      el.innerHTML = renderMarkdown(text);
-      scheduleMarkdownHtml(el, text);
-      contentEl.appendChild(el);
-      scrollMessages();
-    }
-
-    // ── Sessions (past chats) ─────────────────────────────────
-    function loadSessions() {
-      try { return JSON.parse(localStorage.getItem(SESSIONS_KEY) || '[]'); } catch { return []; }
-    }
-    function saveSessions(sessions) {
-      try { localStorage.setItem(SESSIONS_KEY, JSON.stringify(sessions.slice(0, 50))); } catch {}
-    }
-
-    // Cap session names to 3 words max (chat-mode pattern: enforceTwoWordName clone)
-    function enforceThreeWordName(raw) {
-      const words = String(raw || '').trim().split(/\s+/).filter(Boolean);
-      return words.slice(0, 3).join(' ') || 'New Chat';
-    }
-
-    function saveCurrentSession(forTab) {
-      const tab = forTab || _tabMgr.active();
-      if (!tab) return;
-      const msgs = forTab ? (tab.msgs || []) : _conversationMsgs;
-      const userMsgs = msgs.filter(m => m.role === 'user');
-      if (!userMsgs.length) return;
-      const title = enforceThreeWordName(userMsgs[0].content);
-      const now = new Date();
-      const date = now.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
-                   now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-      const session = {
-        id: Date.now(),
-        title,
-        date,
-        model: tab.model ?? modelRef.current ?? null,
-        msgs: msgs.map(m => ({
-          role: m.role,
-          content: typeof m.content === 'string'
-            ? m.content.slice(0, MAX_SESSION_MSG_CHARS)
-            : m.content,
-        })),
-      };
-      const sessions = loadSessions();
-      sessions.unshift(session);
-      saveSessions(sessions);
-      renderSessions();
-    }
-
-    function deleteSession(idx) {
-      const sessions = loadSessions();
-      if (!sessions[idx]) return;
-      sessions.splice(idx, 1);
-      saveSessions(sessions);
-      renderSessions($('cdrSessionsSearch')?.value || '');
-    }
-
-    function renameSession(idx) {
-      const sessions = loadSessions();
-      const s = sessions[idx];
-      if (!s) return;
-      const next = window.prompt('Rename chat (3 words max):', s.title || '');
-      if (next == null) return;
-      const trimmed = enforceThreeWordName(next);
-      if (!trimmed || trimmed === s.title) return;
-      s.title = trimmed;
-      saveSessions(sessions);
-      renderSessions($('cdrSessionsSearch')?.value || '');
-    }
-
-    function renderSessions(filter) {
-      const list = $('cdrSessionsList');
-      if (!list) return;
-      const all = loadSessions();
-      const q = (filter || '').trim().toLowerCase();
-      const sessions = q ? all.filter(s => (s.title || '').toLowerCase().includes(q)) : all;
-      if (!sessions.length) {
-        list.innerHTML = `<div class="cdr-sessions-empty">${q ? 'No chats match your search.' : 'Past conversations will appear here.'}</div>`;
-        return;
-      }
-      // SVGs (no emoji — terminal-themed icons)
-      const editSvg   = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><path d="M11 2.2a1.5 1.5 0 0 1 2.1 2.1L5 12.6 2 13.4 2.8 10.4z"/></svg>`;
-      const deleteSvg = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" width="10" height="10"><path d="M3 5h10M6 5V3.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 .5.5V5M5 5l.7 8a.6.6 0 0 0 .6.5h3.4a.6.6 0 0 0 .6-.5L11 5"/></svg>`;
-      list.innerHTML = sessions.map(s => {
-        const realIdx = all.indexOf(s);
-        const userCount = s.msgs.filter(m => m.role === 'user').length;
-        const modelNote = s.model ? shortModelLabel(s.model) : '';
-        return `
-        <div class="cdr-session-item" data-idx="${realIdx}">
-          <div class="cdr-session-row">
-            <div class="cdr-session-title">${esc(s.title)}</div>
-            <div class="cdr-session-actions">
-              <button class="cdr-session-act" data-act="rename" title="Rename chat">${editSvg}</button>
-              <button class="cdr-session-act cdr-session-del" data-act="delete" title="Delete chat">${deleteSvg}</button>
-            </div>
-          </div>
-          <div class="cdr-session-meta">${esc(s.date)} &middot; ${userCount} msg${userCount !== 1 ? 's' : ''}${modelNote ? ` &middot; ${esc(modelNote)}` : ''}</div>
-        </div>`;
-      }).join('');
-      list.querySelectorAll('.cdr-session-item').forEach(item => {
-        const idx = parseInt(item.dataset.idx, 10);
-        item.addEventListener('click', (e) => {
-          // Ignore clicks that originated on the action buttons
-          if (e.target.closest('.cdr-session-actions')) return;
-          const sessions = loadSessions();
-          if (!sessions[idx]) return;
-          restoreSession(sessions[idx]);
-        });
-        const rn = item.querySelector('[data-act="rename"]');
-        const dl = item.querySelector('[data-act="delete"]');
-        if (rn) rn.addEventListener('click', (e) => { e.stopPropagation(); renameSession(idx); });
-        if (dl) dl.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('Delete this saved chat?')) deleteSession(idx); });
-      });
-    }
-
-    function restoreSession(session) {
-      if (!session?.msgs?.length) return;
-      _conversationMsgs.length = 0;
-      session.msgs.forEach(m => _conversationMsgs.push(m));
-      _fileChanges.length = 0;
-      modelRef.current = session.model ?? null;
-      const tab = _tabMgr.active();
-      if (tab) {
-        tab.title = session.title || tab.title;
-        tab.model = modelRef.current;
-        _tabMgr.save();
-      }
-      populateModelPicker();
-      applyCoderModelToUi(!!modelRef.current);
-      renderTabBar();
-      renderConversation();
-      setStatus('Ready', '');
-    }
-
-    function renderConversation() {
-      const msgs = $('cdrMessages');
-      if (!msgs) return;
-      const hidden = Math.max(0, _conversationMsgs.length - MAX_RENDER_MSGS);
-      const slice = hidden > 0 ? _conversationMsgs.slice(-MAX_RENDER_MSGS) : _conversationMsgs;
-      const display = slice.filter(m =>
-        m.role === 'user' || (m.role === 'assistant' && m.content)
-      );
-      const v = getChatVirtual();
-      if (v && display.length > 12) {
-        v.setMessages(display, (m) => {
-          if (m.role === 'user') return buildUserMsgElement(m.content);
-          return buildAssistantMsgElement('MiraXCode Coder', m.content);
-        }, { hiddenCount: hidden });
-        scrollMessages(true);
-        return;
-      }
-      enterChatLiveMode();
-      msgs.innerHTML = '';
-      if (hidden > 0) {
-        const note = document.createElement('div');
-        note.className = 'cdr-msg-truncated-note';
-        note.textContent = `${hidden} earlier message${hidden === 1 ? '' : 's'} hidden for performance — export chat for full history`;
-        msgs.appendChild(note);
-      }
-      for (const m of display) {
-        if (m.role === 'user') msgs.appendChild(buildUserMsgElement(m.content));
-        else if (m.role === 'assistant') msgs.appendChild(buildAssistantMsgElement('MiraXCode Coder', m.content));
-      }
-      scrollMessages(true);
-    }
-
-    // ── Change overlay ────────────────────────────────────────
-    function showChangeOverlay(idx) {
-      const entry = _fileChanges[idx];
-      if (!entry) return;
-      const overlay = $('cdrChangeOverlay');
-      const title   = $('cdrChangeOverlayTitle');
-      const pre     = $('cdrChangeOverlayPre');
-      if (!overlay || !title || !pre) return;
-      const kindLabels = { write: 'MODIFIED', create: 'CREATED', delete: 'DELETED' };
-      title.textContent = `${kindLabels[entry.kind] || 'CHANGED'} · ${entry.path || entry.name}`;
-      pre.textContent   = entry.content || '(empty)';
-      overlay.classList.add('open');
-    }
-
-    function closeChangeOverlay() {
-      $('cdrChangeOverlay')?.classList.remove('open');
-    }
-
-    function clearChat() {
-      saveCurrentSession();
-      _conversationMsgs.length = 0;
-      _fileChanges.length = 0;
-      activeContentEl = null;
-      const tab = _tabMgr.active();
-      if (tab) tab.compactionLedger = "";
-      clearChatUI();
-      _tabMgr.save();
-      updateCoderContextChip([]);
-    }
+    wireTabManager();
 
     // ── Export — opens a small menu under the Export button with format choices.
     // Formats: txt (plain), code (only fenced code blocks extracted), pdf (rendered).
@@ -1992,6 +1326,68 @@ ${_conversationMsgs.filter(m => m.role !== 'system').map(m => `
         body.innerHTML = `<div class="hc-audit-empty">Error: ${esc(String(e?.message || e))}</div>`;
       }
     }
+
+    Object.assign(domHooks, {
+      startRun,
+      stopRun,
+      goBack,
+      clearChat,
+      openFile,
+      openProject,
+      clearFilesPanel,
+      showAuditLog,
+      exportChat,
+      renderSessions,
+      refreshSystemPromptInConversation,
+      onCoderModelChanged,
+      onTerminalKey,
+      navigateTermHistory,
+      clearTerminal,
+      closeChangeOverlay,
+      onTabNew,
+      autoResize,
+      initExplorerContextMenu,
+      wireChangeRowDelegation,
+      populateModelPicker,
+      applyCoderModelToUi,
+      cdrTraceReset,
+      renderCdrTrace,
+      setAgentCount: (n) => { agentCount = n; },
+    });
+
+    const { mount, destroy, remount } = createDomWiringApi({
+      sharedState,
+      modelRef,
+      sessionsKey: SESSIONS_KEY,
+      hooks: domHooks,
+      getTabMgr: () => _tabMgr,
+      initFirstTab: _initFirstTab,
+      syncProjectLabel,
+      syncCoderGuardToggles,
+      refreshCoderSkills,
+      refreshGraphifyForProject,
+      restoreCoderState,
+      initCoderPowerFeatures,
+      getConversationMsgs: () => _conversationMsgs,
+      renderConversation,
+      renderTabBar,
+      renderFileChangePills,
+      syncTerminalPrompt,
+      updateCoderContextChip,
+      abortActiveRun,
+      incRunGeneration: () => { _runGeneration++; },
+      getPowerWired: () => _powerWired,
+      setPowerWired: (v) => { _powerWired = v; },
+      getEditorPane: () => _editorPane,
+      setEditorPane: (v) => { _editorPane = v; },
+      getIdeCtx: () => _ideCtx,
+      setIdeCtx: (v) => { _ideCtx = v; },
+      getLspDiagUnsub: () => _lspDiagUnsub,
+      setLspDiagUnsub: (v) => { _lspDiagUnsub = v; },
+      setActiveContentEl: (v) => { activeContentEl = v; },
+      listenerRefs: domListenerRefs,
+      clearStatsPolling: stopStatsPolling,
+    });
 
     return { mount, destroy, remount };
   })();
