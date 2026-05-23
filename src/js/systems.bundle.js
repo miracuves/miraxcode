@@ -52,7 +52,7 @@
     'Choose shell "command" and use "feed" + "timeline" screens to give a developer-tool aesthetic.',
     'Use "cards" for people/products, "timeline" for activity, "metric" for KPIs \u2014 skip tables entirely.'
   ];
-  var VALID_SCREENS = ["dashboard", "list", "kanban", "report", "split", "cards", "timeline", "calendar", "metric", "feed"];
+  var VALID_SCREENS2 = ["dashboard", "list", "kanban", "report", "split", "cards", "timeline", "calendar", "metric", "feed"];
   var FALLBACK_SCREENS = ["kanban", "split", "cards", "report", "timeline", "list", "feed", "calendar", "metric", "list"];
   var ACCENT_PALETTE2 = ["#6366f1", "#a70d2a", "#f59e0b", "#3b82f6", "#ec4899", "#14b8a6", "#8b5cf6", "#f97316", "#06b6d4", "#84cc16"];
   var FINANCE_ENTITY_IDS = {
@@ -1790,240 +1790,10 @@
     };
   }
 
-  // src/js/modes/systems/system-maker.js
-  var SystemMaker = (() => {
-    let mounted = false;
-    let systems = [];
-    let activeId = null;
-    let activeModuleId = "";
-    let selectedRecordId = "";
-    let activeEntityId = "";
-    let sortState = { field: "", dir: "asc" };
-    let searchQuery = "";
-    let runAbort = null;
-    let traceStart = Date.now();
-    let libraryCollapsed = false;
-    let inspectorCollapsed = true;
-    let filterRules = [];
-    let filterPanelOpen = false;
-    let selectedIds = /* @__PURE__ */ new Set();
-    let importState = null;
-    let recordModalIsNew = false;
-    const $ = (id) => document.getElementById(id);
-    function _sysDialog({ msg, showInput, inputDefault, showCancel }) {
-      return new Promise((resolve) => {
-        const overlay = document.getElementById("amkDialog");
-        const msgEl = document.getElementById("amkDialogMsg");
-        const inputEl = document.getElementById("amkDialogInput");
-        const okBtn = document.getElementById("amkDialogOk");
-        const cancelBtn = document.getElementById("amkDialogCancel");
-        if (!overlay) {
-          resolve(showInput ? inputDefault : showCancel ? true : void 0);
-          return;
-        }
-        msgEl.textContent = msg;
-        inputEl.style.display = showInput ? "block" : "none";
-        cancelBtn.style.display = showCancel ? "" : "none";
-        if (showInput) inputEl.value = inputDefault || "";
-        overlay.classList.add("open");
-        if (showInput) setTimeout(() => {
-          inputEl.focus();
-          inputEl.select();
-        }, 80);
-        const cleanup = () => {
-          overlay.classList.remove("open");
-          okBtn.removeEventListener("click", onOk);
-          cancelBtn.removeEventListener("click", onCancel);
-          inputEl.removeEventListener("keydown", onKey);
-        };
-        const onOk = () => {
-          cleanup();
-          resolve(showInput ? inputEl.value : true);
-        };
-        const onCancel = () => {
-          cleanup();
-          resolve(showInput ? null : false);
-        };
-        const onKey = (e) => {
-          if (e.key === "Enter") onOk();
-          if (e.key === "Escape") onCancel();
-        };
-        okBtn.addEventListener("click", onOk);
-        cancelBtn.addEventListener("click", onCancel);
-        inputEl.addEventListener("keydown", onKey);
-      });
-    }
-    const _sysPrompt = (msg, def) => _sysDialog({ msg, showInput: true, inputDefault: def, showCancel: true });
-    const _sysConfirm = (msg) => _sysDialog({ msg, showInput: false, showCancel: true });
-    function setStatus(text, cls = "") {
-      const el = $("sysRunStatus");
-      if (!el) return;
-      el.textContent = text;
-      el.className = `sys-run-status ${cls}`.trim();
-      const dot = $("sysTraceDot");
-      if (dot) {
-        if (cls === "running") dot.className = "sys-trace-dot running";
-        else if (cls === "done") dot.className = "sys-trace-dot done";
-        else if (cls === "error") dot.className = "sys-trace-dot error";
-        else dot.className = "sys-trace-dot";
-      }
-    }
-    const traceIcons = {
-      run: `<svg viewBox="0 0 16 16"><path d="M4 2.5 12.5 8 4 13.5z"/></svg>`,
-      ok: `<svg viewBox="0 0 16 16"><path d="m3 8.5 3 3L13 4"/></svg>`,
-      plan: `<svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/><path d="M5 6h6M5 9h4"/></svg>`,
-      data: `<svg viewBox="0 0 16 16"><ellipse cx="8" cy="3.5" rx="5" ry="2"/><path d="M3 3.5v6c0 1.1 2.2 2 5 2s5-.9 5-2v-6"/><path d="M3 6.5c0 1.1 2.2 2 5 2s5-.9 5-2"/></svg>`,
-      warn: `<svg viewBox="0 0 16 16"><path d="M8 2 14 13H2z"/><path d="M8 6v3M8 11h.01"/></svg>`,
-      err: `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="m5.8 5.8 4.4 4.4M10.2 5.8l-4.4 4.4"/></svg>`
-    };
-    const traceAgentLabel = {
-      run: "Agent",
-      ok: "Done",
-      plan: "Architect",
-      data: "Data Eng",
-      warn: "Warning",
-      err: "Error"
-    };
-    function trace(msg, cls = "run") {
-      const el = $("sysTrace");
-      if (!el) return;
-      const console_ = $("sysTraceConsole");
-      if (console_ && console_.classList.contains("collapsed")) {
-        console_.classList.remove("collapsed");
-        console_.classList.add("expanded");
-      }
-      const t = ((Date.now() - traceStart) / 1e3).toFixed(1);
-      const row = document.createElement("div");
-      row.className = "sys-trace-entry";
-      const agentLabel = traceAgentLabel[cls] || "Agent";
-      row.innerHTML = `<span class="sys-te-time">[${t}s]</span><span class="sys-te-agent sys-te-${cls}">${esc(agentLabel)}</span><span class="sys-te-icon sys-te-${cls}">${traceIcons[cls] || traceIcons.run}</span><span class="sys-te-msg sys-te-${cls}">${esc(msg)}</span>`;
-      el.appendChild(row);
-      el.scrollTop = el.scrollHeight;
-      if (console_) {
-        let entries = console_.querySelector(".sys-trace-entries");
-        if (!entries) {
-          entries = document.createElement("div");
-          entries.className = "sys-trace-entries";
-          console_.appendChild(entries);
-        }
-        entries.appendChild(row.cloneNode(true));
-        entries.scrollTop = entries.scrollHeight;
-      }
-      const dot = $("sysTraceDot");
-      if (dot) dot.className = "sys-trace-dot" + (cls === "err" ? " error" : cls === "ok" ? " done" : " running");
-      const summary = $("sysTraceSummary");
-      if (summary) summary.textContent = msg.slice(0, 70);
-    }
-    function clearTrace() {
-      traceStart = Date.now();
-      const el = $("sysTrace");
-      if (el) el.innerHTML = "";
-      const console_ = $("sysTraceConsole");
-      const entries = console_?.querySelector(".sys-trace-entries");
-      if (entries) entries.innerHTML = "";
-      const dot = $("sysTraceDot");
-      if (dot) dot.className = "sys-trace-dot";
-      const summary = $("sysTraceSummary");
-      if (summary) summary.textContent = "No run yet";
-    }
-    function updateCreateButtonState() {
-      const btn = $("sysCreateBtn");
-      if (!btn) return;
-      const running = !!runAbort;
-      const stopping = running && runAbort.signal?.aborted;
-      btn.disabled = false;
-      btn.textContent = stopping ? "Stopping" : running ? "Stop" : "Generate";
-      btn.classList.toggle("primary", !running);
-      btn.classList.toggle("danger", running);
-      btn.setAttribute("aria-label", running ? "Stop system generation" : "Generate system");
-      btn.title = running ? "Stop the current generation run" : "Generate a new system";
-    }
-    function stopSystemGeneration() {
-      if (!runAbort) return;
-      if (!runAbort.signal?.aborted) {
-        trace("Stop requested \u2014 aborting active generation", "warn");
-        runAbort.abort();
-      }
-      setStatus("Stopping", "running");
-      updateCreateButtonState();
-    }
-    function loadUiState() {
-      try {
-        const saved = JSON.parse(localStorage.getItem(UI_STORE_KEY) || "{}");
-        libraryCollapsed = false;
-        inspectorCollapsed = true;
-      } catch {
-        libraryCollapsed = false;
-        inspectorCollapsed = true;
-      }
-    }
-    function saveUiState() {
-      try {
-        localStorage.setItem(UI_STORE_KEY, JSON.stringify({ libraryCollapsed, inspectorCollapsed }));
-      } catch {
-      }
-    }
-    function applyPanelState() {
-      const wrap = $("system-maker-wrap");
-      if (!wrap) return;
-      wrap.classList.toggle("library-collapsed", libraryCollapsed);
-      wrap.classList.toggle("data-collapsed", inspectorCollapsed);
-    }
-    function setLibraryCollapsed(value) {
-      libraryCollapsed = !!value;
-      applyPanelState();
-      saveUiState();
-    }
-    function setInspectorCollapsed(value) {
-      inspectorCollapsed = !!value;
-      applyPanelState();
-      saveUiState();
-    }
-    function loadSystems() {
-      try {
-        systems = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
-        if (!Array.isArray(systems)) systems = [];
-      } catch {
-        systems = [];
-      }
-      systems = systems.map((s) => normalizeSpec2(s, s.description || "")).filter(Boolean);
-      activeId = systems[0]?.id || null;
-    }
-    function saveSystems() {
-      try {
-        localStorage.setItem(STORE_KEY, JSON.stringify(systems));
-      } catch {
-      }
-    }
-    function dataKey(id) {
-      return DATA_KEY_PREFIX + id;
-    }
-    function getActive() {
-      return systems.find((s) => s.id === activeId) || null;
-    }
-    function getRuntimeData(spec) {
-      if (!spec) return {};
-      try {
-        const saved = JSON.parse(localStorage.getItem(dataKey(spec.id)) || "null");
-        if (saved && typeof saved === "object") return saved;
-      } catch {
-      }
-      return structuredCloneSafe2(spec.mockData || {});
-    }
-    function saveRuntimeData(spec, data) {
-      if (!spec) return;
-      try {
-        localStorage.setItem(dataKey(spec.id), JSON.stringify(data || {}));
-      } catch {
-      }
-    }
-    function resetRuntimeData(spec) {
-      if (!spec) return;
-      try {
-        localStorage.removeItem(dataKey(spec.id));
-      } catch {
-      }
-    }
+  // src/js/modes/systems/spec-normalize.js
+  function createSystemsSpecApi(ctx) {
+    const { getRuntimeData } = ctx;
+    const inferName = (desc) => inferNameFromDesc(desc);
     function defaultFields(entityName, domain = "") {
       const base = slug(entityName);
       if (domain === "restaurant") {
@@ -2290,7 +2060,7 @@
         const id = old.id || slug(name, `module_${idx + 1}`);
         const entity = old.entity || (idx === 0 ? slug(moduleNames[1] || "sales") : slug(name));
         const fallbackScreen = idx === 0 ? "dashboard" : FALLBACK_SCREENS[idx % FALLBACK_SCREENS.length];
-        const screen = VALID_SCREENS.includes(old.screen) ? old.screen : fallbackScreen;
+        const screen = VALID_SCREENS2.includes(old.screen) ? old.screen : fallbackScreen;
         return {
           id,
           name: String(old.name || name || `Module ${idx + 1}`).slice(0, 32),
@@ -2327,14 +2097,14 @@
           map[slug(id)] = {
             id: slug(e?.id || id),
             name: e?.name || titleCase(id),
-            fields: Array.isArray(e?.fields) && e.fields.length ? e.fields.map(normalizeField) : defaultFields(e?.name || id)
+            fields: Array.isArray(e?.fields) && e.fields.length ? e.fields.map(normalizeField2) : defaultFields(e?.name || id)
           };
         });
       } else if (Array.isArray(input)) {
         input.forEach((e) => {
           const id = slug(e?.id || e?.name);
           if (!id) return;
-          map[id] = { id, name: e.name || titleCase(id), fields: Array.isArray(e.fields) && e.fields.length ? e.fields.map(normalizeField) : defaultFields(e.name || id) };
+          map[id] = { id, name: e.name || titleCase(id), fields: Array.isArray(e.fields) && e.fields.length ? e.fields.map(normalizeField2) : defaultFields(e.name || id) };
         });
       }
       modules.forEach((m) => {
@@ -2343,7 +2113,7 @@
       });
       return map;
     }
-    function normalizeField(f) {
+    function normalizeField2(f) {
       if (typeof f === "string") return { id: slug(f), label: titleCase(f), type: fieldType("", f) };
       const id = slug(f?.id || f?.name || f?.label, "field");
       return {
@@ -2394,17 +2164,17 @@
     function generateRows(entity, seed = "") {
       return Array.from({ length: 8 }, (_, idx) => normalizeRecord2({}, entity, idx));
     }
-    function seededRand(seed, idx) {
+    function seededRand2(seed, idx) {
       let h = 0;
       for (let i = 0; i < seed.length; i++) h = Math.imul(31, h) + seed.charCodeAt(i) | 0;
       h = h + idx * 2654435761 | 0;
       return Math.min(0.999999, Math.abs(h) / 2147483647);
     }
     function sampleValue(field, idx, entitySeed = "") {
-      const r = seededRand(entitySeed + field.id, idx);
+      const r = seededRand2(entitySeed + field.id, idx);
       const ri = (n) => Math.floor(r * n);
       if (field.type === "number") {
-        const base = seededRand(field.id, 0);
+        const base = seededRand2(field.id, 0);
         if (/salary|wage|pay/i.test(field.id)) return Math.round(45e3 + base * 155e3 + idx * 8e3);
         if (/hourly_rate|hourly/i.test(field.id)) return Math.round(14 + r * 46 + idx);
         if (/price|cost|amount|total|revenue|value/i.test(field.id)) {
@@ -2539,6 +2309,38 @@
       };
       return set[type] || set.grid;
     }
+    return {
+      defaultFields,
+      normalizeSpec: normalizeSpec2,
+      normalizeEntities,
+      normalizeField: normalizeField2,
+      normalizeData,
+      normalizeRecord: normalizeRecord2,
+      generateRows,
+      seededRand: seededRand2,
+      sampleValue
+    };
+  }
+
+  // src/js/modes/systems/generate.js
+  function createSystemsGenerateApi(ctx) {
+    const {
+      $,
+      st,
+      setStatus,
+      trace,
+      clearTrace,
+      updateCreateButtonState,
+      stopSystemGeneration,
+      getActive,
+      getRuntimeData,
+      saveRuntimeData,
+      saveSystems,
+      renderAll,
+      normalizeSpec: normalizeSpec2,
+      defaultFields,
+      moduleIcon
+    } = ctx;
     function inferName(desc) {
       return inferNameFromDesc(desc);
     }
@@ -3661,44 +3463,328 @@ ${String(rawText || JSON.stringify(parsed || {})).slice(0, 18e3)}` }
         spec: structuredCloneSafe2({ ...spec, revisionHistory: [] })
       };
     }
-    async function createSystem() {
-      if (runAbort) {
-        stopSystemGeneration();
-        return;
-      }
-      const desc = $("sysPromptInput")?.value.trim() || "Create a professional ERP system for a growing business";
-      clearTrace();
-      setStatus("Running", "running");
-      runAbort = new AbortController();
-      updateCreateButtonState();
-      try {
-        trace("Planning business modules", "plan");
-        const spec = await generateWithModel(desc, runAbort.signal);
-        if (runAbort.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        trace("Normalising modules, data, and interactions", "data");
-        systems.unshift(spec);
-        activeId = spec.id;
-        activeModuleId = spec.modules[0]?.id || "";
-        activeEntityId = spec.modules[0]?.entity || "";
-        selectedRecordId = "";
-        saveRuntimeData(spec, spec.mockData);
-        saveSystems();
-        renderAll();
-        setStatus("Done", "done");
-        trace("System ready", "ok");
-      } catch (err) {
-        if (err.name === "AbortError") {
-          setStatus("Stopped", "stopped");
-          trace("Generation stopped before a new system was saved", "warn");
-        } else {
-          setStatus("Error", "error");
-          trace(err.message || "System generation failed", "err");
+    return {
+      fallbackSystem,
+      systemPrompt,
+      generateWithModel,
+      createSystem,
+      callModel,
+      parseSpecJson,
+      finalizeGeneratedSpec,
+      assertRenderableSpec
+    };
+  }
+
+  // src/js/modes/systems/system-maker.js
+  var SystemMaker = (() => {
+    let mounted = false;
+    let systems = [];
+    let activeId = null;
+    let activeModuleId = "";
+    let selectedRecordId = "";
+    let activeEntityId = "";
+    let sortState = { field: "", dir: "asc" };
+    let searchQuery = "";
+    let runAbort = null;
+    let traceStart = Date.now();
+    let libraryCollapsed = false;
+    let inspectorCollapsed = true;
+    let filterRules = [];
+    let filterPanelOpen = false;
+    let selectedIds = /* @__PURE__ */ new Set();
+    let importState = null;
+    let recordModalIsNew = false;
+    const $ = (id) => document.getElementById(id);
+    function _sysDialog({ msg, showInput, inputDefault, showCancel }) {
+      return new Promise((resolve) => {
+        const overlay = document.getElementById("amkDialog");
+        const msgEl = document.getElementById("amkDialogMsg");
+        const inputEl = document.getElementById("amkDialogInput");
+        const okBtn = document.getElementById("amkDialogOk");
+        const cancelBtn = document.getElementById("amkDialogCancel");
+        if (!overlay) {
+          resolve(showInput ? inputDefault : showCancel ? true : void 0);
+          return;
         }
-      } finally {
-        runAbort = null;
-        updateCreateButtonState();
+        msgEl.textContent = msg;
+        inputEl.style.display = showInput ? "block" : "none";
+        cancelBtn.style.display = showCancel ? "" : "none";
+        if (showInput) inputEl.value = inputDefault || "";
+        overlay.classList.add("open");
+        if (showInput) setTimeout(() => {
+          inputEl.focus();
+          inputEl.select();
+        }, 80);
+        const cleanup = () => {
+          overlay.classList.remove("open");
+          okBtn.removeEventListener("click", onOk);
+          cancelBtn.removeEventListener("click", onCancel);
+          inputEl.removeEventListener("keydown", onKey);
+        };
+        const onOk = () => {
+          cleanup();
+          resolve(showInput ? inputEl.value : true);
+        };
+        const onCancel = () => {
+          cleanup();
+          resolve(showInput ? null : false);
+        };
+        const onKey = (e) => {
+          if (e.key === "Enter") onOk();
+          if (e.key === "Escape") onCancel();
+        };
+        okBtn.addEventListener("click", onOk);
+        cancelBtn.addEventListener("click", onCancel);
+        inputEl.addEventListener("keydown", onKey);
+      });
+    }
+    const _sysPrompt = (msg, def) => _sysDialog({ msg, showInput: true, inputDefault: def, showCancel: true });
+    const _sysConfirm = (msg) => _sysDialog({ msg, showInput: false, showCancel: true });
+    function setStatus(text, cls = "") {
+      const el = $("sysRunStatus");
+      if (!el) return;
+      el.textContent = text;
+      el.className = `sys-run-status ${cls}`.trim();
+      const dot = $("sysTraceDot");
+      if (dot) {
+        if (cls === "running") dot.className = "sys-trace-dot running";
+        else if (cls === "done") dot.className = "sys-trace-dot done";
+        else if (cls === "error") dot.className = "sys-trace-dot error";
+        else dot.className = "sys-trace-dot";
       }
     }
+    const traceIcons = {
+      run: `<svg viewBox="0 0 16 16"><path d="M4 2.5 12.5 8 4 13.5z"/></svg>`,
+      ok: `<svg viewBox="0 0 16 16"><path d="m3 8.5 3 3L13 4"/></svg>`,
+      plan: `<svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/><path d="M5 6h6M5 9h4"/></svg>`,
+      data: `<svg viewBox="0 0 16 16"><ellipse cx="8" cy="3.5" rx="5" ry="2"/><path d="M3 3.5v6c0 1.1 2.2 2 5 2s5-.9 5-2v-6"/><path d="M3 6.5c0 1.1 2.2 2 5 2s5-.9 5-2"/></svg>`,
+      warn: `<svg viewBox="0 0 16 16"><path d="M8 2 14 13H2z"/><path d="M8 6v3M8 11h.01"/></svg>`,
+      err: `<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="m5.8 5.8 4.4 4.4M10.2 5.8l-4.4 4.4"/></svg>`
+    };
+    const traceAgentLabel = {
+      run: "Agent",
+      ok: "Done",
+      plan: "Architect",
+      data: "Data Eng",
+      warn: "Warning",
+      err: "Error"
+    };
+    function trace(msg, cls = "run") {
+      const el = $("sysTrace");
+      if (!el) return;
+      const console_ = $("sysTraceConsole");
+      if (console_ && console_.classList.contains("collapsed")) {
+        console_.classList.remove("collapsed");
+        console_.classList.add("expanded");
+      }
+      const t = ((Date.now() - traceStart) / 1e3).toFixed(1);
+      const row = document.createElement("div");
+      row.className = "sys-trace-entry";
+      const agentLabel = traceAgentLabel[cls] || "Agent";
+      row.innerHTML = `<span class="sys-te-time">[${t}s]</span><span class="sys-te-agent sys-te-${cls}">${esc(agentLabel)}</span><span class="sys-te-icon sys-te-${cls}">${traceIcons[cls] || traceIcons.run}</span><span class="sys-te-msg sys-te-${cls}">${esc(msg)}</span>`;
+      el.appendChild(row);
+      el.scrollTop = el.scrollHeight;
+      if (console_) {
+        let entries = console_.querySelector(".sys-trace-entries");
+        if (!entries) {
+          entries = document.createElement("div");
+          entries.className = "sys-trace-entries";
+          console_.appendChild(entries);
+        }
+        entries.appendChild(row.cloneNode(true));
+        entries.scrollTop = entries.scrollHeight;
+      }
+      const dot = $("sysTraceDot");
+      if (dot) dot.className = "sys-trace-dot" + (cls === "err" ? " error" : cls === "ok" ? " done" : " running");
+      const summary = $("sysTraceSummary");
+      if (summary) summary.textContent = msg.slice(0, 70);
+    }
+    function clearTrace() {
+      traceStart = Date.now();
+      const el = $("sysTrace");
+      if (el) el.innerHTML = "";
+      const console_ = $("sysTraceConsole");
+      const entries = console_?.querySelector(".sys-trace-entries");
+      if (entries) entries.innerHTML = "";
+      const dot = $("sysTraceDot");
+      if (dot) dot.className = "sys-trace-dot";
+      const summary = $("sysTraceSummary");
+      if (summary) summary.textContent = "No run yet";
+    }
+    function updateCreateButtonState() {
+      const btn = $("sysCreateBtn");
+      if (!btn) return;
+      const running = !!runAbort;
+      const stopping = running && runAbort.signal?.aborted;
+      btn.disabled = false;
+      btn.textContent = stopping ? "Stopping" : running ? "Stop" : "Generate";
+      btn.classList.toggle("primary", !running);
+      btn.classList.toggle("danger", running);
+      btn.setAttribute("aria-label", running ? "Stop system generation" : "Generate system");
+      btn.title = running ? "Stop the current generation run" : "Generate a new system";
+    }
+    function stopSystemGeneration() {
+      if (!runAbort) return;
+      if (!runAbort.signal?.aborted) {
+        trace("Stop requested \u2014 aborting active generation", "warn");
+        runAbort.abort();
+      }
+      setStatus("Stopping", "running");
+      updateCreateButtonState();
+    }
+    function loadUiState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(UI_STORE_KEY) || "{}");
+        libraryCollapsed = false;
+        inspectorCollapsed = true;
+      } catch {
+        libraryCollapsed = false;
+        inspectorCollapsed = true;
+      }
+    }
+    function saveUiState() {
+      try {
+        localStorage.setItem(UI_STORE_KEY, JSON.stringify({ libraryCollapsed, inspectorCollapsed }));
+      } catch {
+      }
+    }
+    function applyPanelState() {
+      const wrap = $("system-maker-wrap");
+      if (!wrap) return;
+      wrap.classList.toggle("library-collapsed", libraryCollapsed);
+      wrap.classList.toggle("data-collapsed", inspectorCollapsed);
+    }
+    function setLibraryCollapsed(value) {
+      libraryCollapsed = !!value;
+      applyPanelState();
+      saveUiState();
+    }
+    function setInspectorCollapsed(value) {
+      inspectorCollapsed = !!value;
+      applyPanelState();
+      saveUiState();
+    }
+    function loadSystems() {
+      try {
+        systems = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+        if (!Array.isArray(systems)) systems = [];
+      } catch {
+        systems = [];
+      }
+      systems = systems.map((s) => normalizeSpec2(s, s.description || "")).filter(Boolean);
+      activeId = systems[0]?.id || null;
+    }
+    function saveSystems() {
+      try {
+        localStorage.setItem(STORE_KEY, JSON.stringify(systems));
+      } catch {
+      }
+    }
+    function dataKey(id) {
+      return DATA_KEY_PREFIX + id;
+    }
+    function getActive() {
+      return systems.find((s) => s.id === activeId) || null;
+    }
+    function getRuntimeData(spec) {
+      if (!spec) return {};
+      try {
+        const saved = JSON.parse(localStorage.getItem(dataKey(spec.id)) || "null");
+        if (saved && typeof saved === "object") return saved;
+      } catch {
+      }
+      return structuredCloneSafe2(spec.mockData || {});
+    }
+    function saveRuntimeData(spec, data) {
+      if (!spec) return;
+      try {
+        localStorage.setItem(dataKey(spec.id), JSON.stringify(data || {}));
+      } catch {
+      }
+    }
+    function resetRuntimeData(spec) {
+      if (!spec) return;
+      try {
+        localStorage.removeItem(dataKey(spec.id));
+      } catch {
+      }
+    }
+    function moduleIcon(name) {
+      const n = String(name || "").toLowerCase();
+      if (/dashboard|overview|home|summary/.test(n)) return "dashboard";
+      if (/sale|revenue|crm/.test(n)) return "chart";
+      if (/customer|client|contact/.test(n)) return "customers";
+      if (/inventory|product|stock|warehouse/.test(n)) return "box";
+      if (/order|purchase|requisition/.test(n)) return "orders";
+      if (/menu|food|recipe|dish|cuisine/.test(n)) return "menu";
+      if (/finance|account|invoice|billing|payment/.test(n)) return "coin";
+      if (/hr|employee|staff|payroll/.test(n)) return "people";
+      if (/report|analytic|insight|metric/.test(n)) return "reports";
+      if (/project|task|operation|workflow/.test(n)) return "flow";
+      if (/supplier|vendor|procurement/.test(n)) return "supplier";
+      if (/setting|config|admin/.test(n)) return "settings";
+      if (/document|contract|file/.test(n)) return "docs";
+      if (/schedule|calendar|appointment/.test(n)) return "calendar";
+      if (/ship|deliver|logistics|dispatch/.test(n)) return "truck";
+      if (/support|ticket|help/.test(n)) return "support";
+      if (/market|campaign|email/.test(n)) return "marketing";
+      return "grid";
+    }
+    function iconSvg(type) {
+      const set = {
+        dashboard: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="2" rx=".5"/><rect x="2" y="12" width="5" height="2" rx=".5"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`,
+        chart: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V3M2 13h12"/><path d="M5 10V7M8 10V4M11 10V6"/></svg>`,
+        customers: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2"/><path d="M2 13a4 4 0 0 1 8 0"/><path d="M11 7a2 2 0 1 0 0-4"/><path d="M14 13a3 3 0 0 0-3-3"/></svg>`,
+        box: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2 13 4.7v6.6L8 14l-5-2.7V4.7z"/><path d="m3 4.7 5 2.7 5-2.7M8 7.4V14"/></svg>`,
+        orders: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M5 7h6M5 10h4"/><circle cx="11" cy="10" r="1" fill="currentColor" stroke="none"/></svg>`,
+        menu: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2a3 3 0 0 0-3 3c0 1.5.8 2.6 2 3.2V13h2v-4.8c1.2-.6 2-1.7 2-3.2a3 3 0 0 0-3-3z"/><path d="M5 12h6"/></svg>`,
+        coin: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="5.5"/><path d="M8 5.5v5M6.5 7h2.3a1.2 1.2 0 0 1 0 2.4H7"/></svg>`,
+        people: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="2"/><path d="M2.5 13a3.5 3.5 0 0 1 7 0"/><path d="M10 7a2 2 0 0 0 0-4M10.5 10.5A3 3 0 0 1 13.5 13"/></svg>`,
+        reports: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="2" width="10" height="12" rx="1.5"/><path d="M5 6h6M5 9h6M5 12h3"/></svg>`,
+        flow: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="4" height="4" rx="1"/><rect x="10" y="2" width="4" height="4" rx="1"/><rect x="6" y="10" width="4" height="4" rx="1"/><path d="M6 4h4M8 6v4"/></svg>`,
+        supplier: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="5" width="8" height="8" rx="1"/><path d="M10 7h2.5L14 9.5V13h-4"/><circle cx="5" cy="13.5" r="1.2"/><circle cx="11" cy="13.5" r="1.2"/></svg>`,
+        settings: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 2v1M8 13v1M2 8h1M13 8h1M3.8 3.8l.7.7M11.5 11.5l.7.7M3.8 12.2l.7-.7M11.5 4.5l.7-.7"/></svg>`,
+        docs: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h6l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M10 2v3h3M5 8h6M5 11h4"/></svg>`,
+        calendar: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M5 2v2M11 2v2M2 7h12"/><circle cx="5.5" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="8" cy="10" r=".8" fill="currentColor" stroke="none"/><circle cx="10.5" cy="10" r=".8" fill="currentColor" stroke="none"/></svg>`,
+        truck: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="5" width="9" height="7" rx="1"/><path d="M10 7h2.5L14 9v3h-4"/><circle cx="4" cy="12.5" r="1.2"/><circle cx="11.5" cy="12.5" r="1.2"/></svg>`,
+        support: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M6 6a2 2 0 1 1 2.7 1.9C8.3 8.2 8 8.6 8 9"/><circle cx="8" cy="11.5" r=".6" fill="currentColor" stroke="none"/></svg>`,
+        marketing: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 9V7l8-4v10L3 9z"/><path d="M3 7v5a2 2 0 0 0 2 2"/><circle cx="13" cy="8" r="1.5"/></svg>`,
+        grid: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>`
+      };
+      return set[type] || set.grid;
+    }
+    let specApi, generateApi;
+    function initSpecApi() {
+      if (specApi) return specApi;
+      specApi = createSystemsSpecApi({ getRuntimeData });
+      return specApi;
+    }
+    function initGenerateApi() {
+      if (generateApi) return generateApi;
+      generateApi = createSystemsGenerateApi({
+        $,
+        st,
+        setStatus,
+        trace,
+        clearTrace,
+        updateCreateButtonState,
+        stopSystemGeneration,
+        getActive,
+        getRuntimeData,
+        saveRuntimeData,
+        saveSystems,
+        renderAll,
+        normalizeSpec: (...a) => initSpecApi().normalizeSpec(...a),
+        defaultFields: (...a) => initSpecApi().defaultFields(...a),
+        moduleIcon
+      });
+      return generateApi;
+    }
+    const normalizeSpec2 = (...a) => initSpecApi().normalizeSpec(...a);
+    const defaultFields = (...a) => initSpecApi().defaultFields(...a);
+    const generateWithModel = (...a) => initGenerateApi().generateWithModel(...a);
+    const createSystem2 = (...a) => initGenerateApi().createSystem(...a);
+    const fallbackSystem = (...a) => initGenerateApi().fallbackSystem(...a);
     const st = {
       get systems() {
         return systems;
@@ -3804,7 +3890,7 @@ ${String(rawText || JSON.stringify(parsed || {})).slice(0, 18e3)}` }
     const restoreVersion = (idx) => R().restoreVersion(idx);
     const syncModelSelect = () => R().syncModelSelect();
     function wireEvents() {
-      $("sysCreateBtn")?.addEventListener("click", createSystem);
+      $("sysCreateBtn")?.addEventListener("click", createSystem2);
       $("sysNewBtn")?.addEventListener("click", () => {
         activeId = null;
         activeModuleId = "";
@@ -3855,7 +3941,7 @@ ${String(rawText || JSON.stringify(parsed || {})).slice(0, 18e3)}` }
         trace("Mock data reset to original", "warn");
       });
       $("sysPromptInput")?.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") createSystem();
+        if (e.key === "Enter") createSystem2();
       });
       $("sysPreviewImportBtn")?.addEventListener("click", () => {
         const spec = getActive();

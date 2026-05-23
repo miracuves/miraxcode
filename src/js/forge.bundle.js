@@ -43,7 +43,7 @@
     { id: "audit", name: "Audit Agent", role: "clearance / balance / symmetry", color: "#ff8f8f" }
   ];
   var FLOOR_Y = -1.15;
-  var MAX_FORGE_NODES = 96;
+  var MAX_FORGE_NODES2 = 96;
   var PROJECT_STORE_KEY = "hashui_forge_projects";
   var FORGE_REFERENCE_SOURCES = [
     "sketchfab.com",
@@ -67,54 +67,6 @@
     "x.com",
     "twitter.com"
   ];
-
-  // src/js/modes/forge/plan.js
-  function vec3(v, fallback) {
-    return Array.isArray(v) && v.length >= 3 ? [Number(v[0]) || 0, Number(v[1]) || 0, Number(v[2]) || 0] : fallback.slice();
-  }
-  function normalizePlan(plan) {
-    const src = plan && typeof plan === "object" ? plan : { name: "Empty model", nodes: [] };
-    const nodes = Array.isArray(src.nodes) ? src.nodes : [];
-    return {
-      name: src.name || "Forged model",
-      glbUrl: typeof src.glbUrl === "string" ? src.glbUrl : "",
-      constraints: Array.isArray(src.constraints) ? src.constraints : [],
-      edges: Array.isArray(src.edges) ? src.edges : [],
-      nodes: nodes.slice(0, MAX_FORGE_NODES).map((node, i) => ({
-        id: String(node.id || `node_${i + 1}`),
-        name: String(node.name || node.id || `Node ${i + 1}`),
-        type: ["box", "cylinder", "capsule", "sphere", "cone", "torus", "lathe", "extrude", "logo", "logo_img", "mesh"].includes(node.type) ? node.type : "box",
-        role: ["structure", "surface", "detail", "audit"].includes(node.role) ? node.role : "structure",
-        position: vec3(node.position, [0, 0, 0]),
-        rotation: vec3(node.rotation, [0, 0, 0]),
-        scale: vec3(node.scale, [1, 1, 1]),
-        params: node.params && typeof node.params === "object" ? node.params : {},
-        color: node.color,
-        opacity: Number.isFinite(node.opacity) ? node.opacity : void 0
-      }))
-    };
-  }
-  function box(id, name, role, position, size, color, rotation) {
-    return { id, name, role, type: "box", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { width: size[0], height: size[1], depth: size[2] }, color };
-  }
-  function cyl(id, name, role, position, radius, height, color, rotation) {
-    return { id, name, role, type: "cylinder", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 36 }, color };
-  }
-  function capsule(id, name, role, position, radius, length, color, rotation, scale, opacity) {
-    return { id, name, role, type: "capsule", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, length, capSegments: 10, radialSegments: 24 }, color, opacity };
-  }
-  function sphere(id, name, role, position, radius, color) {
-    return { id, name, role, type: "sphere", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { radius }, color };
-  }
-  function ellipsoid(id, name, role, position, radius, scale, color, rotation, opacity) {
-    return { id, name, role, type: "sphere", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, widthSegments: 32, heightSegments: 18 }, color, opacity };
-  }
-  function cone(id, name, role, position, radius, height, color, rotation) {
-    return { id, name, role, type: "cone", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 4 }, color };
-  }
-  function torus(id, name, role, position, radius, tube, color, rotation) {
-    return { id, name, role, type: "torus", position, rotation: rotation || [Math.PI / 2, 0, 0], scale: [1, 1, 1], params: { radius, tube }, color };
-  }
 
   // src/js/modes/forge/agents-routing.js
   function createForgeAgentsRoutingApi(ctx) {
@@ -155,7 +107,7 @@
         (a, b) => modelStrengthScore(b.value, b.label, bigTask) - modelStrengthScore(a.value, a.label, bigTask)
       )[0] || null;
     }
-    function providerFromValue(value) {
+    function providerFromValue2(value) {
       return value && value.startsWith("cloud:") ? value.split(":")[1] : "local";
     }
     function providerDisplayName(provider) {
@@ -184,7 +136,7 @@
       if (/timed?.?out|timeout|capacity|overloaded|unavailable|failed to fetch|network/.test(msg) || err?.name === "AbortError") return 45 * 1e3;
       return 0;
     }
-    function markForgeProviderFailure(provider, err) {
+    function markForgeProviderFailure2(provider, err) {
       if (!provider || !isForgeRoutingError(err)) return;
       const ms = cooldownMsForForgeError(err);
       if (!ms) return;
@@ -195,7 +147,7 @@
       FORGE_PROVIDER_COOLDOWNS.set(String(provider), { until, reason });
       log("Router", `Cooling down ${providerDisplayName(provider)} for ${Math.ceil(ms / 1e3)}s`, "warn", reason);
     }
-    function skipCoolingCandidate(candidate, candidates) {
+    function skipCoolingCandidate2(candidate, candidates) {
       const healthyExists = candidates.some((route) => route?.provider && !forgeProviderCooldown(route.provider));
       const cooldown = candidate?.provider ? forgeProviderCooldown(candidate.provider) : null;
       if (!healthyExists || !cooldown) return false;
@@ -203,15 +155,15 @@
       log("Router", `Skipping ${providerDisplayName(candidate.provider)} route (${seconds}s cooldown)`, "wait", cooldown.reason || "");
       return true;
     }
-    function providerModelsForForge(bigTask, options = {}) {
+    function providerModelsForForge2(bigTask, options = {}) {
       const includeCooling = !!options.includeCooling;
       const allOpts = Array.from(document.getElementById("model")?.options || []).map((o) => ({ value: o.value, label: o.textContent || o.label || o.value })).filter((o) => {
-        const provider = providerFromValue(o.value);
+        const provider = providerFromValue2(o.value);
         return o.value && !o.disabled && !o.value.startsWith("\u2500") && (includeCooling || !forgeProviderCooldown(provider));
       });
       const providerOptions = {};
       allOpts.forEach((o) => {
-        const provider = providerFromValue(o.value);
+        const provider = providerFromValue2(o.value);
         if (!providerOptions[provider]) providerOptions[provider] = [];
         providerOptions[provider].push(o);
       });
@@ -219,11 +171,11 @@
         const best = bestModelForProvider(options2, bigTask);
         return [provider, best?.value || options2[0]?.value || "", best?.label || options2[0]?.label || ""];
       }).filter(([, value]) => value).sort((a, b) => modelStrengthScore(b[1], b[2], bigTask) - modelStrengthScore(a[1], a[2], bigTask));
-      if (!ranked.length && !includeCooling) return providerModelsForForge(bigTask, { includeCooling: true });
+      if (!ranked.length && !includeCooling) return providerModelsForForge2(bigTask, { includeCooling: true });
       return ranked;
     }
     function autoAssignForgeModels(prompt, force) {
-      const providerModels = providerModelsForForge(true);
+      const providerModels = providerModelsForForge2(true);
       const nonFreeProviderModels = providerModels.filter(([, value, label]) => !isFreeModel(value, label));
       if (!providerModels.length) {
         log("Parameter Agent", "No model options available for auto-routing", "warn");
@@ -242,7 +194,7 @@
       for (const agent of AGENTS) {
         const sel = $(`frgModel_${agent.id}`);
         if (!sel) continue;
-        const currentProvider = providerFromValue(sel.value);
+        const currentProvider = providerFromValue2(sel.value);
         const currentLabel = sel.options[sel.selectedIndex]?.textContent || "";
         const currentCooling = forgeProviderCooldown(currentProvider);
         if (!force && sel.value && !used.has(currentProvider) && !isFreeModel(sel.value, currentLabel) && !currentCooling) {
@@ -270,43 +222,138 @@
       modelSizeScore,
       modelStrengthScore,
       bestModelForProvider,
-      providerFromValue,
+      providerFromValue: providerFromValue2,
       providerDisplayName,
       forgeProviderCooldown,
       isForgeRoutingError,
       cooldownMsForForgeError,
-      markForgeProviderFailure,
-      skipCoolingCandidate,
-      providerModelsForForge,
+      markForgeProviderFailure: markForgeProviderFailure2,
+      skipCoolingCandidate: skipCoolingCandidate2,
+      providerModelsForForge: providerModelsForForge2,
       autoAssignForgeModels
     };
   }
 
-  // src/js/modes/forge/forge-mode.js
-  (function() {
-    "use strict";
-    const FORGE_PROVIDER_COOLDOWNS2 = /* @__PURE__ */ new Map();
-    let forgeProjects = [];
-    let activeProjectId = null;
-    let projectSaveTimer = 0;
-    let activeReferenceBrief = "";
-    let activeForgeRoute = "parametric";
-    const $ = (id) => document.getElementById(id);
-    function cloneJson(value) {
+  // src/js/modes/forge/plan.js
+  function vec3(v, fallback) {
+    return Array.isArray(v) && v.length >= 3 ? [Number(v[0]) || 0, Number(v[1]) || 0, Number(v[2]) || 0] : fallback.slice();
+  }
+  function normalizePlan(plan) {
+    const src = plan && typeof plan === "object" ? plan : { name: "Empty model", nodes: [] };
+    const nodes = Array.isArray(src.nodes) ? src.nodes : [];
+    return {
+      name: src.name || "Forged model",
+      glbUrl: typeof src.glbUrl === "string" ? src.glbUrl : "",
+      constraints: Array.isArray(src.constraints) ? src.constraints : [],
+      edges: Array.isArray(src.edges) ? src.edges : [],
+      nodes: nodes.slice(0, MAX_FORGE_NODES2).map((node, i) => ({
+        id: String(node.id || `node_${i + 1}`),
+        name: String(node.name || node.id || `Node ${i + 1}`),
+        type: ["box", "cylinder", "capsule", "sphere", "cone", "torus", "lathe", "extrude", "logo", "logo_img", "mesh"].includes(node.type) ? node.type : "box",
+        role: ["structure", "surface", "detail", "audit"].includes(node.role) ? node.role : "structure",
+        position: vec3(node.position, [0, 0, 0]),
+        rotation: vec3(node.rotation, [0, 0, 0]),
+        scale: vec3(node.scale, [1, 1, 1]),
+        params: node.params && typeof node.params === "object" ? node.params : {},
+        color: node.color,
+        opacity: Number.isFinite(node.opacity) ? node.opacity : void 0
+      }))
+    };
+  }
+  function box(id, name, role, position, size, color, rotation) {
+    return { id, name, role, type: "box", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { width: size[0], height: size[1], depth: size[2] }, color };
+  }
+  function cyl(id, name, role, position, radius, height, color, rotation) {
+    return { id, name, role, type: "cylinder", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 36 }, color };
+  }
+  function capsule2(id, name, role, position, radius, length, color, rotation, scale, opacity) {
+    return { id, name, role, type: "capsule", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, length, capSegments: 10, radialSegments: 24 }, color, opacity };
+  }
+  function sphere(id, name, role, position, radius, color) {
+    return { id, name, role, type: "sphere", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { radius }, color };
+  }
+  function ellipsoid2(id, name, role, position, radius, scale, color, rotation, opacity) {
+    return { id, name, role, type: "sphere", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, widthSegments: 32, heightSegments: 18 }, color, opacity };
+  }
+  function cone2(id, name, role, position, radius, height, color, rotation) {
+    return { id, name, role, type: "cone", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 4 }, color };
+  }
+  function torus2(id, name, role, position, radius, tube, color, rotation) {
+    return { id, name, role, type: "torus", position, rotation: rotation || [Math.PI / 2, 0, 0], scale: [1, 1, 1], params: { radius, tube }, color };
+  }
+  function serializeGeometry(geometry) {
+    const pos = geometry.getAttribute("position");
+    if (!pos || pos.count < 3 || pos.count > 25e3) return null;
+    const normal = geometry.getAttribute("normal");
+    const uv = geometry.getAttribute("uv");
+    return {
+      positions: Array.from(pos.array),
+      normals: normal && normal.array.length === pos.array.length ? Array.from(normal.array) : void 0,
+      uvs: uv ? Array.from(uv.array) : void 0,
+      indices: geometry.index ? Array.from(geometry.index.array) : void 0
+    };
+  }
+  function meshNodesFromScene(root, fileName) {
+    const nodes = [];
+    let totalVertices = 0;
+    root.updateMatrixWorld(true);
+    root.traverse((obj) => {
+      if (!obj.isMesh || !obj.geometry || nodes.length >= 32 || totalVertices > 6e4) return;
+      const geo = obj.geometry.clone();
+      geo.applyMatrix4(obj.matrixWorld);
+      const serialized = serializeGeometry(geo);
+      geo.dispose?.();
+      if (!serialized) return;
+      totalVertices += serialized.positions.length / 3;
+      const color = Array.isArray(obj.material) ? obj.material[0]?.color?.getHexString?.() : obj.material?.color?.getHexString?.();
+      nodes.push({
+        id: `asset_${Date.now().toString(36)}_${nodes.length}`,
+        name: obj.name || `${fileName.replace(/\.[^.]+$/, "")} mesh ${nodes.length + 1}`,
+        role: nodes.length ? "surface" : "structure",
+        type: "mesh",
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        params: { ...serialized, smooth: true },
+        color: color ? `#${color}` : "#c9a96e"
+      });
+    });
+    return nodes;
+  }
+  function safeFileName(name) {
+    return String(name || "3d-forge-model").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "3d-forge-model";
+  }
+
+  // src/js/modes/forge/projects.js
+  function createForgeProjectsApi(ctx) {
+    const {
+      $,
+      st,
+      escapeHtml,
+      setStatus,
+      log,
+      updatePlanList,
+      buildPlan,
+      renderAgents,
+      clearScene,
+      AGENTS: AGENTS2,
+      modelLabel
+    } = ctx;
+    function cloneJson2(value) {
       return JSON.parse(JSON.stringify(value || null));
     }
     function loadForgeProjects() {
       try {
         const raw = localStorage.getItem(PROJECT_STORE_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
-        forgeProjects = Array.isArray(parsed) ? parsed.filter((p) => p && Array.isArray(p.plan?.nodes)) : [];
+        st.forgeProjects = Array.isArray(parsed) ? parsed.filter((p) => p && Array.isArray(p.plan?.nodes)) : [];
       } catch {
-        forgeProjects = [];
+        st.forgeProjects = [];
       }
     }
     function persistForgeProjects() {
       try {
-        localStorage.setItem(PROJECT_STORE_KEY, JSON.stringify(forgeProjects.slice(0, 40)));
+        localStorage.setItem(PROJECT_STORE_KEY, JSON.stringify(st.forgeProjects.slice(0, 40)));
       } catch {
       }
     }
@@ -315,7 +362,7 @@
       return src.split(" ").slice(0, 4).join(" ") || "Forge Project";
     }
     function currentModelRoutes() {
-      return AGENTS.map((agent) => ({
+      return AGENTS2.map((agent) => ({
         id: agent.id,
         value: $(`frgModel_${agent.id}`)?.value || "",
         label: modelLabel($(`frgModel_${agent.id}`)?.value || "")
@@ -327,7 +374,7 @@
       const output = $("frgOutputTarget")?.value || "glb";
       return { style, detail, output };
     }
-    function updateStage(stage, state, text) {
+    function updateStage2(stage, state, text) {
       document.querySelectorAll("[data-frg-stage]").forEach((el) => {
         const isTarget = el.dataset.frgStage === stage;
         if (isTarget) {
@@ -360,12 +407,12 @@
     function renderForgeProjects() {
       const host = $("frgProjectsList");
       if (!host) return;
-      if (!forgeProjects.length) {
+      if (!st.forgeProjects.length) {
         host.innerHTML = `<div class="frg-project-empty">Saved Forge projects will appear here.</div>`;
         return;
       }
-      host.innerHTML = forgeProjects.map((project) => `
-      <div class="frg-project-card${project.id === activeProjectId ? " active" : ""}" data-frg-project="${escapeHtml(project.id)}">
+      host.innerHTML = st.forgeProjects.map((project) => `
+      <div class="frg-project-card${project.id === st.activeProjectId ? " active" : ""}" data-frg-project="${escapeHtml(project.id)}">
         <div class="frg-project-name">${escapeHtml(project.name || "Forge Project")}</div>
         <div class="frg-project-meta">${escapeHtml(project.route || project.plan?.route || "parametric")} \xB7 ${escapeHtml((project.plan?.nodes?.length || 0) + " mesh parts")} \xB7 ${escapeHtml(new Date(project.updatedAt || project.createdAt || Date.now()).toLocaleDateString())}</div>
         <div class="frg-project-prompt">${escapeHtml(project.prompt || project.plan?.name || "")}</div>
@@ -373,44 +420,44 @@
       </div>
     `).join("");
     }
-    function saveCurrentProject(manual) {
-      if (!activePlan?.nodes?.length) {
+    function saveCurrentProject2(manual) {
+      if (!st.activePlan?.nodes?.length) {
         if (manual) log("Projects", "No Forge object to save yet", "warn");
         return null;
       }
       const now = Date.now();
-      const prompt = ($("frgPrompt")?.value || activePlan.name || "").trim();
-      let project = forgeProjects.find((p) => p.id === activeProjectId);
+      const prompt = ($("frgPrompt")?.value || st.activePlan.name || "").trim();
+      let project = st.forgeProjects.find((p) => p.id === st.activeProjectId);
       if (!project) {
         project = {
           id: "forge_" + now.toString(36),
-          name: projectNameFromPrompt(prompt, activePlan),
+          name: projectNameFromPrompt(prompt, st.activePlan),
           createdAt: now
         };
-        forgeProjects.unshift(project);
-        activeProjectId = project.id;
+        st.forgeProjects.unshift(project);
+        st.activeProjectId = project.id;
       }
       project.updatedAt = now;
       project.prompt = prompt;
-      project.plan = cloneJson(activePlan);
-      project.route = activePlan.route || activeForgeRoute || "parametric";
+      project.plan = cloneJson2(st.activePlan);
+      project.route = st.activePlan.route || st.activeForgeRoute || "parametric";
       project.routes = currentModelRoutes();
-      project.name = project.name || projectNameFromPrompt(prompt, activePlan);
+      project.name = project.name || projectNameFromPrompt(prompt, st.activePlan);
       persistForgeProjects();
       renderForgeProjects();
       if (manual) log("Projects", `Saved ${project.name}`, "ok", `${project.plan.nodes.length} mesh parts`);
       return project;
     }
     function queueProjectSave() {
-      if (!activePlan?.nodes?.length) return;
-      clearTimeout(projectSaveTimer);
-      projectSaveTimer = setTimeout(() => saveCurrentProject(false), 450);
+      if (!st.activePlan?.nodes?.length) return;
+      clearTimeout(st.projectSaveTimer);
+      st.projectSaveTimer = setTimeout(() => saveCurrentProject2(false), 450);
     }
     function newForgeProject() {
-      activeProjectId = null;
+      st.activeProjectId = null;
       if ($("frgPrompt")) $("frgPrompt").value = "";
       clearScene();
-      activePlan = null;
+      st.activePlan = null;
       updatePlanList(null);
       renderSelection();
       renderForgeProjects();
@@ -418,9 +465,9 @@
       log("Projects", "New Forge project ready", "wait");
     }
     function openForgeProject(id) {
-      const project = forgeProjects.find((p) => p.id === id);
+      const project = st.forgeProjects.find((p) => p.id === id);
       if (!project) return;
-      activeProjectId = project.id;
+      st.activeProjectId = project.id;
       if ($("frgPrompt")) $("frgPrompt").value = project.prompt || project.plan?.name || "";
       restoreModelRoutes(project.routes);
       buildPlan(project.plan);
@@ -428,136 +475,47 @@
       log("Projects", `Opened ${project.name || "Forge Project"}`, "ok", `${project.plan.nodes.length} mesh parts`);
     }
     function deleteForgeProject(id) {
-      const project = forgeProjects.find((p) => p.id === id);
+      const project = st.forgeProjects.find((p) => p.id === id);
       if (!project) return;
       if (!confirm(`Delete "${project.name || "Forge Project"}"?`)) return;
-      forgeProjects = forgeProjects.filter((p) => p.id !== id);
-      if (activeProjectId === id) activeProjectId = null;
+      st.forgeProjects = st.forgeProjects.filter((p) => p.id !== id);
+      if (st.activeProjectId === id) st.activeProjectId = null;
       persistForgeProjects();
       renderForgeProjects();
       log("Projects", "Deleted Forge project", "warn");
     }
-    function escapeHtml(s) {
-      return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-    }
-    function setStatus(text) {
-      const el = $("frgStatus");
-      if (el) el.textContent = text || "Idle";
-    }
-    function traceKind(kind) {
-      if (kind === "err") return "error";
-      if (kind === "ok") return "done";
-      if (kind === "boss" || kind === "run" || kind === "wait" || kind === "warn") return "running";
-      return "";
-    }
-    function log(label, message, kind, tokens) {
-      const host = $("frgTraceEntries");
-      if (!host) return;
-      const statusCls = kind || "wait";
-      const elapsed = ((Date.now() - traceStartTime) / 1e3).toFixed(1);
-      const line = document.createElement("div");
-      line.className = "frg-trace-entry";
-      line.innerHTML = `<span class="trace-time">[${elapsed}s]</span><span class="trace-agent trace-${statusCls}">${escapeHtml(label)}</span><span class="trace-msg trace-${statusCls}">${escapeHtml(message)}</span>` + (tokens ? `<span class="trace-tokens">${escapeHtml(String(tokens))}</span>` : "");
-      host.appendChild(line);
-      host.scrollTop = host.scrollHeight;
-      const summary = $("frgTraceSummary");
-      if (summary) summary.textContent = `${label}: ${message}`;
-      const dot = $("frgTraceDot");
-      if (dot) dot.className = "frg-trace-dot " + traceKind(statusCls);
-    }
-    function setAgentState(id, state) {
-      const el = document.querySelector(`[data-frg-agent="${id}"] .frg-agent-state`);
-      if (el) el.textContent = state;
-    }
-    function renderAgents() {
-      const host = $("frgAgents");
-      if (!host) return;
-      const options = modelOptionsHtml();
-      host.innerHTML = AGENTS.map((agent) => `
-      <div class="frg-agent" data-frg-agent="${agent.id}">
-        <span class="frg-agent-dot" style="color:${agent.color};background:${agent.color}"></span>
-        <span>
-          <span class="frg-agent-name">${escapeHtml(agent.name)}</span>
-          <span class="frg-agent-role">${escapeHtml(agent.role)}</span>
-        </span>
-        <span class="frg-agent-state">idle</span>
-        <select class="frg-agent-model" id="frgModel_${agent.id}" title="${escapeHtml(agent.name)} model">
-          ${options}
-        </select>
-      </div>
-    `).join("");
-    }
-    function modelOptionsHtml() {
-      const src = document.getElementById("model");
-      const current = src?.value || "";
-      const sourceOptions = Array.from(src?.options || []);
-      if (!sourceOptions.length) return `<option value="">Main model</option>`;
-      return [
-        `<option value="">Main model (${escapeHtml(src.options[src.selectedIndex]?.textContent || current || "selected")})</option>`,
-        ...sourceOptions.map((opt) => `<option value="${escapeHtml(opt.value)}">${escapeHtml(opt.textContent || opt.value)}</option>`)
-      ].join("");
-    }
-    function syncModelSelectors() {
-      const old = {};
-      AGENTS.forEach((agent) => {
-        old[agent.id] = $(`frgModel_${agent.id}`)?.value || "";
-      });
-      renderAgents();
-      AGENTS.forEach((agent) => {
-        const sel = $(`frgModel_${agent.id}`);
-        if (sel && old[agent.id] && Array.from(sel.options).some((o) => o.value === old[agent.id])) {
-          sel.value = old[agent.id];
-        }
-      });
-    }
-    let agentsRoutingApi;
-    function agentsRouting() {
-      if (!agentsRoutingApi) {
-        agentsRoutingApi = createForgeAgentsRoutingApi({ $, log, cooldowns: FORGE_PROVIDER_COOLDOWNS2 });
-      }
-      return agentsRoutingApi;
-    }
-    const isFreeModel = (...a) => agentsRouting().isFreeModel(...a);
-    const modelSizeScore = (...a) => agentsRouting().modelSizeScore(...a);
-    const modelStrengthScore = (...a) => agentsRouting().modelStrengthScore(...a);
-    const bestModelForProvider = (...a) => agentsRouting().bestModelForProvider(...a);
-    const providerFromValue = (...a) => agentsRouting().providerFromValue(...a);
-    const providerDisplayName = (...a) => agentsRouting().providerDisplayName(...a);
-    const forgeProviderCooldown = (...a) => agentsRouting().forgeProviderCooldown(...a);
-    const isForgeRoutingError = (...a) => agentsRouting().isForgeRoutingError(...a);
-    const cooldownMsForForgeError = (...a) => agentsRouting().cooldownMsForForgeError(...a);
-    const markForgeProviderFailure = (...a) => agentsRouting().markForgeProviderFailure(...a);
-    const skipCoolingCandidate = (...a) => agentsRouting().skipCoolingCandidate(...a);
-    const providerModelsForForge = (...a) => agentsRouting().providerModelsForForge(...a);
-    const autoAssignForgeModels = (...a) => agentsRouting().autoAssignForgeModels(...a);
-    function selectedModelFor(agentId) {
-      return $(`frgModel_${agentId}`)?.value || window._H?.selectedModel?.() || document.getElementById("model")?.value || "";
-    }
-    function modelLabel(value) {
-      if (!value) return "main model";
-      const opt = Array.from(document.getElementById("model")?.options || []).find((o) => o.value === value);
-      return (opt?.textContent || value).replace(/\s+/g, " ").slice(0, 42);
-    }
-    function updatePlanList(plan) {
-      const host = $("frgPlanList");
-      if (!host) return;
-      const nodes = renderableNodes(plan?.nodes || []);
-      host.innerHTML = nodes.length ? nodes.map((node) => `
-      <div class="frg-plan-item${selectedMesh?.userData?.nodeId === node.id ? " selected" : ""}" data-node-id="${escapeHtml(node.id || "")}">
-        <b>${escapeHtml(node.name || node.id || node.type)}</b>
-        <span>${escapeHtml(node.role || "structure")} \xB7 ${escapeHtml(node.type || "box")}</span>
-      </div>
-    `).join("") : `<div class="frg-plan-item"><b>No mesh yet</b><span>Awaiting Parameter Agent</span></div>`;
-      $("frgPlanName").textContent = plan?.name || "Void ready";
-      $("frgNodeCount").textContent = `${nodes.length} mesh part${nodes.length === 1 ? "" : "s"}`;
-    }
-    function renderableNodes(nodes) {
-      return (Array.isArray(nodes) ? nodes : []).filter((node) => node && node.role !== "audit");
-    }
+    return {
+      loadForgeProjects,
+      persistForgeProjects,
+      renderForgeProjects,
+      saveCurrentProject: saveCurrentProject2,
+      queueProjectSave,
+      newForgeProject,
+      openForgeProject,
+      deleteForgeProject,
+      cloneJson: cloneJson2,
+      projectNameFromPrompt,
+      currentModelRoutes,
+      restoreModelRoutes
+    };
+  }
+
+  // src/js/modes/forge/viewport.js
+  function createForgeViewportApi(ctx) {
+    const {
+      $,
+      st,
+      escapeHtml,
+      setStatus,
+      log,
+      updatePlanList,
+      renderableNodes: renderableNodes2,
+      queueProjectSave
+    } = ctx;
     async function initThree() {
-      if (initialized) return true;
-      const mount2 = $("frgCanvasMount");
-      if (!mount2) return false;
+      if (st.initialized) return true;
+      const mount = $("frgCanvasMount");
+      if (!mount) return false;
       setStatus("Loading");
       log("SYSTEM", "Loading Three.js runtime...");
       try {
@@ -565,111 +523,111 @@
         const controlsMod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/controls/OrbitControls.js");
         const transformMod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/controls/TransformControls.js");
         const roomEnvMod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/environments/RoomEnvironment.js");
-        THREE = threeMod;
-        OrbitControls = controlsMod.OrbitControls;
-        TransformControls = transformMod.TransformControls;
+        st.THREE = threeMod;
+        st.OrbitControls = controlsMod.OrbitControls;
+        st.TransformControls = transformMod.TransformControls;
         window.__forgeRoomEnv = roomEnvMod.RoomEnvironment;
       } catch (err) {
         log("SYSTEM", "Could not load Three.js from CDN: " + (err.message || err), "err");
         setStatus("3D error");
         return false;
       }
-      scene = new THREE.Scene();
-      scene.background = new THREE.Color(328965);
-      scene.fog = new THREE.FogExp2(328965, 0.055);
-      camera = new THREE.PerspectiveCamera(48, 1, 0.1, 120);
-      camera.position.set(6, 4.2, 8);
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.12;
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      mount2.innerHTML = "";
-      mount2.appendChild(renderer.domElement);
+      st.scene = new st.THREE.Scene();
+      st.scene.background = new st.THREE.Color(328965);
+      st.scene.fog = new st.THREE.FogExp2(328965, 0.055);
+      st.camera = new st.THREE.PerspectiveCamera(48, 1, 0.1, 120);
+      st.camera.position.set(6, 4.2, 8);
+      st.renderer = new st.THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+      st.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      st.renderer.outputColorSpace = st.THREE.SRGBColorSpace;
+      st.renderer.toneMapping = st.THREE.ACESFilmicToneMapping;
+      st.renderer.toneMappingExposure = 1.12;
+      st.renderer.shadowMap.enabled = true;
+      st.renderer.shadowMap.type = st.THREE.PCFSoftShadowMap;
+      mount.innerHTML = "";
+      mount.appendChild(st.renderer.domElement);
       try {
-        const pmremGen = new THREE.PMREMGenerator(renderer);
+        const pmremGen = new st.THREE.PMREMGenerator(st.renderer);
         pmremGen.compileEquirectangularShader();
-        scene.environment = pmremGen.fromScene(new window.__forgeRoomEnv(), 0.04).texture;
+        st.scene.environment = pmremGen.fromScene(new window.__forgeRoomEnv(), 0.04).texture;
         pmremGen.dispose();
       } catch (err) {
         log("SYSTEM", "Env map unavailable: " + (err.message || err), "warn");
       }
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-      controls.dampingFactor = 0.06;
-      controls.enablePan = true;
-      controls.screenSpacePanning = true;
-      if ("zoomToCursor" in controls) controls.zoomToCursor = true;
-      controls.mouseButtons = {
-        LEFT: THREE.MOUSE.ROTATE,
-        MIDDLE: THREE.MOUSE.PAN,
-        RIGHT: THREE.MOUSE.PAN
+      st.controls = new st.OrbitControls(st.camera, st.renderer.domElement);
+      st.controls.enableDamping = true;
+      st.controls.dampingFactor = 0.06;
+      st.controls.enablePan = true;
+      st.controls.screenSpacePanning = true;
+      if ("zoomToCursor" in st.controls) st.controls.zoomToCursor = true;
+      st.controls.mouseButtons = {
+        LEFT: st.THREE.MOUSE.ROTATE,
+        MIDDLE: st.THREE.MOUSE.PAN,
+        RIGHT: st.THREE.MOUSE.PAN
       };
-      controls.target.set(0, 0.55, 0);
-      transformControls = new TransformControls(camera, renderer.domElement);
-      transformControls.setMode(transformMode);
-      transformControls.setSize(0.82);
+      st.controls.target.set(0, 0.55, 0);
+      st.transformControls = new st.TransformControls(st.camera, st.renderer.domElement);
+      st.transformControls.setMode(st.transformMode);
+      st.transformControls.setSize(0.82);
       setSnapEnabled(false);
-      transformControls.addEventListener("dragging-changed", (event) => {
-        if (controls) controls.enabled = !event.value;
+      st.transformControls.addEventListener("dragging-changed", (event) => {
+        if (st.controls) st.controls.enabled = !event.value;
       });
-      transformControls.addEventListener("objectChange", () => {
+      st.transformControls.addEventListener("objectChange", () => {
         syncSelectedNodeFromMesh();
-        renderSelection();
+        renderSelection2();
       });
-      if (typeof transformControls.getHelper === "function") scene.add(transformControls.getHelper());
-      else scene.add(transformControls);
-      raycaster = new THREE.Raycaster();
-      pointer = new THREE.Vector2();
-      renderer.domElement.addEventListener("click", handleCanvasClick);
-      renderer.domElement.addEventListener("dblclick", handleCanvasDoubleClick);
-      renderer.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
-      modelGroup = new THREE.Group();
-      particleGroup = new THREE.Group();
-      scene.add(modelGroup, particleGroup);
-      const key = new THREE.DirectionalLight(14679029, 2.1);
+      if (typeof st.transformControls.getHelper === "function") st.scene.add(st.transformControls.getHelper());
+      else st.scene.add(st.transformControls);
+      st.raycaster = new st.THREE.Raycaster();
+      st.pointer = new st.THREE.Vector2();
+      st.renderer.domElement.addEventListener("click", handleCanvasClick);
+      st.renderer.domElement.addEventListener("dblclick", handleCanvasDoubleClick);
+      st.renderer.domElement.addEventListener("contextmenu", (event) => event.preventDefault());
+      st.modelGroup = new st.THREE.Group();
+      st.particleGroup = new st.THREE.Group();
+      st.scene.add(st.modelGroup, st.particleGroup);
+      const key = new st.THREE.DirectionalLight(14679029, 2.1);
       key.position.set(6, 8, 5);
       key.castShadow = true;
       key.shadow.mapSize.set(1024, 1024);
       key.shadow.bias = -5e-4;
-      key.shadow.camera.left = -10;
-      key.shadow.camera.right = 10;
-      key.shadow.camera.top = 10;
-      key.shadow.camera.bottom = -10;
-      key.shadow.camera.near = 0.1;
-      key.shadow.camera.far = 40;
-      scene.add(key);
-      const rim = new THREE.DirectionalLight(4969150, 1.2);
+      key.shadow.st.camera.left = -10;
+      key.shadow.st.camera.right = 10;
+      key.shadow.st.camera.top = 10;
+      key.shadow.st.camera.bottom = -10;
+      key.shadow.st.camera.near = 0.1;
+      key.shadow.st.camera.far = 40;
+      st.scene.add(key);
+      const rim = new st.THREE.DirectionalLight(4969150, 1.2);
       rim.position.set(-6, 3, -5);
-      scene.add(rim);
-      scene.add(new THREE.AmbientLight(6983562, 0.45));
-      scene.add(new THREE.HemisphereLight(11590098, 1709072, 0.5));
-      const grid = new THREE.GridHelper(18, 36, 16777215, 16777215);
+      st.scene.add(rim);
+      st.scene.add(new st.THREE.AmbientLight(6983562, 0.45));
+      st.scene.add(new st.THREE.HemisphereLight(11590098, 1709072, 0.5));
+      const grid = new st.THREE.GridHelper(18, 36, 16777215, 16777215);
       grid.position.y = -1.15;
       grid.material.transparent = true;
       grid.material.opacity = 0.34;
-      scene.add(grid);
-      const floor = new THREE.Mesh(
-        new THREE.PlaneGeometry(18, 18, 36, 36),
-        new THREE.MeshBasicMaterial({
+      st.scene.add(grid);
+      const floor = new st.THREE.Mesh(
+        new st.THREE.PlaneGeometry(18, 18, 36, 36),
+        new st.THREE.MeshBasicMaterial({
           color: 16777215,
           transparent: true,
           opacity: 0.035,
-          side: THREE.DoubleSide,
+          side: st.THREE.DoubleSide,
           depthWrite: false
         })
       );
       floor.rotation.x = -Math.PI / 2;
       floor.position.y = -1.151;
       floor.receiveShadow = true;
-      scene.add(floor);
-      starField = makeStarField();
-      scene.add(starField);
+      st.scene.add(floor);
+      st.starField = makeStarField();
+      st.scene.add(st.starField);
       window.addEventListener("resize", resize);
       resize();
-      initialized = true;
+      st.initialized = true;
       animate();
       setStatus("Idle");
       log("SYSTEM", "Forge void is online.");
@@ -686,66 +644,66 @@
         positions[i * 3 + 1] = r * Math.cos(phi);
         positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
       }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-      const mat = new THREE.PointsMaterial({
+      const geo = new st.THREE.BufferGeometry();
+      geo.setAttribute("position", new st.THREE.BufferAttribute(positions, 3));
+      const mat = new st.THREE.PointsMaterial({
         color: 10482919,
         size: 0.022,
         transparent: true,
         opacity: 0.45,
         depthWrite: false
       });
-      return new THREE.Points(geo, mat);
+      return new st.THREE.Points(geo, mat);
     }
     function resize() {
-      const mount2 = $("frgCanvasMount");
-      if (!renderer || !camera || !mount2) return;
-      const rect = mount2.getBoundingClientRect();
+      const mount = $("frgCanvasMount");
+      if (!st.renderer || !st.camera || !mount) return;
+      const rect = mount.getBoundingClientRect();
       const w = Math.max(1, Math.floor(rect.width));
       const h = Math.max(1, Math.floor(rect.height));
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h, false);
+      st.camera.aspect = w / h;
+      st.camera.updateProjectionMatrix();
+      st.renderer.setSize(w, h, false);
     }
     function animate(now) {
-      raf = requestAnimationFrame(animate);
-      if (!renderer || !scene || !camera) return;
-      if (!mounted) return;
-      controls?.update();
-      if (starField) starField.rotation.y += 18e-5;
-      if (logoMeshes.length > 0) {
-        logoBobT += 6e-3;
-        const bob = Math.sin(logoBobT) * 0.16;
-        const sway = Math.sin(logoBobT * 0.55) * 0.05;
-        const pulse = 1 + Math.sin(logoBobT * 1.3) * 0.012;
-        for (const m of logoMeshes) {
+      st.raf = requestAnimationFrame(animate);
+      if (!st.renderer || !st.scene || !st.camera) return;
+      if (!st.mounted) return;
+      st.controls?.update();
+      if (st.starField) st.starField.rotation.y += 18e-5;
+      if (st.logoMeshes.length > 0) {
+        st.logoBobT += 6e-3;
+        const bob = Math.sin(st.logoBobT) * 0.16;
+        const sway = Math.sin(st.logoBobT * 0.55) * 0.05;
+        const pulse = 1 + Math.sin(st.logoBobT * 1.3) * 0.012;
+        for (const m of st.logoMeshes) {
           m.position.y = m.userData.logoBaseY + bob;
           m.rotation.y = sway;
           m.scale.set(pulse, pulse, 1);
         }
       }
-      if (selectionBox && selectedMesh) selectionBox.update();
+      if (st.selectionBox && st.selectedMesh) st.selectionBox.update();
       updateFlights(now || performance.now());
       updateReveal(now || performance.now());
-      if (++underfloorTick % 8 === 0) updateUnderfloorHighlights();
-      renderer.render(scene, camera);
+      if (++st.underfloorTick % 8 === 0) updateUnderfloorHighlights();
+      st.renderer.render(st.scene, st.camera);
     }
     function clearScene() {
       selectMesh(null);
-      flights.forEach((f) => particleGroup.remove(f.mesh));
-      flights = [];
-      revealMeshes = [];
-      logoMeshes = [];
-      logoBobT = 0;
-      if (scanMesh) {
-        scene?.remove(scanMesh);
-        scanMesh.geometry?.dispose();
-        scanMesh.material?.dispose();
-        scanMesh = null;
+      st.flights.forEach((f) => st.particleGroup.remove(f.mesh));
+      st.flights = [];
+      st.revealMeshes = [];
+      st.logoMeshes = [];
+      st.logoBobT = 0;
+      if (st.scanMesh) {
+        st.scene?.remove(st.scanMesh);
+        st.scanMesh.geometry?.dispose();
+        st.scanMesh.material?.dispose();
+        st.scanMesh = null;
       }
-      if (modelGroup) {
-        while (modelGroup.children.length) {
-          const obj = modelGroup.children.pop();
+      if (st.modelGroup) {
+        while (st.modelGroup.children.length) {
+          const obj = st.modelGroup.children.pop();
           obj.traverse?.((child) => {
             child.geometry?.dispose?.();
             if (Array.isArray(child.material)) child.material.forEach((m) => m.dispose?.());
@@ -753,9 +711,9 @@
           });
         }
       }
-      if (particleGroup) {
-        while (particleGroup.children.length) {
-          const obj = particleGroup.children.pop();
+      if (st.particleGroup) {
+        while (st.particleGroup.children.length) {
+          const obj = st.particleGroup.children.pop();
           obj.geometry?.dispose?.();
           obj.material?.dispose?.();
         }
@@ -766,45 +724,45 @@
       switch (node.type) {
         case "logo":
         case "logo_img":
-          return new THREE.PlaneGeometry(p.width ?? 2.1, p.height ?? 2.1);
+          return new st.THREE.PlaneGeometry(p.width ?? 2.1, p.height ?? 2.1);
         case "mesh":
           return meshGeometryFromParams(p);
         case "cylinder":
-          return new THREE.CylinderGeometry(p.radiusTop ?? p.radius ?? 0.35, p.radiusBottom ?? p.radius ?? 0.35, p.height ?? 1, p.segments ?? 48);
+          return new st.THREE.CylinderGeometry(p.radiusTop ?? p.radius ?? 0.35, p.radiusBottom ?? p.radius ?? 0.35, p.height ?? 1, p.segments ?? 48);
         case "capsule":
-          return new THREE.CapsuleGeometry(p.radius ?? 0.12, p.length ?? p.height ?? 0.6, p.capSegments ?? 16, p.radialSegments ?? 32);
+          return new st.THREE.CapsuleGeometry(p.radius ?? 0.12, p.length ?? p.height ?? 0.6, p.capSegments ?? 16, p.radialSegments ?? 32);
         case "sphere":
-          return new THREE.SphereGeometry(p.radius ?? 0.45, p.widthSegments ?? 48, p.heightSegments ?? 32);
+          return new st.THREE.SphereGeometry(p.radius ?? 0.45, p.widthSegments ?? 48, p.heightSegments ?? 32);
         case "cone":
-          return new THREE.ConeGeometry(p.radius ?? 0.42, p.height ?? 1, p.segments ?? 48);
+          return new st.THREE.ConeGeometry(p.radius ?? 0.42, p.height ?? 1, p.segments ?? 48);
         case "torus":
-          return new THREE.TorusGeometry(p.radius ?? 0.5, p.tube ?? 0.08, 24, 64);
+          return new st.THREE.TorusGeometry(p.radius ?? 0.5, p.tube ?? 0.08, 24, 64);
         case "lathe": {
-          const pts = Array.isArray(p.points) && p.points.length >= 2 ? p.points.map((pt) => new THREE.Vector2(Number(pt[0]) || 0.1, Number(pt[1]) || 0)) : [new THREE.Vector2(0.18, -0.55), new THREE.Vector2(0.42, -0.2), new THREE.Vector2(0.34, 0.42), new THREE.Vector2(0.08, 0.65)];
-          return new THREE.LatheGeometry(pts, p.segments ?? 64);
+          const pts = Array.isArray(p.points) && p.points.length >= 2 ? p.points.map((pt) => new st.THREE.Vector2(Number(pt[0]) || 0.1, Number(pt[1]) || 0)) : [new st.THREE.Vector2(0.18, -0.55), new st.THREE.Vector2(0.42, -0.2), new st.THREE.Vector2(0.34, 0.42), new st.THREE.Vector2(0.08, 0.65)];
+          return new st.THREE.LatheGeometry(pts, p.segments ?? 64);
         }
         case "extrude": {
           const pts = Array.isArray(p.points) && p.points.length >= 3 ? p.points.map((pt) => [Number(pt[0]) || 0, Number(pt[1]) || 0]) : [[-0.35, -0.25], [0.35, -0.25], [0.42, 0.2], [0, 0.45], [-0.42, 0.2]];
-          const shape = new THREE.Shape();
+          const shape = new st.THREE.Shape();
           shape.moveTo(pts[0][0], pts[0][1]);
           for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i][0], pts[i][1]);
           shape.closePath();
-          return new THREE.ExtrudeGeometry(shape, { depth: p.depth ?? 0.18, bevelEnabled: true, bevelSize: p.bevelSize ?? 0.025, bevelThickness: p.bevelThickness ?? 0.025, bevelSegments: p.bevelSegments ?? 2 });
+          return new st.THREE.ExtrudeGeometry(shape, { depth: p.depth ?? 0.18, bevelEnabled: true, bevelSize: p.bevelSize ?? 0.025, bevelThickness: p.bevelThickness ?? 0.025, bevelSegments: p.bevelSegments ?? 2 });
         }
         default:
-          return new THREE.BoxGeometry(p.width ?? 1, p.height ?? 1, p.depth ?? 1);
+          return new st.THREE.BoxGeometry(p.width ?? 1, p.height ?? 1, p.depth ?? 1);
       }
     }
     function meshGeometryFromParams(p) {
-      const geo = new THREE.BufferGeometry();
+      const geo = new st.THREE.BufferGeometry();
       const positions = Array.isArray(p.positions) ? p.positions : [];
-      if (positions.length < 9) return new THREE.BoxGeometry(0.4, 0.4, 0.4);
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      if (positions.length < 9) return new st.THREE.BoxGeometry(0.4, 0.4, 0.4);
+      geo.setAttribute("position", new st.THREE.Float32BufferAttribute(positions, 3));
       if (Array.isArray(p.normals) && p.normals.length === positions.length) {
-        geo.setAttribute("normal", new THREE.Float32BufferAttribute(p.normals, 3));
+        geo.setAttribute("normal", new st.THREE.Float32BufferAttribute(p.normals, 3));
       }
       if (Array.isArray(p.uvs) && p.uvs.length >= positions.length / 3 * 2) {
-        geo.setAttribute("uv", new THREE.Float32BufferAttribute(p.uvs, 2));
+        geo.setAttribute("uv", new st.THREE.Float32BufferAttribute(p.uvs, 2));
       }
       if (Array.isArray(p.indices) && p.indices.length >= 3) {
         geo.setIndex(p.indices);
@@ -828,12 +786,12 @@
       const pos = base.getAttribute("position");
       if (!pos || pos.count > 12e3) return base;
       const next = [];
-      const a = new THREE.Vector3();
-      const b = new THREE.Vector3();
-      const c = new THREE.Vector3();
-      const ab = new THREE.Vector3();
-      const bc = new THREE.Vector3();
-      const ca = new THREE.Vector3();
+      const a = new st.THREE.Vector3();
+      const b = new st.THREE.Vector3();
+      const c = new st.THREE.Vector3();
+      const ab = new st.THREE.Vector3();
+      const bc = new st.THREE.Vector3();
+      const ca = new st.THREE.Vector3();
       const push = (v) => next.push(v.x, v.y, v.z);
       for (let i = 0; i < pos.count; i += 3) {
         a.fromBufferAttribute(pos, i);
@@ -856,8 +814,8 @@
         push(ca);
       }
       base.dispose?.();
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute("position", new THREE.Float32BufferAttribute(next, 3));
+      const geo = new st.THREE.BufferGeometry();
+      geo.setAttribute("position", new st.THREE.Float32BufferAttribute(next, 3));
       return geo;
     }
     function makeLogoMaterial(node) {
@@ -866,41 +824,41 @@
       const canvas = document.createElement("canvas");
       canvas.width = size;
       canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, size, size);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
+      const ctx2 = canvas.getContext("2d");
+      ctx2.clearRect(0, 0, size, size);
+      ctx2.textAlign = "center";
+      ctx2.textBaseline = "middle";
       const text = p.text || "H";
       const family = `"Great Vibes", cursive`;
       let fontSize = p.fontSize || 860;
       let metrics = null;
       for (let i = 0; i < 18; i++) {
-        ctx.font = `${fontSize}px ${family}`;
-        metrics = ctx.measureText(text);
+        ctx2.font = `${fontSize}px ${family}`;
+        metrics = ctx2.measureText(text);
         const w = Math.abs(metrics.actualBoundingBoxLeft || 0) + Math.abs(metrics.actualBoundingBoxRight || metrics.width);
         const h = Math.abs(metrics.actualBoundingBoxAscent || fontSize * 0.8) + Math.abs(metrics.actualBoundingBoxDescent || fontSize * 0.25);
         if (w <= size * 0.72 && h <= size * 0.68) break;
         fontSize *= 0.92;
       }
-      ctx.lineWidth = p.strokeWidth || 18;
-      ctx.strokeStyle = p.stroke || "rgba(5,12,11,0.82)";
-      ctx.fillStyle = p.fill || "#c9a96e";
-      ctx.shadowColor = p.glow || "rgba(201,169,110,0.82)";
-      ctx.shadowBlur = p.shadowBlur || 34;
-      metrics = metrics || ctx.measureText(text);
+      ctx2.lineWidth = p.strokeWidth || 18;
+      ctx2.strokeStyle = p.stroke || "rgba(5,12,11,0.82)";
+      ctx2.fillStyle = p.fill || "#c9a96e";
+      ctx2.shadowColor = p.glow || "rgba(201,169,110,0.82)";
+      ctx2.shadowBlur = p.shadowBlur || 34;
+      metrics = metrics || ctx2.measureText(text);
       const glyphCenterOffsetX = ((metrics.actualBoundingBoxRight || metrics.width / 2) - (metrics.actualBoundingBoxLeft || metrics.width / 2)) / 2;
       const glyphCenterOffsetY = ((metrics.actualBoundingBoxDescent || fontSize * 0.2) - (metrics.actualBoundingBoxAscent || fontSize * 0.8)) / 2;
       const x = size * 0.5 - glyphCenterOffsetX;
       const y = size * 0.53 - glyphCenterOffsetY;
-      ctx.strokeText(text, x, y);
-      ctx.fillText(text, x, y);
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.colorSpace = THREE.SRGBColorSpace;
-      const mat = new THREE.MeshBasicMaterial({
+      ctx2.strokeText(text, x, y);
+      ctx2.fillText(text, x, y);
+      const texture = new st.THREE.CanvasTexture(canvas);
+      texture.colorSpace = st.THREE.SRGBColorSpace;
+      const mat = new st.THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
         opacity: 0,
-        side: THREE.DoubleSide,
+        side: st.THREE.DoubleSide,
         depthWrite: false
       });
       mat.userData.logoTexture = texture;
@@ -908,15 +866,15 @@
     }
     function makeImageLogoMaterial(node) {
       const p = node.params || {};
-      const loader = new THREE.TextureLoader();
+      const loader = new st.THREE.TextureLoader();
       const texture = loader.load(p.src || "/assets/miraxcode-logo.png");
-      texture.colorSpace = THREE.SRGBColorSpace;
-      return new THREE.MeshBasicMaterial({
+      texture.colorSpace = st.THREE.SRGBColorSpace;
+      return new st.THREE.MeshBasicMaterial({
         map: texture,
-        color: new THREE.Color(node.color || "#ffffff"),
+        color: new st.THREE.Color(node.color || "#ffffff"),
         transparent: true,
         opacity: 0,
-        side: THREE.DoubleSide,
+        side: st.THREE.DoubleSide,
         depthWrite: false
       });
     }
@@ -924,26 +882,26 @@
       const canvas = document.createElement("canvas");
       canvas.width = 4;
       canvas.height = 128;
-      const ctx = canvas.getContext("2d");
-      const grad = ctx.createLinearGradient(0, 0, 0, 128);
+      const ctx2 = canvas.getContext("2d");
+      const grad = ctx2.createLinearGradient(0, 0, 0, 128);
       grad.addColorStop(0, "rgba(75,210,190,0)");
       grad.addColorStop(0.38, "rgba(75,210,190,0)");
       grad.addColorStop(0.5, "rgba(75,210,190,0.85)");
       grad.addColorStop(0.62, "rgba(75,210,190,0)");
       grad.addColorStop(1, "rgba(75,210,190,0)");
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 4, 128);
-      const tex = new THREE.CanvasTexture(canvas);
-      const geo = new THREE.PlaneGeometry(3.2, 0.22);
-      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false });
-      const mesh = new THREE.Mesh(geo, mat);
+      ctx2.fillStyle = grad;
+      ctx2.fillRect(0, 0, 4, 128);
+      const tex = new st.THREE.CanvasTexture(canvas);
+      const geo = new st.THREE.PlaneGeometry(3.2, 0.22);
+      const mat = new st.THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.7, side: st.THREE.DoubleSide, depthWrite: false });
+      const mesh = new st.THREE.Mesh(geo, mat);
       mesh.position.set(0, baseY, 0.02);
       mesh.userData.scanBaseY = baseY;
       return mesh;
     }
     function addNodeMesh(node, index, total) {
-      const color = node.color ? new THREE.Color(node.color) : new THREE.Color(ROLE_COLORS[node.role] || ROLE_COLORS.structure);
-      const mat = node.type === "logo" ? makeLogoMaterial(node) : node.type === "logo_img" ? makeImageLogoMaterial(node) : new THREE.MeshStandardMaterial({
+      const color = node.color ? new st.THREE.Color(node.color) : new st.THREE.Color(ROLE_COLORS[node.role] || ROLE_COLORS.structure);
+      const mat = node.type === "logo" ? makeLogoMaterial(node) : node.type === "logo_img" ? makeImageLogoMaterial(node) : new st.THREE.MeshStandardMaterial({
         color,
         roughness: 0.42,
         metalness: node.role === "detail" ? 0.55 : 0.28,
@@ -960,7 +918,7 @@
       if (geoParams.subdivisions == null && node.role === "surface" && ["extrude", "lathe", "mesh", "capsule"].includes(node.type)) {
         geoParams = Object.assign({}, geoParams, { subdivisions: 1 });
       }
-      const mesh = new THREE.Mesh(finalizeGeometry(primitiveGeometry(node), geoParams), mat);
+      const mesh = new st.THREE.Mesh(finalizeGeometry(primitiveGeometry(node), geoParams), mat);
       if (node.type !== "logo" && node.type !== "logo_img") {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -980,17 +938,17 @@
         scale: mesh.scale.clone()
       };
       mesh.name = node.name || node.id || "Forge part";
-      modelGroup.add(mesh);
+      st.modelGroup.add(mesh);
       if (node.type === "logo_img") {
         mesh.userData.logoBaseY = mesh.position.y;
-        logoMeshes.push(mesh);
+        st.logoMeshes.push(mesh);
       }
-      revealMeshes.push({ mesh, start: performance.now() + index * 90, duration: 760, targetOpacity: node.opacity ?? (node.type === "mesh" ? 0.98 : 0.86) });
+      st.revealMeshes.push({ mesh, start: performance.now() + index * 90, duration: 760, targetOpacity: node.opacity ?? (node.type === "mesh" ? 0.98 : 0.86) });
       spawnFlightsTo(mesh.position, node.role || "structure", Math.max(10, Math.floor(34 / Math.max(1, total / 8))));
     }
     function updateUnderfloorHighlights() {
-      if (!THREE || !modelGroup) return;
-      const box2 = new THREE.Box3();
+      if (!st.THREE || !st.modelGroup) return;
+      const box2 = new st.THREE.Box3();
       selectableMeshes().forEach((mesh) => {
         box2.setFromObject(mesh);
         const under = !box2.isEmpty() && box2.min.y < FLOOR_Y - 0.01;
@@ -1001,27 +959,27 @@
           mat.emissiveIntensity = 0.32;
           mesh.userData.underFloor = true;
         } else if (mesh.userData.underFloor) {
-          mat.emissive.copy(mat.userData.baseEmissive || new THREE.Color(ROLE_COLORS[mesh.userData.node?.role] || ROLE_COLORS.structure));
+          mat.emissive.copy(mat.userData.baseEmissive || new st.THREE.Color(ROLE_COLORS[mesh.userData.node?.role] || ROLE_COLORS.structure));
           mat.emissiveIntensity = mat.userData.baseEmissiveIntensity ?? 0.08;
           mesh.userData.underFloor = false;
         }
       });
     }
     function buildPlan(plan) {
-      if (!THREE || !modelGroup) {
+      if (!st.THREE || !st.modelGroup) {
         log("Viewport", "Three.js not ready \u2014 cannot build plan. Check CDN connectivity.", "err");
         return;
       }
       clearScene();
-      activePlan = normalizePlan(plan);
-      window.ForgeEditor?.setPlanJson?.(activePlan);
-      const nodes = renderableNodes(activePlan.nodes);
+      st.activePlan = normalizePlan(plan);
+      window.ForgeEditor?.setPlanJson?.(st.activePlan);
+      const nodes = renderableNodes2(st.activePlan.nodes);
       nodes.forEach((node, i) => addNodeMesh(node, i, nodes.length));
-      updatePlanList(activePlan);
-      if (plan._introLogo && camera && controls) {
-        camera.position.set(0, 0.35, 4.8);
-        controls.target.set(0, 0.2, 0);
-        controls.update();
+      updatePlanList(st.activePlan);
+      if (plan._introLogo && st.camera && st.controls) {
+        st.camera.position.set(0, 0.35, 4.8);
+        st.controls.target.set(0, 0.2, 0);
+        st.controls.update();
       } else {
         frameModel();
       }
@@ -1029,20 +987,20 @@
     }
     function selectableMeshes() {
       const out = [];
-      if (!modelGroup) return out;
-      modelGroup.traverse((obj) => {
+      if (!st.modelGroup) return out;
+      st.modelGroup.traverse((obj) => {
         if (obj?.isMesh && obj.userData?.selectable) out.push(obj);
       });
       return out;
     }
     function handleCanvasClick(event) {
-      if (!renderer || !camera || !raycaster || !pointer || !modelGroup) return;
-      if (transformControls?.dragging) return;
-      const rect = renderer.domElement.getBoundingClientRect();
-      pointer.x = (event.clientX - rect.left) / rect.width * 2 - 1;
-      pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects(selectableMeshes(), true)[0];
+      if (!st.renderer || !st.camera || !st.raycaster || !st.pointer || !st.modelGroup) return;
+      if (st.transformControls?.dragging) return;
+      const rect = st.renderer.domElement.getBoundingClientRect();
+      st.pointer.x = (event.clientX - rect.left) / rect.width * 2 - 1;
+      st.pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      st.raycaster.setFromCamera(st.pointer, st.camera);
+      const hit = st.raycaster.intersectObjects(selectableMeshes(), true)[0];
       selectMesh(hit ? nearestSelectable(hit.object) : null);
     }
     function handleCanvasDoubleClick(event) {
@@ -1055,108 +1013,108 @@
       return cur || null;
     }
     function selectMesh(mesh) {
-      if (selectionBox) {
-        scene?.remove(selectionBox);
-        selectionBox.geometry?.dispose?.();
-        selectionBox.material?.dispose?.();
-        selectionBox = null;
+      if (st.selectionBox) {
+        st.scene?.remove(st.selectionBox);
+        st.selectionBox.geometry?.dispose?.();
+        st.selectionBox.material?.dispose?.();
+        st.selectionBox = null;
       }
-      selectedObjectWhole = false;
-      selectedMesh = mesh || null;
-      if (transformControls) {
-        if (selectedMesh) {
-          transformControls.attach(selectedMesh);
-          transformControls.setMode(transformMode);
+      st.selectedObjectWhole = false;
+      st.selectedMesh = mesh || null;
+      if (st.transformControls) {
+        if (st.selectedMesh) {
+          st.transformControls.attach(st.selectedMesh);
+          st.transformControls.setMode(st.transformMode);
         } else {
-          transformControls.detach();
+          st.transformControls.detach();
         }
       }
-      if (selectedMesh && THREE && scene) {
-        selectionBox = new THREE.BoxHelper(selectedMesh, 10482919);
-        scene.add(selectionBox);
-        log("Editor", `Selected ${selectedMesh.userData.node?.name || selectedMesh.name}`, "wait");
+      if (st.selectedMesh && st.THREE && st.scene) {
+        st.selectionBox = new st.THREE.BoxHelper(st.selectedMesh, 10482919);
+        st.scene.add(st.selectionBox);
+        log("Editor", `Selected ${st.selectedMesh.userData.node?.name || st.selectedMesh.name}`, "wait");
       }
-      renderSelection();
-      updatePlanList(activePlan);
+      renderSelection2();
+      updatePlanList(st.activePlan);
     }
     function selectWholeObject() {
-      if (!modelGroup || !modelGroup.children.length) return;
-      if (selectionBox) {
-        scene?.remove(selectionBox);
-        selectionBox.geometry?.dispose?.();
-        selectionBox.material?.dispose?.();
-        selectionBox = null;
+      if (!st.modelGroup || !st.modelGroup.children.length) return;
+      if (st.selectionBox) {
+        st.scene?.remove(st.selectionBox);
+        st.selectionBox.geometry?.dispose?.();
+        st.selectionBox.material?.dispose?.();
+        st.selectionBox = null;
       }
-      selectedMesh = modelGroup;
-      selectedObjectWhole = true;
-      if (transformControls) {
-        transformControls.attach(modelGroup);
-        transformControls.setMode(transformMode);
+      st.selectedMesh = st.modelGroup;
+      st.selectedObjectWhole = true;
+      if (st.transformControls) {
+        st.transformControls.attach(st.modelGroup);
+        st.transformControls.setMode(st.transformMode);
       }
-      if (THREE && scene) {
-        selectionBox = new THREE.BoxHelper(modelGroup, 16777215);
-        scene.add(selectionBox);
+      if (st.THREE && st.scene) {
+        st.selectionBox = new st.THREE.BoxHelper(st.modelGroup, 16777215);
+        st.scene.add(st.selectionBox);
       }
-      renderSelection();
+      renderSelection2();
       renderCadToolbar();
-      updatePlanList(activePlan);
+      updatePlanList(st.activePlan);
       log("Editor", "Selected whole object", "wait");
     }
     function focusCameraOnSelection() {
-      if (!camera || !controls || !THREE) return;
-      const targetObj = selectedMesh || modelGroup;
+      if (!st.camera || !st.controls || !st.THREE) return;
+      const targetObj = st.selectedMesh || st.modelGroup;
       if (!targetObj) return;
-      const box2 = new THREE.Box3().setFromObject(targetObj);
+      const box2 = new st.THREE.Box3().setFromObject(targetObj);
       if (box2.isEmpty()) return;
-      const center = box2.getCenter(new THREE.Vector3());
-      const sizeVec = box2.getSize(new THREE.Vector3());
+      const center = box2.getCenter(new st.THREE.Vector3());
+      const sizeVec = box2.getSize(new st.THREE.Vector3());
       const radius = Math.max(0.18, sizeVec.length() * 0.5);
-      const dir = camera.position.clone().sub(controls.target);
+      const dir = st.camera.position.clone().sub(st.controls.target);
       if (dir.lengthSq() < 1e-4) dir.set(4, 2.4, 5);
       dir.normalize();
       const distance = Math.max(radius * 2.2, 0.75);
-      controls.target.copy(center);
-      camera.position.copy(center).add(dir.multiplyScalar(distance));
-      camera.near = Math.max(0.01, distance / 100);
-      camera.updateProjectionMatrix();
-      controls.update();
-      log("Camera", `Focused ${selectedObjectWhole ? "whole object" : selectedMesh?.userData?.node?.name || "selection"}`, "wait");
+      st.controls.target.copy(center);
+      st.camera.position.copy(center).add(dir.multiplyScalar(distance));
+      st.camera.near = Math.max(0.01, distance / 100);
+      st.camera.updateProjectionMatrix();
+      st.controls.update();
+      log("Camera", `Focused ${st.selectedObjectWhole ? "whole object" : st.selectedMesh?.userData?.node?.name || "selection"}`, "wait");
     }
     function panCameraVertical(amount) {
-      if (!camera || !controls || !THREE) return;
-      const up = new THREE.Vector3(0, 1, 0).multiplyScalar(amount);
-      camera.position.add(up);
-      controls.target.add(up);
-      controls.update();
-      log("Camera", amount > 0 ? "Panned camera up" : "Panned camera down", "wait");
+      if (!st.camera || !st.controls || !st.THREE) return;
+      const up = new st.THREE.Vector3(0, 1, 0).multiplyScalar(amount);
+      st.camera.position.add(up);
+      st.controls.target.add(up);
+      st.controls.update();
+      log("Camera", amount > 0 ? "Panned st.camera up" : "Panned st.camera down", "wait");
     }
-    function renderSelection() {
+    function renderSelection2() {
       const card = $("frgSelectionCard");
       if (!card) return;
-      if (!selectedMesh) {
+      if (!st.selectedMesh) {
         card.innerHTML = `<div class="frg-selection-empty">Click any part in the void to edit it.</div>`;
         return;
       }
-      const node = selectedMesh.userData.node || {};
-      const pos = selectedMesh.position;
-      const scale = selectedMesh.scale;
-      const rot = selectedMesh.rotation;
+      const node = st.selectedMesh.userData.node || {};
+      const pos = st.selectedMesh.position;
+      const scale = st.selectedMesh.scale;
+      const rot = st.selectedMesh.rotation;
       card.innerHTML = `
       <div class="frg-selection-title">
-        <b title="${escapeHtml(selectedObjectWhole ? "Whole object" : node.name || selectedMesh.name || "Part")}">${escapeHtml(selectedObjectWhole ? "Whole object" : node.name || selectedMesh.name || "Part")}</b>
-        <span>${escapeHtml(selectedObjectWhole ? "object" : node.role || "part")}</span>
+        <b title="${escapeHtml(st.selectedObjectWhole ? "Whole object" : node.name || st.selectedMesh.name || "Part")}">${escapeHtml(st.selectedObjectWhole ? "Whole object" : node.name || st.selectedMesh.name || "Part")}</b>
+        <span>${escapeHtml(st.selectedObjectWhole ? "object" : node.role || "part")}</span>
       </div>
       <div class="frg-edit-buttons">
-        <button class="frg-edit-btn${transformMode === "translate" ? " active" : ""}" data-frg-edit="translate">Move</button>
-        <button class="frg-edit-btn${transformMode === "rotate" ? " active" : ""}" data-frg-edit="rotate">Rotate</button>
-        <button class="frg-edit-btn${transformMode === "scale" ? " active" : ""}" data-frg-edit="scale">Resize</button>
+        <button class="frg-edit-btn${st.transformMode === "translate" ? " active" : ""}" data-frg-edit="translate">Move</button>
+        <button class="frg-edit-btn${st.transformMode === "rotate" ? " active" : ""}" data-frg-edit="rotate">Rotate</button>
+        <button class="frg-edit-btn${st.transformMode === "scale" ? " active" : ""}" data-frg-edit="scale">Resize</button>
         <button class="frg-edit-btn danger" data-frg-edit="delete">Delete</button>
       </div>
       <div class="frg-edit-buttons">
         <button class="frg-edit-btn" data-frg-edit="duplicate">Duplicate</button>
         <button class="frg-edit-btn" data-frg-edit="floor">To floor</button>
         <button class="frg-edit-btn" data-frg-edit="reset">Reset</button>
-        <button class="frg-edit-btn${snapEnabled ? " active" : ""}" data-frg-edit="snap">Snap</button>
+        <button class="frg-edit-btn${st.snapEnabled ? " active" : ""}" data-frg-edit="snap">Snap</button>
       </div>
       <div class="frg-edit-grid" aria-label="Position">
         ${["x", "y", "z"].map((axis) => `<span class="frg-edit-field"><label>Pos ${axis.toUpperCase()}</label><input data-frg-pos="${axis}" type="number" step="0.05" value="${escapeHtml(pos[axis].toFixed(2))}"></span>`).join("")}
@@ -1165,39 +1123,39 @@
         ${["x", "y", "z"].map((axis) => `<span class="frg-edit-field"><label>Scale ${axis.toUpperCase()}</label><input data-frg-scale="${axis}" type="number" step="0.05" min="0.02" value="${escapeHtml(scale[axis].toFixed(2))}"></span>`).join("")}
       </div>
       <div class="frg-edit-grid" aria-label="Rotation" style="margin-top:6px">
-        ${["x", "y", "z"].map((axis) => `<span class="frg-edit-field"><label>Rot ${axis.toUpperCase()}</label><input data-frg-rot="${axis}" type="number" step="5" value="${escapeHtml(Math.round(THREE.MathUtils.radToDeg(rot[axis])))}"></span>`).join("")}
+        ${["x", "y", "z"].map((axis) => `<span class="frg-edit-field"><label>Rot ${axis.toUpperCase()}</label><input data-frg-rot="${axis}" type="number" step="5" value="${escapeHtml(Math.round(st.THREE.MathUtils.radToDeg(rot[axis])))}"></span>`).join("")}
       </div>`;
     }
     function setTransformMode(mode) {
-      transformMode = mode === "scale" ? "scale" : mode === "rotate" ? "rotate" : "translate";
-      if (transformControls) transformControls.setMode(transformMode);
+      st.transformMode = mode === "scale" ? "scale" : mode === "rotate" ? "rotate" : "translate";
+      if (st.transformControls) st.transformControls.setMode(st.transformMode);
       renderCadToolbar();
-      renderSelection();
+      renderSelection2();
     }
     function renderCadToolbar() {
       document.querySelectorAll("[data-frg-tool]").forEach((btn) => {
         const tool = btn.dataset.frgTool;
         btn.classList.toggle(
           "active",
-          tool === transformMode || tool === "selectObject" && selectedObjectWhole || tool === "snap" && snapEnabled
+          tool === st.transformMode || tool === "selectObject" && st.selectedObjectWhole || tool === "snap" && st.snapEnabled
         );
       });
     }
     function setSnapEnabled(enabled) {
-      snapEnabled = !!enabled;
-      if (transformControls) {
-        transformControls.setTranslationSnap?.(snapEnabled ? 0.1 : null);
-        transformControls.setRotationSnap?.(snapEnabled && THREE ? THREE.MathUtils.degToRad(5) : null);
-        transformControls.setScaleSnap?.(snapEnabled ? 0.05 : null);
+      st.snapEnabled = !!enabled;
+      if (st.transformControls) {
+        st.transformControls.setTranslationSnap?.(st.snapEnabled ? 0.1 : null);
+        st.transformControls.setRotationSnap?.(st.snapEnabled && st.THREE ? st.THREE.MathUtils.degToRad(5) : null);
+        st.transformControls.setScaleSnap?.(st.snapEnabled ? 0.05 : null);
       }
       renderCadToolbar();
-      renderSelection();
-      log("Editor", snapEnabled ? "Snapping enabled" : "Snapping disabled", "wait");
+      renderSelection2();
+      log("Editor", st.snapEnabled ? "Snapping enabled" : "Snapping disabled", "wait");
     }
     function syncSelectedNodeFromMesh() {
-      if (!selectedMesh) return;
-      if (selectedObjectWhole) {
-        activePlan?.nodes?.forEach((node2) => {
+      if (!st.selectedMesh) return;
+      if (st.selectedObjectWhole) {
+        st.activePlan?.nodes?.forEach((node2) => {
           const mesh = selectableMeshes().find((obj) => obj.userData.nodeId === node2.id);
           if (!mesh) return;
           node2.position = [mesh.position.x, mesh.position.y, mesh.position.z];
@@ -1207,72 +1165,72 @@
         queueProjectSave();
         return;
       }
-      const node = selectedMesh.userData.node;
+      const node = st.selectedMesh.userData.node;
       if (!node) return;
-      node.position = [selectedMesh.position.x, selectedMesh.position.y, selectedMesh.position.z];
-      node.rotation = [selectedMesh.rotation.x, selectedMesh.rotation.y, selectedMesh.rotation.z];
-      node.scale = [selectedMesh.scale.x, selectedMesh.scale.y, selectedMesh.scale.z];
+      node.position = [st.selectedMesh.position.x, st.selectedMesh.position.y, st.selectedMesh.position.z];
+      node.rotation = [st.selectedMesh.rotation.x, st.selectedMesh.rotation.y, st.selectedMesh.rotation.z];
+      node.scale = [st.selectedMesh.scale.x, st.selectedMesh.scale.y, st.selectedMesh.scale.z];
       queueProjectSave();
     }
     function updateSelectedScale(axis, value) {
-      if (!selectedMesh) return;
+      if (!st.selectedMesh) return;
       const n = Math.max(0.02, Number(value) || 0.02);
-      selectedMesh.scale[axis] = n;
+      st.selectedMesh.scale[axis] = n;
       syncSelectedNodeFromMesh();
-      selectionBox?.update();
-      updatePlanList(activePlan);
+      st.selectionBox?.update();
+      updatePlanList(st.activePlan);
     }
     function updateSelectedPosition(axis, value) {
-      if (!selectedMesh) return;
-      selectedMesh.position[axis] = Number(value) || 0;
+      if (!st.selectedMesh) return;
+      st.selectedMesh.position[axis] = Number(value) || 0;
       syncSelectedNodeFromMesh();
-      selectionBox?.update();
-      updatePlanList(activePlan);
+      st.selectionBox?.update();
+      updatePlanList(st.activePlan);
     }
     function updateSelectedRotation(axis, degrees) {
-      if (!selectedMesh || !THREE) return;
-      selectedMesh.rotation[axis] = THREE.MathUtils.degToRad(Number(degrees) || 0);
+      if (!st.selectedMesh || !st.THREE) return;
+      st.selectedMesh.rotation[axis] = st.THREE.MathUtils.degToRad(Number(degrees) || 0);
       syncSelectedNodeFromMesh();
-      selectionBox?.update();
-      updatePlanList(activePlan);
+      st.selectionBox?.update();
+      updatePlanList(st.activePlan);
     }
     function deleteSelectedPart() {
-      if (!selectedMesh || !modelGroup) return;
-      if (selectedObjectWhole) {
-        const count = activePlan?.nodes?.length || modelGroup.children.length;
+      if (!st.selectedMesh || !st.modelGroup) return;
+      if (st.selectedObjectWhole) {
+        const count = st.activePlan?.nodes?.length || st.modelGroup.children.length;
         clearScene();
-        activePlan = { ...activePlan || { name: "Forge object" }, nodes: [] };
-        updatePlanList(activePlan);
-        renderSelection();
+        st.activePlan = { ...st.activePlan || { name: "Forge object" }, nodes: [] };
+        updatePlanList(st.activePlan);
+        renderSelection2();
         queueProjectSave();
         log("Editor", `Deleted whole object \xB7 ${count} part(s)`, "warn");
         return;
       }
-      const nodeId = selectedMesh.userData.nodeId;
-      const label = selectedMesh.userData.node?.name || selectedMesh.name || "part";
-      transformControls?.detach();
-      if (selectionBox) {
-        scene?.remove(selectionBox);
-        selectionBox.geometry?.dispose?.();
-        selectionBox.material?.dispose?.();
-        selectionBox = null;
+      const nodeId = st.selectedMesh.userData.nodeId;
+      const label = st.selectedMesh.userData.node?.name || st.selectedMesh.name || "part";
+      st.transformControls?.detach();
+      if (st.selectionBox) {
+        st.scene?.remove(st.selectionBox);
+        st.selectionBox.geometry?.dispose?.();
+        st.selectionBox.material?.dispose?.();
+        st.selectionBox = null;
       }
-      revealMeshes = revealMeshes.filter((item) => item.mesh !== selectedMesh);
-      modelGroup.remove(selectedMesh);
-      selectedMesh.geometry?.dispose?.();
-      if (Array.isArray(selectedMesh.material)) selectedMesh.material.forEach((m) => m.dispose?.());
-      else selectedMesh.material?.dispose?.();
-      if (activePlan?.nodes) activePlan.nodes = activePlan.nodes.filter((node) => node.id !== nodeId);
-      selectedMesh = null;
-      updatePlanList(activePlan);
-      renderSelection();
+      st.revealMeshes = st.revealMeshes.filter((item) => item.mesh !== st.selectedMesh);
+      st.modelGroup.remove(st.selectedMesh);
+      st.selectedMesh.geometry?.dispose?.();
+      if (Array.isArray(st.selectedMesh.material)) st.selectedMesh.material.forEach((m) => m.dispose?.());
+      else st.selectedMesh.material?.dispose?.();
+      if (st.activePlan?.nodes) st.activePlan.nodes = st.activePlan.nodes.filter((node) => node.id !== nodeId);
+      st.selectedMesh = null;
+      updatePlanList(st.activePlan);
+      renderSelection2();
       queueProjectSave();
       log("Editor", `Deleted ${label}`, "warn");
     }
     function duplicateSelectedPart() {
-      if (!selectedMesh || !activePlan || !modelGroup) return;
-      if (selectedObjectWhole) {
-        const sourceNodes = activePlan.nodes.map((node) => JSON.parse(JSON.stringify(node)));
+      if (!st.selectedMesh || !st.activePlan || !st.modelGroup) return;
+      if (st.selectedObjectWhole) {
+        const sourceNodes = st.activePlan.nodes.map((node) => JSON.parse(JSON.stringify(node)));
         const suffix = Date.now().toString(36);
         const clones = sourceNodes.map((node) => ({
           ...node,
@@ -1280,84 +1238,88 @@
           name: `${node.name || node.id || "Part"} copy`,
           position: [(node.position?.[0] || 0) + 0.38, node.position?.[1] || 0, (node.position?.[2] || 0) + 0.38]
         }));
-        activePlan.nodes.push(...clones);
-        clones.forEach((node, i) => addNodeMesh(node, activePlan.nodes.length - clones.length + i, activePlan.nodes.length));
-        updatePlanList(activePlan);
+        st.activePlan.nodes.push(...clones);
+        clones.forEach((node, i) => addNodeMesh(node, st.activePlan.nodes.length - clones.length + i, st.activePlan.nodes.length));
+        updatePlanList(st.activePlan);
         selectWholeObject();
         queueProjectSave();
         log("Editor", `Duplicated whole object \xB7 ${clones.length} part(s)`, "ok");
         return;
       }
-      const sourceNode = selectedMesh.userData.node || {};
+      const sourceNode = st.selectedMesh.userData.node || {};
       const cloneNode = JSON.parse(JSON.stringify(sourceNode));
       cloneNode.id = `${sourceNode.id || "part"}_copy_${Date.now().toString(36)}`;
-      cloneNode.name = `${sourceNode.name || selectedMesh.name || "Part"} copy`;
+      cloneNode.name = `${sourceNode.name || st.selectedMesh.name || "Part"} copy`;
       cloneNode.position = [
-        selectedMesh.position.x + 0.22,
-        selectedMesh.position.y,
-        selectedMesh.position.z + 0.22
+        st.selectedMesh.position.x + 0.22,
+        st.selectedMesh.position.y,
+        st.selectedMesh.position.z + 0.22
       ];
-      cloneNode.rotation = [selectedMesh.rotation.x, selectedMesh.rotation.y, selectedMesh.rotation.z];
-      cloneNode.scale = [selectedMesh.scale.x, selectedMesh.scale.y, selectedMesh.scale.z];
-      activePlan.nodes.push(cloneNode);
-      addNodeMesh(cloneNode, activePlan.nodes.length - 1, activePlan.nodes.length);
+      cloneNode.rotation = [st.selectedMesh.rotation.x, st.selectedMesh.rotation.y, st.selectedMesh.rotation.z];
+      cloneNode.scale = [st.selectedMesh.scale.x, st.selectedMesh.scale.y, st.selectedMesh.scale.z];
+      st.activePlan.nodes.push(cloneNode);
+      addNodeMesh(cloneNode, st.activePlan.nodes.length - 1, st.activePlan.nodes.length);
       const mesh = selectableMeshes().find((obj) => obj.userData.nodeId === cloneNode.id);
-      updatePlanList(activePlan);
+      updatePlanList(st.activePlan);
       selectMesh(mesh || null);
       queueProjectSave();
-      log("Editor", `Duplicated ${sourceNode.name || selectedMesh.name || "part"}`, "ok");
+      log("Editor", `Duplicated ${sourceNode.name || st.selectedMesh.name || "part"}`, "ok");
     }
     function resetSelectedPart() {
-      if (!selectedMesh) return;
-      if (selectedObjectWhole) {
-        modelGroup.position.set(0, 0, 0);
-        modelGroup.rotation.set(0, 0, 0);
-        modelGroup.scale.set(1, 1, 1);
-        selectionBox?.update();
-        renderSelection();
+      if (!st.selectedMesh) return;
+      if (st.selectedObjectWhole) {
+        st.modelGroup.position.set(0, 0, 0);
+        st.modelGroup.rotation.set(0, 0, 0);
+        st.modelGroup.scale.set(1, 1, 1);
+        st.selectionBox?.update();
+        renderSelection2();
         queueProjectSave();
         log("Editor", "Reset whole object transform", "wait");
         return;
       }
-      const original = selectedMesh.userData.originalTransform;
+      const original = st.selectedMesh.userData.originalTransform;
       if (!original) return;
-      selectedMesh.position.copy(original.position);
-      selectedMesh.rotation.copy(original.rotation);
-      selectedMesh.scale.copy(original.scale);
+      st.selectedMesh.position.copy(original.position);
+      st.selectedMesh.rotation.copy(original.rotation);
+      st.selectedMesh.scale.copy(original.scale);
       syncSelectedNodeFromMesh();
-      selectionBox?.update();
-      renderSelection();
-      updatePlanList(activePlan);
+      st.selectionBox?.update();
+      renderSelection2();
+      updatePlanList(st.activePlan);
       queueProjectSave();
-      log("Editor", `Reset ${selectedMesh.userData.node?.name || selectedMesh.name || "part"}`, "wait");
+      log("Editor", `Reset ${st.selectedMesh.userData.node?.name || st.selectedMesh.name || "part"}`, "wait");
     }
     function alignSelectedToFloor() {
-      if (!selectedMesh || !THREE) return;
-      const box2 = new THREE.Box3().setFromObject(selectedMesh);
+      if (!st.selectedMesh || !st.THREE) return;
+      const box2 = new st.THREE.Box3().setFromObject(st.selectedMesh);
       if (box2.isEmpty()) return;
-      selectedMesh.position.y += FLOOR_Y - box2.min.y;
+      st.selectedMesh.position.y += FLOOR_Y - box2.min.y;
       syncSelectedNodeFromMesh();
-      selectionBox?.update();
-      renderSelection();
-      updatePlanList(activePlan);
+      st.selectionBox?.update();
+      renderSelection2();
+      updatePlanList(st.activePlan);
       queueProjectSave();
-      log("Editor", `Aligned ${selectedMesh.userData.node?.name || selectedMesh.name || "part"} to floor`, "ok");
+      log("Editor", `Aligned ${st.selectedMesh.userData.node?.name || st.selectedMesh.name || "part"} to floor`, "ok");
     }
     async function ensurePipelineModule(kind) {
-      if (kind === "gltfLoader" && !GLTFLoader) {
-        ({ GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/loaders/GLTFLoader.js"));
-      } else if (kind === "gltfExporter" && !GLTFExporter) {
-        ({ GLTFExporter } = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/exporters/GLTFExporter.js"));
-      } else if (kind === "stlExporter" && !STLExporter) {
-        ({ STLExporter } = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/exporters/STLExporter.js"));
-      } else if (kind === "objExporter" && !OBJExporter) {
-        ({ OBJExporter } = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/exporters/OBJExporter.js"));
+      if (kind === "gltfLoader" && !st.GLTFLoader) {
+        const mod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/loaders/GLTFLoader.js");
+        st.GLTFLoader = mod.GLTFLoader;
+      } else if (kind === "gltfExporter" && !st.GLTFExporter) {
+        const mod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/exporters/GLTFExporter.js");
+        st.GLTFExporter = mod.GLTFExporter;
+      } else if (kind === "stlExporter" && !st.STLExporter) {
+        const mod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/exporters/STLExporter.js");
+        st.STLExporter = mod.STLExporter;
+      } else if (kind === "objExporter" && !st.OBJExporter) {
+        const mod = await import("https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/exporters/OBJExporter.js");
+        st.OBJExporter = mod.OBJExporter;
       }
     }
     function exportableObject() {
-      if (!modelGroup || !modelGroup.children.length) return null;
+      if (!st.modelGroup || !st.modelGroup.children.length) return null;
       syncSelectedNodeFromMesh();
-      const clone = modelGroup.clone(true);
+      const clone = st.modelGroup.clone(true);
       clone.traverse((obj) => {
         if (!obj.isMesh) return;
         obj.visible = true;
@@ -1381,12 +1343,12 @@
         return;
       }
       updateStage("export", "active", `writing ${kind.toUpperCase()}`);
-      const base = safeFileName2(activePlan?.name || $("frgPrompt")?.value || "3d-forge-model");
+      const base = safeFileName(st.activePlan?.name || $("frgPrompt")?.value || "3d-forge-model");
       try {
         if (kind === "glb") {
-          if (activePlan?.glbUrl) {
+          if (st.activePlan?.glbUrl) {
             const a = document.createElement("a");
-            a.href = activePlan.glbUrl;
+            a.href = st.activePlan.glbUrl;
             a.download = `${base}.glb`;
             document.body.appendChild(a);
             a.click();
@@ -1396,18 +1358,18 @@
             return;
           }
           await ensurePipelineModule("gltfExporter");
-          const exporter = new GLTFExporter();
+          const exporter = new st.GLTFExporter();
           const result = await new Promise((resolve, reject) => {
             exporter.parse(object, resolve, reject, { binary: true, onlyVisible: true, trs: false });
           });
           downloadBlob(`${base}.glb`, new Blob([result], { type: "model/gltf-binary" }));
         } else if (kind === "obj") {
           await ensurePipelineModule("objExporter");
-          const text = new OBJExporter().parse(object);
+          const text = new st.OBJExporter().parse(object);
           downloadBlob(`${base}.obj`, new Blob([text], { type: "text/plain" }));
         } else if (kind === "stl") {
           await ensurePipelineModule("stlExporter");
-          const result = new STLExporter().parse(object, { binary: true });
+          const result = new st.STLExporter().parse(object, { binary: true });
           downloadBlob(`${base}.stl`, new Blob([result], { type: "model/stl" }));
         }
         log("Pipeline", `Exported ${kind.toUpperCase()} asset`, "ok");
@@ -1422,15 +1384,15 @@
       try {
         await ensurePipelineModule("gltfLoader");
         const url = URL.createObjectURL(file);
-        const loader = new GLTFLoader();
+        const loader = new st.GLTFLoader();
         const gltf = await loader.loadAsync(url);
         URL.revokeObjectURL(url);
-        const nodes = meshNodesFromScene2(gltf.scene, file.name);
+        const nodes = meshNodesFromScene(gltf.st.scene, file.name);
         if (!nodes.length) {
           log("Pipeline", "Imported asset had no supported mesh parts", "warn");
           return;
         }
-        const current = activePlan?.nodes?.length ? normalizePlan(activePlan) : { name: `Imported ${file.name.replace(/\.[^.]+$/, "")}`, nodes: [] };
+        const current = st.activePlan?.nodes?.length ? normalizePlan(st.activePlan) : { name: `Imported ${file.name.replace(/\.[^.]+$/, "")}`, nodes: [] };
         current.nodes = current.nodes.concat(nodes).slice(0, MAX_FORGE_NODES);
         current.name = current.name || `Imported ${file.name.replace(/\.[^.]+$/, "")}`;
         buildPlan(current);
@@ -1439,48 +1401,6 @@
       } catch (err) {
         log("Pipeline", `Import failed \xB7 ${err.message || err}`, "err");
       }
-    }
-    function meshNodesFromScene2(root, fileName) {
-      const nodes = [];
-      let totalVertices = 0;
-      root.updateMatrixWorld(true);
-      root.traverse((obj) => {
-        if (!obj.isMesh || !obj.geometry || nodes.length >= 32 || totalVertices > 6e4) return;
-        const geo = obj.geometry.clone();
-        geo.applyMatrix4(obj.matrixWorld);
-        const serialized = serializeGeometry2(geo);
-        geo.dispose?.();
-        if (!serialized) return;
-        totalVertices += serialized.positions.length / 3;
-        const color = Array.isArray(obj.material) ? obj.material[0]?.color?.getHexString?.() : obj.material?.color?.getHexString?.();
-        nodes.push({
-          id: `asset_${Date.now().toString(36)}_${nodes.length}`,
-          name: obj.name || `${fileName.replace(/\.[^.]+$/, "")} mesh ${nodes.length + 1}`,
-          role: nodes.length ? "surface" : "structure",
-          type: "mesh",
-          position: [0, 0, 0],
-          rotation: [0, 0, 0],
-          scale: [1, 1, 1],
-          params: { ...serialized, smooth: true },
-          color: color ? `#${color}` : "#c9a96e"
-        });
-      });
-      return nodes;
-    }
-    function serializeGeometry2(geometry) {
-      const pos = geometry.getAttribute("position");
-      if (!pos || pos.count < 3 || pos.count > 25e3) return null;
-      const normal = geometry.getAttribute("normal");
-      const uv = geometry.getAttribute("uv");
-      return {
-        positions: Array.from(pos.array),
-        normals: normal && normal.array.length === pos.array.length ? Array.from(normal.array) : void 0,
-        uvs: uv ? Array.from(uv.array) : void 0,
-        indices: geometry.index ? Array.from(geometry.index.array) : void 0
-      };
-    }
-    function safeFileName2(name) {
-      return String(name || "3d-forge-model").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "3d-forge-model";
     }
     function downloadBlob(name, blob) {
       const url = URL.createObjectURL(blob);
@@ -1501,52 +1421,52 @@
       const v = Math.random();
       const theta = 2 * Math.PI * u;
       const phi = Math.acos(2 * v - 1);
-      return new THREE.Vector3(
+      return new st.THREE.Vector3(
         radius * Math.sin(phi) * Math.cos(theta),
         radius * Math.cos(phi),
         radius * Math.sin(phi) * Math.sin(theta)
       );
     }
     function spawnFlightsTo(target, role, count) {
-      if (!THREE || !particleGroup) return;
+      if (!st.THREE || !st.particleGroup) return;
       const color = ROLE_COLORS[role] || ROLE_COLORS.structure;
-      const geo = new THREE.SphereGeometry(0.025, 8, 8);
-      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 });
+      const geo = new st.THREE.SphereGeometry(0.025, 8, 8);
+      const mat = new st.THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 });
       const now = performance.now();
       const duration = role === "structure" ? 2800 : role === "surface" ? 2e3 : role === "detail" ? 1400 : 3500;
       for (let i = 0; i < count; i++) {
-        const mesh = new THREE.Mesh(geo, mat.clone());
+        const mesh = new st.THREE.Mesh(geo, mat.clone());
         const p0 = randomSpherePoint(7.8 + Math.random() * 2.2);
         const p3 = target.clone();
         const lift = role === "structure" ? 2.4 : role === "surface" ? 0.9 : role === "detail" ? 0.35 : 3.2;
-        const side = new THREE.Vector3(-p3.z, 0, p3.x).normalize().multiplyScalar(role === "surface" ? 1.5 : role === "audit" ? 2.7 : 0.7);
-        const p1 = p0.clone().multiplyScalar(0.62).add(new THREE.Vector3(0, lift, 0)).add(side);
-        const p2 = p3.clone().add(new THREE.Vector3(0, lift * 0.45, 0)).sub(side.multiplyScalar(0.55));
-        const curve = new THREE.CubicBezierCurve3(p0, p1, p2, p3);
+        const side = new st.THREE.Vector3(-p3.z, 0, p3.x).normalize().multiplyScalar(role === "surface" ? 1.5 : role === "audit" ? 2.7 : 0.7);
+        const p1 = p0.clone().multiplyScalar(0.62).add(new st.THREE.Vector3(0, lift, 0)).add(side);
+        const p2 = p3.clone().add(new st.THREE.Vector3(0, lift * 0.45, 0)).sub(side.multiplyScalar(0.55));
+        const curve = new st.THREE.CubicBezierCurve3(p0, p1, p2, p3);
         mesh.position.copy(p0);
-        particleGroup.add(mesh);
-        flights.push({ mesh, curve, start: now + i * 18, duration: duration * (0.78 + Math.random() * 0.34) });
+        st.particleGroup.add(mesh);
+        st.flights.push({ mesh, curve, start: now + i * 18, duration: duration * (0.78 + Math.random() * 0.34) });
       }
-      $("frgParticleCount").textContent = `${flights.length} particles`;
+      $("frgParticleCount").textContent = `${st.flights.length} particles`;
     }
     function updateFlights(now) {
-      for (let i = flights.length - 1; i >= 0; i--) {
-        const f = flights[i];
+      for (let i = st.flights.length - 1; i >= 0; i--) {
+        const f = st.flights[i];
         const t = Math.min(1, Math.max(0, (now - f.start) / f.duration));
         f.mesh.position.copy(f.curve.getPoint(t));
         f.mesh.material.opacity = 1 - Math.max(0, t - 0.72) / 0.28;
         if (t >= 1) {
-          particleGroup.remove(f.mesh);
+          st.particleGroup.remove(f.mesh);
           f.mesh.geometry.dispose();
           f.mesh.material.dispose();
-          flights.splice(i, 1);
+          st.flights.splice(i, 1);
         }
       }
       const pc = $("frgParticleCount");
-      if (pc) pc.textContent = `${flights.length} particles`;
+      if (pc) pc.textContent = `${st.flights.length} particles`;
     }
     function updateReveal(now) {
-      for (const item of revealMeshes) {
+      for (const item of st.revealMeshes) {
         const t = Math.min(1, Math.max(0, (now - item.start) / item.duration));
         item.mesh.material.opacity = item.targetOpacity * easeOut(t);
       }
@@ -1555,22 +1475,54 @@
       return 1 - Math.pow(1 - t, 3);
     }
     function frameModel() {
-      if (!modelGroup || !camera || !controls) return;
-      const box2 = new THREE.Box3().setFromObject(modelGroup);
+      if (!st.modelGroup || !st.camera || !st.controls) return;
+      const box2 = new st.THREE.Box3().setFromObject(st.modelGroup);
       if (box2.isEmpty()) return;
-      const center = box2.getCenter(new THREE.Vector3());
-      const size = box2.getSize(new THREE.Vector3()).length();
-      controls.target.copy(center);
-      camera.position.copy(center).add(new THREE.Vector3(size * 0.62 + 3.2, size * 0.38 + 2.4, size * 0.78 + 4.2));
-      camera.lookAt(center);
-      controls.update();
+      const center = box2.getCenter(new st.THREE.Vector3());
+      const size = box2.getSize(new st.THREE.Vector3()).length();
+      st.controls.target.copy(center);
+      st.camera.position.copy(center).add(new st.THREE.Vector3(size * 0.62 + 3.2, size * 0.38 + 2.4, size * 0.78 + 4.2));
+      st.camera.lookAt(center);
+      st.controls.update();
     }
     function resetView() {
-      if (!camera || !controls) return;
-      camera.position.set(6, 4.2, 8);
-      controls.target.set(0, 0.55, 0);
-      controls.update();
+      if (!st.camera || !st.controls) return;
+      st.camera.position.set(6, 4.2, 8);
+      st.controls.target.set(0, 0.55, 0);
+      st.controls.update();
     }
+    return {
+      initThree,
+      clearScene,
+      buildPlan,
+      resetView,
+      frameModel,
+      selectMesh,
+      selectWholeObject,
+      selectNodeById,
+      deleteSelectedPart,
+      duplicateSelectedPart,
+      resetSelectedPart,
+      alignSelectedToFloor,
+      setTransformMode,
+      setSnapEnabled,
+      updateSelectedScale,
+      updateSelectedPosition,
+      updateSelectedRotation,
+      focusCameraOnSelection,
+      panCameraVertical,
+      exportForgeAsset,
+      importForgeAsset,
+      exportableObject,
+      spawnFlightsTo,
+      selectableMeshes,
+      renderCadToolbar,
+      renderSelection: renderSelection2
+    };
+  }
+
+  // src/js/modes/forge/prompts.js
+  function createForgePromptsApi() {
     function isSkeletonOnlyPrompt(prompt) {
       const q = String(prompt || "").toLowerCase();
       return /skeleton|bones|anatomy/.test(q) && !/person with|character with|with (skin|body|outer|muscle)/.test(q);
@@ -1620,17 +1572,245 @@
         brief: "Manufactured or engineered object suitable for lathe, tube, extrude, box, sphere, and loft primitives."
       };
     }
+    return {
+      isSkeletonOnlyPrompt,
+      needsTemplateAuthority,
+      isKnifeLikePrompt,
+      isSpoonLikePrompt,
+      isSwordLikePrompt,
+      isDroneLikePrompt,
+      isPhonePrompt,
+      isLaptopPrompt,
+      classifyForgePrompt
+    };
+  }
+
+  // src/js/modes/forge/plans-samples.js
+  function createForgePlansSamplesApi(ctx) {
+    const { classifyForgePrompt } = ctx;
+    function hLogoPlan2() {
+      return {
+        name: "MiraXcode intro mark",
+        _introLogo: true,
+        nodes: [
+          {
+            id: "hcx_teal_halo",
+            name: "Teal halo layer",
+            role: "structure",
+            type: "logo_img",
+            position: [0.06, 0.2, -0.08],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            params: { width: 4.4, height: 2.86, src: "/assets/miraxcode-logo.png" },
+            color: "#4bd2be",
+            opacity: 0.26
+          },
+          {
+            id: "hcx_main",
+            name: "MiraXcode logo",
+            role: "surface",
+            type: "logo_img",
+            position: [0, 0.2, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            params: { width: 4, height: 2.6, src: "/assets/miraxcode-logo.png" },
+            color: "#ffffff",
+            opacity: 0.98
+          },
+          {
+            id: "hcx_gold_sheen",
+            name: "Gold sheen overlay",
+            role: "detail",
+            type: "logo_img",
+            position: [-0.03, 0.22, 0.04],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            params: { width: 4.05, height: 2.63, src: "/assets/miraxcode-logo.png" },
+            color: "#c9a96e",
+            opacity: 0.22
+          }
+        ]
+      };
+    }
+    function chairPlan() {
+      return {
+        name: "Forged ergonomic chair",
+        nodes: [
+          box("seat", "Seat slab", "structure", [0, 0, 0], [1.7, 0.18, 1.45], "#4bd2be"),
+          box("back", "Curved back plane", "surface", [0, 0.92, -0.62], [1.75, 1.55, 0.18], "#f5c97a", [-0.28, 0, 0]),
+          cyl("leg_fl", "Front left leg", "structure", [-0.68, -0.78, 0.48], 0.07, 1.45, "#4bd2be"),
+          cyl("leg_fr", "Front right leg", "structure", [0.68, -0.78, 0.48], 0.07, 1.45, "#4bd2be"),
+          cyl("leg_bl", "Back left leg", "structure", [-0.68, -0.76, -0.48], 0.07, 1.38, "#4bd2be"),
+          cyl("leg_br", "Back right leg", "structure", [0.68, -0.76, -0.48], 0.07, 1.38, "#4bd2be"),
+          box("arm_l", "Left arm rest", "surface", [-1.02, 0.34, 0], [0.16, 0.16, 1.35], "#f5c97a"),
+          box("arm_r", "Right arm rest", "surface", [1.02, 0.34, 0], [0.16, 0.16, 1.35], "#f5c97a"),
+          torus("lumbar", "Lumbar detail", "detail", [0, 0.86, -0.75], 0.58, 0.035, "#8fb7ff", [Math.PI / 2, 0, 0]),
+          sphere("audit_marker", "Balance marker", "audit", [0, -1.46, 0], 0.09, "#ff8f8f")
+        ]
+      };
+    }
+    function roverPlan() {
+      return {
+        name: "Forged lunar rover",
+        nodes: [
+          box("body", "Pressure body", "structure", [0, 0.22, 0], [2.2, 0.55, 1.25], "#4bd2be"),
+          box("deck", "Instrument deck", "surface", [0, 0.64, -0.05], [1.55, 0.18, 0.92], "#f5c97a"),
+          cyl("wheel_fl", "Wheel front left", "structure", [-0.88, -0.24, 0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
+          cyl("wheel_fr", "Wheel front right", "structure", [0.88, -0.24, 0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
+          cyl("wheel_bl", "Wheel back left", "structure", [-0.88, -0.24, -0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
+          cyl("wheel_br", "Wheel back right", "structure", [0.88, -0.24, -0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
+          cyl("mast", "Sensor mast", "detail", [0.48, 1.08, -0.25], 0.045, 1.05, "#8fb7ff"),
+          sphere("camera", "Camera head", "detail", [0.48, 1.68, -0.25], 0.18, "#8fb7ff"),
+          box("solar_l", "Left solar wing", "surface", [-1.42, 0.58, 0], [0.85, 0.06, 1.18], "#f5c97a"),
+          box("solar_r", "Right solar wing", "surface", [1.42, 0.58, 0], [0.85, 0.06, 1.18], "#f5c97a")
+        ]
+      };
+    }
+    function dronePlan(prompt) {
+      const q = String(prompt || "").toLowerCase();
+      const heavy = /cinema|camera|professional|heavy|large/.test(q);
+      const arm = heavy ? 1.38 : 1.14;
+      const gold = "#c9a96e";
+      const bright = "#f5d77a";
+      const dark = "#070a0d";
+      const teal = "#4bd2be";
+      const nodes = [
+        ellipsoid("fuselage_shell", "Dark rounded avionics body", "structure", [0, 0.02, 0], 0.42, [1.55, 0.36, 0.9], dark, [0, 0, 0], 0.94),
+        box("gold_body_frame", "Gold body frame", "surface", [0, 0.075, 0], [0.96, 0.09, 0.54], gold),
+        box("front_sensor_panel", "Front sensor panel", "surface", [0, 0.04, 0.44], [0.38, 0.16, 0.055], "#181210"),
+        cyl("main_camera_barrel", "Forward camera barrel", "detail", [0.18, 0.04, 0.51], 0.09, 0.09, gold, [Math.PI / 2, 0, 0]),
+        cyl("glass_camera_lens", "Glowing camera lens", "detail", [0.18, 0.04, 0.565], 0.055, 0.025, teal, [Math.PI / 2, 0, 0]),
+        sphere("status_led", "Pulsing gold status LED", "detail", [-0.18, 0.105, 0.48], 0.035, bright),
+        capsule("left_front_arm", "Left front carbon arm", "structure", [-arm * 0.42, 0.03, arm * 0.42], 0.035, arm * 1.1, gold, [0, Math.PI / 4, Math.PI / 2]),
+        capsule("right_front_arm", "Right front carbon arm", "structure", [arm * 0.42, 0.03, arm * 0.42], 0.035, arm * 1.1, gold, [0, -Math.PI / 4, Math.PI / 2]),
+        capsule("left_rear_arm", "Left rear carbon arm", "structure", [-arm * 0.42, 0.03, -arm * 0.42], 0.035, arm * 1.1, gold, [0, -Math.PI / 4, Math.PI / 2]),
+        capsule("right_rear_arm", "Right rear carbon arm", "structure", [arm * 0.42, 0.03, -arm * 0.42], 0.035, arm * 1.1, gold, [0, Math.PI / 4, Math.PI / 2]),
+        capsule("left_landing_strut", "Left landing strut", "structure", [-0.34, -0.34, 0.1], 0.025, 0.68, gold, [0.22, 0, 0]),
+        capsule("right_landing_strut", "Right landing strut", "structure", [0.34, -0.34, 0.1], 0.025, 0.68, gold, [-0.22, 0, 0]),
+        capsule("landing_skid", "Gold landing skid", "structure", [0, -0.72, 0.14], 0.03, 1.08, gold, [0, 0, Math.PI / 2])
+      ];
+      [
+        ["front_left", -arm, arm, 1],
+        ["front_right", arm, arm, -1],
+        ["rear_left", -arm, -arm, -1],
+        ["rear_right", arm, -arm, 1]
+      ].forEach(([id, x, z, spin], i) => {
+        nodes.push(cyl(`motor_${id}`, `${labelWords(id)} motor pod`, "structure", [x, 0.06, z], 0.13, 0.13, gold));
+        nodes.push(torus(`rotor_guard_${id}`, `${labelWords(id)} rotor halo guard`, "surface", [x, 0.09, z], 0.38, 0.018, gold));
+        nodes.push(cyl(`rotor_hub_${id}`, `${labelWords(id)} rotor hub`, "detail", [x, 0.12, z], 0.055, 0.045, bright));
+        nodes.push(box(`propeller_a_${id}`, `${labelWords(id)} spinning propeller blade A`, "detail", [x, 0.145, z], [0.7, 0.018, 0.055], bright, [0, i * 0.42, 0]));
+        nodes.push(box(`propeller_b_${id}`, `${labelWords(id)} spinning propeller blade B`, "detail", [x, 0.148, z], [0.055, 0.018, 0.7], bright, [0, spin * 0.32, 0]));
+        nodes.push(sphere(`rotor_glow_${id}`, `${labelWords(id)} rotor glow core`, "detail", [x, 0.18, z], 0.035, "#fff8c0"));
+      });
+      nodes.push(box("top_gold_rail", "Top gold electronics rail", "surface", [0, 0.28, -0.04], [0.72, 0.045, 0.16], gold));
+      nodes.push(box("battery_pack", "Rear battery pack", "structure", [0, 0.1, -0.42], [0.54, 0.18, 0.22], "#181210"));
+      nodes.push(box("battery_gold_cap", "Battery gold cap", "detail", [0, 0.13, -0.55], [0.46, 0.13, 0.035], gold));
+      return { name: heavy ? "Forged professional camera drone" : "Forged intro quad drone", nodes };
+    }
+    function labelWords(id) {
+      return String(id).replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
+    }
+    function housePlan() {
+      return {
+        name: "Forged modular house",
+        nodes: [
+          box("base", "Main volume", "structure", [0, 0, 0], [2.5, 1.35, 1.75], "#4bd2be"),
+          cone("roof", "Pitched roof", "surface", [0, 1.05, 0], 1.55, 0.95, "#f5c97a", [0, Math.PI / 4, 0]),
+          box("door", "Recessed door", "detail", [0, -0.34, 0.9], [0.42, 0.78, 0.08], "#8fb7ff"),
+          box("window_l", "Left window", "detail", [-0.72, 0.18, 0.91], [0.42, 0.35, 0.07], "#8fb7ff"),
+          box("window_r", "Right window", "detail", [0.72, 0.18, 0.91], [0.42, 0.35, 0.07], "#8fb7ff"),
+          cyl("chimney", "Chimney", "surface", [0.82, 1.58, -0.35], 0.12, 0.75, "#f5c97a"),
+          box("audit_foundation", "Foundation audit plane", "audit", [0, -0.77, 0], [2.72, 0.06, 1.95], "#ff8f8f")
+        ]
+      };
+    }
+    function towerPlan() {
+      const nodes = [cyl("core", "Central tower core", "structure", [0, 0.75, 0], 0.55, 3.2, "#4bd2be")];
+      for (let i = 0; i < 6; i++) {
+        nodes.push(box(`floor_${i}`, `Cantilever floor ${i + 1}`, i % 2 ? "surface" : "structure", [0, -0.55 + i * 0.52, 0], [1.55 - i * 0.09, 0.08, 1.2 - i * 0.06], i % 2 ? "#f5c97a" : "#4bd2be", [0, i * 0.28, 0]));
+      }
+      nodes.push(cone("spire", "Signal spire", "detail", [0, 2.78, 0], 0.28, 0.9, "#8fb7ff"));
+      nodes.push(torus("audit_ring", "Overhang audit ring", "audit", [0, 1.02, 0], 1.05, 0.02, "#ff8f8f"));
+      return { name: "Forged tower study", nodes };
+    }
+    function mechanismPlan() {
+      return {
+        name: "Forged watch mechanism",
+        nodes: [
+          torus("outer", "Outer case ring", "structure", [0, 0, 0], 1.2, 0.08, "#4bd2be"),
+          torus("inner", "Inner gear ring", "surface", [0, 0, 0], 0.78, 0.045, "#f5c97a"),
+          cyl("hub", "Central hub", "structure", [0, 0, 0], 0.18, 0.16, "#4bd2be"),
+          ...Array.from({ length: 12 }, (_, i) => {
+            const a = i / 12 * Math.PI * 2;
+            return box(`tooth_${i}`, `Gear tooth ${i + 1}`, "detail", [Math.cos(a) * 0.78, 0, Math.sin(a) * 0.78], [0.12, 0.12, 0.26], "#8fb7ff", [0, -a, 0]);
+          }),
+          box("hand_h", "Hour hand", "surface", [0.25, 0.12, 0], [0.62, 0.04, 0.06], "#f5c97a", [0, 0, -0.3]),
+          box("hand_m", "Minute hand", "surface", [0, 0.14, -0.42], [0.05, 0.04, 0.86], "#f5c97a", [0, 0.2, 0])
+        ]
+      };
+    }
+    return {
+      hLogoPlan: hLogoPlan2,
+      chairPlan,
+      roverPlan,
+      dronePlan,
+      labelWords,
+      housePlan,
+      towerPlan,
+      mechanismPlan
+    };
+  }
+
+  // src/js/modes/forge/agents-run.js
+  function createForgeAgentsRunApi(ctx) {
+    const {
+      $,
+      st,
+      escapeHtml,
+      setStatus,
+      log,
+      traceKind,
+      forgePrefs,
+      updateStage: updateStage2,
+      resetStages,
+      setAgentState,
+      renderAgents,
+      selectedModelFor,
+      modelLabel,
+      updatePlanList,
+      buildPlan,
+      clearScene,
+      initThree,
+      queueProjectSave,
+      autoAssignForgeModels,
+      agentsRouting,
+      classifyForgePrompt,
+      needsTemplateAuthority,
+      isKnifeLikePrompt,
+      isSpoonLikePrompt,
+      isSwordLikePrompt,
+      isDroneLikePrompt,
+      isPhonePrompt,
+      isLaptopPrompt,
+      isSkeletonOnlyPrompt,
+      hLogoPlan: hLogoPlan2,
+      roverPlan,
+      dronePlan,
+      housePlan,
+      towerPlan,
+      mechanismPlan
+    } = ctx;
     async function runGodAgent(useSample) {
       if (!await initThree()) return;
-      if (abortCtrl) abortCtrl.abort();
-      abortCtrl = new AbortController();
-      traceRunCount += 1;
-      traceStartTime = Date.now();
+      if (st.abortCtrl) st.abortCtrl.abort();
+      st.abortCtrl = new AbortController();
+      st.traceRunCount += 1;
+      st.traceStartTime = Date.now();
       const prompt = ($("frgPrompt")?.value || "").trim() || "a complex original 3D object";
       const prefs = forgePrefs();
-      activeReferenceBrief = "";
+      st.activeReferenceBrief = "";
       resetStages();
-      updateStage("input", "done", "prompt locked");
+      updateStage2("input", "done", "prompt locked");
       const traceEntries = $("frgTraceEntries");
       if (traceEntries) traceEntries.innerHTML = "";
       const consoleEl = $("frgTraceConsole");
@@ -1641,7 +1821,7 @@
       AGENTS.forEach((a) => setAgentState(a.id, "idle"));
       setStatus("Forging");
       setAgentState("god", "thinking");
-      log("Orchestrator", `Run ${traceRunCount} started`, "boss");
+      log("Orchestrator", `Run ${st.traceRunCount} started`, "boss");
       autoAssignForgeModels(prompt, false);
       let routeBrief = classifyForgePrompt(prompt);
       if (routeBrief.route === "organic_diffusion") {
@@ -1652,19 +1832,19 @@
         };
         log("Router", "Diffusion backend unavailable; routing organic prompt to direct mesh geometry", "warn");
       }
-      activeForgeRoute = routeBrief.route;
+      st.activeForgeRoute = routeBrief.route;
       log("God Agent", `Route: ${routeBrief.route}`, "boss", routeBrief.brief);
       log("Parameter Agent", useSample ? "Loading sample geometry plan." : `Designing "${prompt}" with ${modelLabel(selectedModelFor("god"))}`, "run");
       let plan = null;
       if (useSample) {
-        plan = hLogoPlan();
+        plan = hLogoPlan2();
         plan.route = "parametric";
       } else {
         try {
-          updateStage("generate", "active", "references");
-          activeReferenceBrief = await gatherReferenceBrief(prompt, routeBrief.route, abortCtrl.signal);
-          updateStage("generate", "active", "parameter agent");
-          plan = await requestForgeKernelPlan(prompt, prefs, activeReferenceBrief, routeBrief, abortCtrl.signal);
+          updateStage2("generate", "active", "references");
+          st.activeReferenceBrief = await gatherReferenceBrief(prompt, routeBrief.route, st.abortCtrl.signal);
+          updateStage2("generate", "active", "parameter agent");
+          plan = await requestForgeKernelPlan(prompt, prefs, st.activeReferenceBrief, routeBrief, st.abortCtrl.signal);
           if (plan) {
             plan.route = routeBrief.route;
             log(routeBrief.route === "anatomical" ? "SDF Kernel" : "Geometry Kernel", `Executed ${routeBrief.route} mesh plan \xB7 ${plan.nodes.length} mesh part(s)`, "ok");
@@ -1674,7 +1854,7 @@
           return;
         }
       }
-      updateStage("generate", "done", plan ? "plan ready" : "failed");
+      updateStage2("generate", "done", plan ? "plan ready" : "failed");
       if (!plan) {
         failForgeRun("Parameter Agent", "No model plan was produced.");
         return;
@@ -1684,16 +1864,16 @@
         plan.route = routeBrief.route;
       }
       setAgentState("god", "done");
-      if (!useSample && routeBrief.route !== "organic_diffusion" && abortCtrl && !abortCtrl.signal.aborted) {
-        updateStage("refine", "active", "structure agent");
+      if (!useSample && routeBrief.route !== "organic_diffusion" && st.abortCtrl && !st.abortCtrl.signal.aborted) {
+        updateStage2("refine", "active", "structure agent");
         const ROLE_PIPELINE = ["structure", "surface", "detail", "audit"];
         for (const role of ROLE_PIPELINE) {
-          if (abortCtrl.signal.aborted) break;
+          if (st.abortCtrl.signal.aborted) break;
           const agentMeta = AGENTS.find((a) => a.id === role);
           setAgentState(role, "thinking");
-          updateStage("refine", "active", `${agentMeta?.name || role}`);
+          updateStage2("refine", "active", `${agentMeta?.name || role}`);
           try {
-            const extraNodes = await askRoleAgentWithFailover(role, prompt, plan, activeReferenceBrief, prefs, abortCtrl.signal);
+            const extraNodes = await askRoleAgentWithFailover(role, prompt, plan, st.activeReferenceBrief, prefs, st.abortCtrl.signal);
             if (Array.isArray(extraNodes) && extraNodes.length) {
               plan.nodes.push(...extraNodes);
               log(agentMeta?.name || role, `Added ${extraNodes.length} ${role} part(s)`, "ok");
@@ -1710,21 +1890,21 @@
         plan = normalizePlan(plan);
         plan.route = routeBrief.route;
       }
-      updateStage("refine", "done", plan.route === "anatomical" ? "sdf smoothed" : "post-process done");
+      updateStage2("refine", "done", plan.route === "anatomical" ? "sdf smoothed" : "post-process done");
       buildPlan(plan);
       saveCurrentProject(false);
       log("Orchestrator", `Forge complete \xB7 ${renderableNodes(plan.nodes).length} mesh part(s) exported`, "ok");
       const dot = $("frgTraceDot");
       if (dot) dot.className = "frg-trace-dot done";
-      updateStage("export", "active", `${(prefs.output || "glb").toUpperCase()} ready`);
+      updateStage2("export", "active", `${(prefs.output || "glb").toUpperCase()} ready`);
       setStatus("Ready");
     }
     function failForgeRun(label, message) {
       log(label || "Forge", message || "Generation failed", "err");
       setStatus("Failed");
-      updateStage("generate", "active", "failed");
-      updateStage("refine", "active", "blocked");
-      updateStage("export", "active", "blocked");
+      updateStage2("generate", "active", "failed");
+      updateStage2("refine", "active", "blocked");
+      updateStage2("export", "active", "blocked");
       AGENTS.forEach((a) => setAgentState(a.id, a.id === "god" ? "failed" : "blocked"));
       const dot = $("frgTraceDot");
       if (dot) dot.className = "frg-trace-dot error";
@@ -1924,7 +2104,7 @@ Rules:
 - Use sphere for organic masses, joints, eyes, caps.
 - Use box only for hard rectangular parts.
 - Build exactly one primary subject. Every primitive must overlap, attach to, or visibly continue that subject. Do not scatter loose sample parts or create a second mini-model.
-- For phones/smartphones, design a thin handheld device with rounded body, screen glass, bezel/rails, camera island or camera bump, lens rings, flash, speaker slots, charging port, side buttons, sensors, and at least 14 meaningful primitives.
+- For phones/smartphones, design a thin handheld device with rounded body, screen glass, bezel/rails, st.camera island or st.camera bump, lens rings, flash, speaker slots, charging port, side buttons, sensors, and at least 14 meaningful primitives.
 - Do not output semantic nodes. Do not mention agents. Do not use object templates.
 - The kernel will blindly execute your primitives; make the geometry recognizable from the parameters alone.
 - Use these reference-derived constraints when present. Treat dimensions and ratios as hard constraints, not prose to repeat.
@@ -2181,13 +2361,13 @@ Rules:
 - Use visible scale. Center the model near origin.
 - Structure nodes first, then surface, detail, audit.
 - Prefer lathe over cylinder for ANY revolved or organic curved form (bowls, vases, heads, limbs, torsos, necks, fruit, bottles, lamp shades, knobs). Cylinder is only for straight mechanical shafts. Lathe profiles let you taper, bulge, and round shapes properly.
-- ALWAYS set "subdivisions":1 on every sphere, capsule, lathe, extrude, and mesh node that represents a smooth organic or sculptural surface. The renderer applies Loop-style smoothing so subdivided primitives look polished instead of faceted.
+- ALWAYS set "subdivisions":1 on every sphere, capsule, lathe, extrude, and mesh node that represents a smooth organic or sculptural surface. The st.renderer applies Loop-style smoothing so subdivided primitives look polished instead of faceted.
 - ALWAYS set "segments":64 (or higher) on every lathe, cylinder, cone, and capsule. Default segment counts are too low to look smooth at production quality.
 - Use cylinders/torus/spheres/cones/capsules for curved, mechanical, or organic parts, boxes for planar parts, lathe for rotational CAD profiles, and extrude for custom 2D outlines with depth.
 - Style target: ${prefs.style}. Detail target: ${prefs.detail}. Output target: ${prefs.output}.
 - For GLB/game output, keep separate named parts, clean pivots, no audit geometry unless it helps editing. For 3D print, make parts visually connected, grounded, and avoid tiny floating details.
 - For animals, people, products, vehicles, tools, symbols, architecture, furniture, machines, or abstract sculptures, build a recognizable primitive approximation.
-- For phones/smartphones, return a recognizable smartphone, not a plain slab: rounded frame, glass display, bezels/metal rails, camera bump/island, multiple lenses/rings, flash, speaker slots, charging port, side buttons, sensors, and UI/display details. Minimum 18 visible non-audit parts.
+- For phones/smartphones, return a recognizable smartphone, not a plain slab: rounded frame, glass display, bezels/metal rails, st.camera bump/island, multiple lenses/rings, flash, speaker slots, charging port, side buttons, sensors, and UI/display details. Minimum 18 visible non-audit parts.
 - For animals, build a real quadruped model with smooth mesh surface nodes: horizontal torso mesh, chest/hip masses, neck, head mesh, muzzle, two ears, four legs with paws, and tail. Name those parts explicitly. Never return a mushroom, pedestal, humanoid, chair-like stack, or abstract mascot when the prompt asks for an animal.
 - For spoons or cutlery, build a recognizable utensil: a shallow concave oval bowl/scoop mesh, raised rim/lip, narrowed neck transition, long tapered handle mesh, rounded handle end, metal bevels/highlights, and polished steel/silver material. Never return a symbol, pentagon, plaque, ball, or generic primitive stack.
 - For people or humanoid characters, build a proportional anatomical body model, not a toy mannequin: head about 1/7.5 body height, ribcage narrower than shoulders, pelvis below abdomen, arms hanging beside torso, knees/ankles aligned, hands and feet sized correctly.
@@ -2230,10 +2410,10 @@ Maximum ${prefs?.detail === "high" ? 14 : prefs?.detail === "fast" ? 5 : 9} node
 Use this style/output target: ${prefs?.style || "realistic"} / ${prefs?.output || "glb"}.
 Use the reference brief to add accurate object-specific parts, not generic decoration.
 Single subject rule: every new node must attach to an existing visible part as a surface, limb, support, panel, handle, fastener, seam, or material feature. Never add a freestanding object, loose sample primitive, second character, side prop, or detached mini-model. Return [] if your only idea would be separate from the main object.
-For phones, add only smartphone parts: rounded frame, screen glass, bezels, camera island, lens rings, flash, speaker slots, charging port, side buttons, sensors, and subtle UI tiles.
+For phones, add only smartphone parts: rounded frame, screen glass, bezels, st.camera island, lens rings, flash, speaker slots, charging port, side buttons, sensors, and subtle UI tiles.
 For animals, add only anatomical quadruped parts: torso/chest/hips, head/muzzle, ears, legs, paws, tail, eyes, nose, whiskers, fur patches.
 For spoons, add only utensil parts: concave bowl/scoop, rim/lip, neck/shoulder transition, long tapered handle, end cap, bevels, polished metal highlights.
-Do not add floating decorations or abstract markers. Structure must add load-bearing/support parts; surface must refine silhouette/material panels; detail must add handles, bolts, seams, bevels, grooves, controls, or functional small parts; audit must add only clearance/balance/floor/symmetry review markers.`;
+Do not add floating decorations or abstract markers. Structure must add load-bearing/support parts; surface must refine silhouette/material panels; detail must add handles, bolts, seams, bevels, grooves, st.controls, or functional small parts; audit must add only clearance/balance/floor/symmetry review markers.`;
       const text = await api.ollamaChat(model, [
         { role: "system", content: system },
         { role: "user", content: `User object: ${prompt}
@@ -2320,7 +2500,7 @@ Current plan: ${existing}` }
       const next = {
         ...normalized,
         name: normalized.name || (cat ? "Mesh cat model" : "Mesh animal model"),
-        nodes: meshNodes.slice(0, MAX_FORGE_NODES)
+        nodes: meshNodes.slice(0, MAX_FORGE_NODES2)
       };
       log("Surface Agent", `Reconstructed organic mesh surface \xB7 ${meshNodes.length} mesh node(s)`, "ok");
       return next;
@@ -2340,8 +2520,8 @@ Current plan: ${existing}` }
         ellipsoidMesh("mesh_forehead_frontal", "Sloped frontal bone forehead mesh", "surface", [0, 0.79, 0.38], [0.46, 0.27, 0.18], bone, [-0.12, 0, 0]),
         ellipsoidMesh("mesh_left_parietal", "Left parietal bone mesh", "surface", [-0.39, 0.6, -0.04], [0.2, 0.43, 0.4], bone),
         ellipsoidMesh("mesh_right_parietal", "Right parietal bone mesh", "surface", [0.39, 0.6, -0.04], [0.2, 0.43, 0.4], bone),
-        torus("mesh_left_orbital_rim", "Left eye socket orbital rim mesh", "structure", [-0.24, 0.4, 0.54], 0.16, 0.024, bone, [0, Math.PI / 2, 0]),
-        torus("mesh_right_orbital_rim", "Right eye socket orbital rim mesh", "structure", [0.24, 0.4, 0.54], 0.16, 0.024, bone, [0, Math.PI / 2, 0]),
+        torus2("mesh_left_orbital_rim", "Left eye socket orbital rim mesh", "structure", [-0.24, 0.4, 0.54], 0.16, 0.024, bone, [0, Math.PI / 2, 0]),
+        torus2("mesh_right_orbital_rim", "Right eye socket orbital rim mesh", "structure", [0.24, 0.4, 0.54], 0.16, 0.024, bone, [0, Math.PI / 2, 0]),
         ellipsoidMesh("mesh_left_eye_socket_void", "Left eye socket dark hollow mesh", "surface", [-0.24, 0.39, 0.57], [0.14, 0.105, 0.035], dark),
         ellipsoidMesh("mesh_right_eye_socket_void", "Right eye socket dark hollow mesh", "surface", [0.24, 0.39, 0.57], [0.14, 0.105, 0.035], dark),
         coneMesh("mesh_nasal_cavity", "Pear-shaped nasal cavity aperture mesh", "surface", [0, 0.18, 0.6], [0.14, 0.3, 0.07], dark, [Math.PI, 0, 0]),
@@ -2372,7 +2552,7 @@ Current plan: ${existing}` }
         tubeMesh("mesh_right_dental_arcade", "Right dental arcade curve mesh", "surface", [[0.33, -0.1, 0.48], [0.2, -0.13, 0.58], [0, -0.14, 0.61]], 0.018, bone)
       );
       log("Surface Agent", `Reconstructed anatomical skull mesh \xB7 ${nodes.length} mesh node(s)`, "ok");
-      return { ...normalized, name: "Anatomical mesh skull", nodes: nodes.slice(0, MAX_FORGE_NODES) };
+      return { ...normalized, name: "Anatomical mesh skull", nodes: nodes.slice(0, MAX_FORGE_NODES2) };
     }
     function reconstructSpoonStructure(prompt, plan) {
       const normalized = normalizePlan(plan);
@@ -2387,7 +2567,7 @@ Current plan: ${existing}` }
       const dark = "#424c49";
       const nodes = [
         spoonBowlMesh("spoon_bowl_concave", "Concave oval spoon bowl polished metal mesh", "structure", [0.82, 0.03, 0], 0.62, 0.38, 0.14, steel),
-        torus("spoon_bowl_raised_rim", "Raised oval bowl rim lip polished metal", "surface", [0.82, 0.08, 0], 0.38, 0.018, bright, [Math.PI / 2, 0, 0]),
+        torus2("spoon_bowl_raised_rim", "Raised oval bowl rim lip polished metal", "surface", [0.82, 0.08, 0], 0.38, 0.018, bright, [Math.PI / 2, 0, 0]),
         spoonBowlMesh("spoon_inner_shadow", "Inner concave scoop shadow surface", "surface", [0.82, 0.018, 0], 0.48, 0.29, 0.09, shadow),
         taperedHandleMesh("spoon_handle_tapered", "Long tapered spoon handle polished metal mesh", "structure", [-0.58, 0.025, 0], 1.86, 0.22, 0.11, 0.045, steel),
         taperedHandleMesh("spoon_handle_top_highlight", "Raised handle center highlight ridge", "surface", [-0.58, 0.064, 0], 1.55, 0.085, 0.045, 0.012, bright),
@@ -2403,7 +2583,7 @@ Current plan: ${existing}` }
       ];
       nodes[1].scale = [1.55, 0.18, 1];
       log("Surface Agent", `Reconstructed spoon-specific CAD mesh \xB7 ${nodes.length} mesh node(s)`, "ok");
-      return { ...normalized, name: "Polished metal spoon", nodes: nodes.slice(0, MAX_FORGE_NODES) };
+      return { ...normalized, name: "Polished metal spoon", nodes: nodes.slice(0, MAX_FORGE_NODES2) };
     }
     function ellipsoidMesh(id, name, role, position, radii, color, rotation) {
       return { id, name, role, type: "mesh", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: makeEllipsoidMeshParams(radii[0], radii[1], radii[2]), color, opacity: 0.98 };
@@ -2651,7 +2831,7 @@ ${String(badText || "").slice(0, 9e3)}`
       const normalized = normalizePlan(plan);
       const nodes = renderableNodes(normalized.nodes);
       const rotorNodes = nodes.filter((node) => /rotor|prop|propeller|guard|motor/i.test(`${node.id} ${node.name}`));
-      const bodyNodes = nodes.filter((node) => /body|core|fuselage|avionics|camera|lens/i.test(`${node.id} ${node.name}`));
+      const bodyNodes = nodes.filter((node) => /body|core|fuselage|avionics|st.camera|lens/i.test(`${node.id} ${node.name}`));
       const guardNodes = nodes.filter((node) => /guard|halo/i.test(`${node.id} ${node.name}`));
       const propNodes = nodes.filter((node) => /prop|propeller|blade/i.test(`${node.id} ${node.name}`));
       const landingNodes = nodes.filter((node) => /landing|skid|strut/i.test(`${node.id} ${node.name}`));
@@ -2670,7 +2850,7 @@ ${String(badText || "").slice(0, 9e3)}`
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 16) return false;
       const text = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
-      const cameraNodes = nodes.filter((node) => /camera|lens|flash/i.test(`${node.id} ${node.name}`));
+      const cameraNodes = nodes.filter((node) => /st.camera|lens|flash/i.test(`${node.id} ${node.name}`));
       const controlNodes = nodes.filter((node) => /button|port|speaker|notch|sensor|bezel|rail|frame/i.test(`${node.id} ${node.name}`));
       const hasBody = /\b(body|chassis|frame|case|shell)\b/.test(text);
       const hasScreen = /\b(screen|display|glass|panel)\b/.test(text);
@@ -2774,7 +2954,7 @@ ${String(badText || "").slice(0, 9e3)}`
     }
     function allowsMultipleForgeSubjects(prompt) {
       const q = String(prompt || "").toLowerCase();
-      return /\b(two|three|four|five|pair|set of|collection|group|scene|diorama|room|city|street|landscape)\b/.test(q) || /\bon (a |the )?(table|desk|workbench|floor|shelf)\b/.test(q);
+      return /\b(two|three|four|five|pair|set of|collection|group|st.scene|diorama|room|city|street|landscape)\b/.test(q) || /\bon (a |the )?(table|desk|workbench|floor|shelf)\b/.test(q);
     }
     function connectedModelStats(nodes) {
       const items = (Array.isArray(nodes) ? nodes : []).map((node, index) => {
@@ -2902,7 +3082,7 @@ ${String(badText || "").slice(0, 9e3)}`
         box("blade_core", chef ? "Chef knife blade body" : "Knife blade body", "structure", [0.42, 0.18, 0], [bladeLen, 0.08, bladeWidth], "#d9dee2"),
         box("blade_spine", "Straight blade spine", "surface", [0.36, 0.235, -bladeWidth * 0.42], [bladeLen * 0.92, 0.035, 0.035], "#f4f7f8"),
         box("blade_edge", "Sharpened cutting edge", "surface", [0.42, 0.13, bladeWidth * 0.46], [bladeLen * 0.95, 0.035, 0.045], "#f4f7f8", [0, 0, -0.018]),
-        cone("blade_tip", "Pointed blade tip", "structure", [0.42 + bladeLen / 2 + 0.18, 0.18, 0], bladeWidth * 0.52, 0.36, "#eef3f5", [0, 0, -Math.PI / 2]),
+        cone2("blade_tip", "Pointed blade tip", "structure", [0.42 + bladeLen / 2 + 0.18, 0.18, 0], bladeWidth * 0.52, 0.36, "#eef3f5", [0, 0, -Math.PI / 2]),
         box("blade_fuller", "Central blade groove", "detail", [0.36, 0.245, 6e-3], [bladeLen * 0.58, 0.022, 0.026], "#6f8794"),
         box("tang", "Full tang", "structure", [-0.78, 0.18, 0], [0.72, 0.055, 0.1], "#9aa4a8"),
         box("guard", "Finger guard bolster", "structure", [-0.42, 0.18, 0], [0.09, 0.22, 0.34], "#c9a96e"),
@@ -2926,7 +3106,7 @@ ${String(badText || "").slice(0, 9e3)}`
       const bladeY = 0.72;
       const nodes = [
         box("blade_core", "Long blade body", "structure", [0, bladeY, 0], [0.22, bladeLen, 0.055], "#d9dee2"),
-        cone("blade_tip", "Piercing blade tip", "structure", [0, bladeY + bladeLen / 2 + 0.24, 0], 0.19, 0.52, "#eef3f5", [0, 0, Math.PI / 4]),
+        cone2("blade_tip", "Piercing blade tip", "structure", [0, bladeY + bladeLen / 2 + 0.24, 0], 0.19, 0.52, "#eef3f5", [0, 0, Math.PI / 4]),
         box("blade_ridge", "Central fuller ridge", "detail", [0, bladeY + 0.2, 0.035], [0.035, bladeLen * 0.78, 0.018], "#9fb0ba"),
         box("left_edge", "Left sharpened bevel", "surface", [-0.14, bladeY + 0.12, 0.01], [0.055, bladeLen * 0.94, 0.035], "#f4f7f8", [0, 0, curved ? -0.035 : 0]),
         box("right_edge", "Right sharpened bevel", "surface", [0.14, bladeY + 0.12, 0.01], [0.055, bladeLen * 0.94, 0.035], "#f4f7f8", [0, 0, curved ? 0.035 : 0]),
@@ -2934,13 +3114,13 @@ ${String(badText || "").slice(0, 9e3)}`
         sphere("guard_left_cap", "Left guard cap", "detail", [-0.66, -1.05, 0], 0.12, "#f5c97a"),
         sphere("guard_right_cap", "Right guard cap", "detail", [0.66, -1.05, 0], 0.12, "#f5c97a"),
         cyl("grip_core", "Leather grip core", "structure", [0, -1.55, 0], 0.15, 0.78, "#4b3428"),
-        torus("grip_ring_top", "Top grip ring", "detail", [0, -1.18, 0], 0.17, 0.025, "#8fb7ff"),
-        torus("grip_ring_mid", "Middle grip ring", "detail", [0, -1.55, 0], 0.17, 0.022, "#8fb7ff"),
-        torus("grip_ring_bottom", "Bottom grip ring", "detail", [0, -1.91, 0], 0.17, 0.025, "#8fb7ff"),
+        torus2("grip_ring_top", "Top grip ring", "detail", [0, -1.18, 0], 0.17, 0.025, "#8fb7ff"),
+        torus2("grip_ring_mid", "Middle grip ring", "detail", [0, -1.55, 0], 0.17, 0.022, "#8fb7ff"),
+        torus2("grip_ring_bottom", "Bottom grip ring", "detail", [0, -1.91, 0], 0.17, 0.025, "#8fb7ff"),
         sphere("pommel", "Weighted pommel", "structure", [0, -2.13, 0], 0.22, "#c9a96e"),
         cyl("pommel_pin", "Pommel pin", "detail", [0, -2.36, 0], 0.055, 0.22, "#f5c97a"),
         box("audit_balance", "Balance audit marker", "audit", [0, -0.55, 0.22], [0.08, 0.08, 0.08], "#ff8f8f"),
-        torus("blade_profile_audit", "Blade profile audit ring", "audit", [0, 0.95, 0], 0.36, 0.012, "#ff8f8f", [0, 0, 0]),
+        torus2("blade_profile_audit", "Blade profile audit ring", "audit", [0, 0.95, 0], 0.36, 0.012, "#ff8f8f", [0, 0, 0]),
         box("shadow_floor_ref", "Floor alignment reference", "audit", [0, -2.48, 0], [1.25, 0.035, 0.18], "#ff8f8f"),
         box("fuller_channel", "Recessed fuller channel", "detail", [0, bladeY + 0.05, 0.062], [0.09, bladeLen * 0.62, 0.014], "#6f8794")
       ];
@@ -2960,7 +3140,7 @@ ${String(badText || "").slice(0, 9e3)}`
       const nodes = [];
       if (round) {
         nodes.push(cyl("table_top", "Round tabletop slab", "structure", [0, 0.18, 0], 1.18, 0.16, topColor, [0, 0, 0]));
-        nodes.push(torus("table_top_bevel", "Rounded tabletop bevel", "surface", [0, 0.27, 0], 1.18, 0.035, edgeColor));
+        nodes.push(torus2("table_top_bevel", "Rounded tabletop bevel", "surface", [0, 0.27, 0], 1.18, 0.035, edgeColor));
         nodes.push(cyl("pedestal", "Central pedestal column", "structure", [0, -0.48, 0], 0.16, 1.28, legColor));
         nodes.push(cyl("pedestal_base", "Weighted circular base", "structure", [0, -1.05, 0], 0.54, 0.12, legColor));
         for (let i = 0; i < 6; i++) {
@@ -2968,7 +3148,7 @@ ${String(badText || "").slice(0, 9e3)}`
           nodes.push(box(`radial_support_${i}`, `Radial support ${i + 1}`, "surface", [Math.cos(a) * 0.43, -0.02, Math.sin(a) * 0.43], [0.72, 0.055, 0.055], edgeColor, [0, -a, 0]));
           nodes.push(sphere(`screw_${i}`, `Top screw cap ${i + 1}`, "detail", [Math.cos(a) * 0.74, 0.31, Math.sin(a) * 0.74], 0.035, "#8fb7ff"));
         }
-        nodes.push(torus("audit_round_clearance", "Round clearance audit", "audit", [0, -1.13, 0], 1.24, 0.012, "#ff8f8f"));
+        nodes.push(torus2("audit_round_clearance", "Round clearance audit", "audit", [0, -1.13, 0], 1.24, 0.012, "#ff8f8f"));
         return { name: "Forged round table", nodes };
       }
       nodes.push(box("table_top", "Tabletop slab", "structure", [0, 0.15, 0], [2.65, 0.16, 1.45], topColor));
@@ -2997,7 +3177,7 @@ ${String(badText || "").slice(0, 9e3)}`
       nodes.push(box("wood_grain_front", "Front wood grain line", "detail", [0, 0.335, 0.34], [2.28, 0.012, 0.025], "#8fb7ff"));
       nodes.push(box("wood_grain_back", "Back wood grain line", "detail", [0, 0.338, -0.22], [2.12, 0.012, 0.025], "#8fb7ff"));
       nodes.push(box("floor_contact_audit", "Floor contact audit plane", "audit", [0, FLOOR_Y + 0.012, 0], [2.55, 0.025, 1.26], "#ff8f8f"));
-      nodes.push(torus("clearance_audit", "Knee clearance audit ring", "audit", [0, -0.44, 0], 0.68, 0.012, "#ff8f8f"));
+      nodes.push(torus2("clearance_audit", "Knee clearance audit ring", "audit", [0, -0.44, 0], 0.68, 0.012, "#ff8f8f"));
       return { name: workbench ? "Forged workbench" : "Forged table", nodes };
     }
     function personPlan(prompt) {
@@ -3012,35 +3192,35 @@ ${String(badText || "").slice(0, 9e3)}`
       const deepSkin = /robot|android|cyborg/.test(q) ? "#5f8fd8" : "#9d7358";
       const dark = "#2f2118";
       const nodes = [
-        ellipsoid("head", "Anatomical head", "surface", [0, 1.82, 0.03], 0.24, [0.82, 1.08, 0.76], skin),
-        capsule("neck", "Neck", "surface", [0, 1.47, 0], 0.105, 0.23, skin),
-        ellipsoid("chest", "Ribcage chest mass", "structure", [0, 1.12, 0], 0.42, [1, 1.08, 0.58], skin),
-        ellipsoid("abdomen", "Abdominal mass", "surface", [0, 0.66, 0.02], 0.34, [0.9, 1.02, 0.55], skin),
-        ellipsoid("pelvis", "Pelvic mass", "structure", [0, 0.22, 0], 0.34, [1.12, 0.68, 0.62], deepSkin),
-        ellipsoid("left_pectoralis", "Left pectoral plane", "detail", [-0.16, 1.2, 0.25], 0.16, [1.25, 0.45, 0.2], deepSkin),
-        ellipsoid("right_pectoralis", "Right pectoral plane", "detail", [0.16, 1.2, 0.25], 0.16, [1.25, 0.45, 0.2], deepSkin),
-        capsule("spine_pose_line", "Subtle spinal posture line", "detail", [0, 0.92, -0.27], 0.018, 0.86, "#d9dee2"),
-        ellipsoid("left_shoulder", "Left deltoid", "surface", [-0.5, 1.3, 0], 0.15, [1.2, 0.86, 0.82], skin),
-        ellipsoid("right_shoulder", "Right deltoid", "surface", [0.5, 1.3, 0], 0.15, [1.2, 0.86, 0.82], skin),
-        capsule("left_upper_arm", "Left upper arm", "surface", [-0.69, 0.92, 0], 0.095, 0.52, skin, [0, 0, -0.22]),
-        capsule("right_upper_arm", "Right upper arm", "surface", [0.69, 0.92, 0], 0.095, 0.52, skin, [0, 0, 0.22]),
-        ellipsoid("left_elbow", "Left elbow", "detail", [-0.78, 0.55, 0], 0.075, [1, 0.85, 0.85], deepSkin),
-        ellipsoid("right_elbow", "Right elbow", "detail", [0.78, 0.55, 0], 0.075, [1, 0.85, 0.85], deepSkin),
-        capsule("left_forearm", "Left forearm", "surface", [-0.82, 0.2, 0], 0.075, 0.5, skin, [0, 0, -0.08]),
-        capsule("right_forearm", "Right forearm", "surface", [0.82, 0.2, 0], 0.075, 0.5, skin, [0, 0, 0.08]),
-        ellipsoid("left_hand", "Left hand", "detail", [-0.86, -0.12, 0.03], 0.095, [0.8, 0.42, 1.25], skin),
-        ellipsoid("right_hand", "Right hand", "detail", [0.86, -0.12, 0.03], 0.095, [0.8, 0.42, 1.25], skin),
-        capsule("left_thigh", "Left thigh", "surface", [-0.2, -0.38, 0], 0.13, 0.72, deepSkin, [0.03, 0, -0.05]),
-        capsule("right_thigh", "Right thigh", "surface", [0.2, -0.38, 0], 0.13, 0.72, deepSkin, [0.03, 0, 0.05]),
-        ellipsoid("left_knee", "Left knee", "detail", [-0.21, -0.84, 0.04], 0.1, [0.9, 0.72, 0.82], skin),
-        ellipsoid("right_knee", "Right knee", "detail", [0.21, -0.84, 0.04], 0.1, [0.9, 0.72, 0.82], skin),
-        capsule("left_lower_leg", "Left lower leg", "surface", [-0.21, -1.27, 0], 0.095, 0.7, skin),
-        capsule("right_lower_leg", "Right lower leg", "surface", [0.21, -1.27, 0], 0.095, 0.7, skin),
-        ellipsoid("left_foot", "Left foot", "detail", [-0.22, -1.72, 0.13], 0.12, [0.75, 0.34, 1.55], skin),
-        ellipsoid("right_foot", "Right foot", "detail", [0.22, -1.72, 0.13], 0.12, [0.75, 0.34, 1.55], skin),
-        ellipsoid("left_eye", "Left eye", "detail", [-0.075, 1.85, 0.2], 0.022, [1, 0.72, 0.32], "#050505"),
-        ellipsoid("right_eye", "Right eye", "detail", [0.075, 1.85, 0.2], 0.022, [1, 0.72, 0.32], "#050505"),
-        capsule("nose_bridge", "Nose bridge", "detail", [0, 1.78, 0.225], 0.018, 0.08, deepSkin, [Math.PI / 2, 0, 0]),
+        ellipsoid2("head", "Anatomical head", "surface", [0, 1.82, 0.03], 0.24, [0.82, 1.08, 0.76], skin),
+        capsule2("neck", "Neck", "surface", [0, 1.47, 0], 0.105, 0.23, skin),
+        ellipsoid2("chest", "Ribcage chest mass", "structure", [0, 1.12, 0], 0.42, [1, 1.08, 0.58], skin),
+        ellipsoid2("abdomen", "Abdominal mass", "surface", [0, 0.66, 0.02], 0.34, [0.9, 1.02, 0.55], skin),
+        ellipsoid2("pelvis", "Pelvic mass", "structure", [0, 0.22, 0], 0.34, [1.12, 0.68, 0.62], deepSkin),
+        ellipsoid2("left_pectoralis", "Left pectoral plane", "detail", [-0.16, 1.2, 0.25], 0.16, [1.25, 0.45, 0.2], deepSkin),
+        ellipsoid2("right_pectoralis", "Right pectoral plane", "detail", [0.16, 1.2, 0.25], 0.16, [1.25, 0.45, 0.2], deepSkin),
+        capsule2("spine_pose_line", "Subtle spinal posture line", "detail", [0, 0.92, -0.27], 0.018, 0.86, "#d9dee2"),
+        ellipsoid2("left_shoulder", "Left deltoid", "surface", [-0.5, 1.3, 0], 0.15, [1.2, 0.86, 0.82], skin),
+        ellipsoid2("right_shoulder", "Right deltoid", "surface", [0.5, 1.3, 0], 0.15, [1.2, 0.86, 0.82], skin),
+        capsule2("left_upper_arm", "Left upper arm", "surface", [-0.69, 0.92, 0], 0.095, 0.52, skin, [0, 0, -0.22]),
+        capsule2("right_upper_arm", "Right upper arm", "surface", [0.69, 0.92, 0], 0.095, 0.52, skin, [0, 0, 0.22]),
+        ellipsoid2("left_elbow", "Left elbow", "detail", [-0.78, 0.55, 0], 0.075, [1, 0.85, 0.85], deepSkin),
+        ellipsoid2("right_elbow", "Right elbow", "detail", [0.78, 0.55, 0], 0.075, [1, 0.85, 0.85], deepSkin),
+        capsule2("left_forearm", "Left forearm", "surface", [-0.82, 0.2, 0], 0.075, 0.5, skin, [0, 0, -0.08]),
+        capsule2("right_forearm", "Right forearm", "surface", [0.82, 0.2, 0], 0.075, 0.5, skin, [0, 0, 0.08]),
+        ellipsoid2("left_hand", "Left hand", "detail", [-0.86, -0.12, 0.03], 0.095, [0.8, 0.42, 1.25], skin),
+        ellipsoid2("right_hand", "Right hand", "detail", [0.86, -0.12, 0.03], 0.095, [0.8, 0.42, 1.25], skin),
+        capsule2("left_thigh", "Left thigh", "surface", [-0.2, -0.38, 0], 0.13, 0.72, deepSkin, [0.03, 0, -0.05]),
+        capsule2("right_thigh", "Right thigh", "surface", [0.2, -0.38, 0], 0.13, 0.72, deepSkin, [0.03, 0, 0.05]),
+        ellipsoid2("left_knee", "Left knee", "detail", [-0.21, -0.84, 0.04], 0.1, [0.9, 0.72, 0.82], skin),
+        ellipsoid2("right_knee", "Right knee", "detail", [0.21, -0.84, 0.04], 0.1, [0.9, 0.72, 0.82], skin),
+        capsule2("left_lower_leg", "Left lower leg", "surface", [-0.21, -1.27, 0], 0.095, 0.7, skin),
+        capsule2("right_lower_leg", "Right lower leg", "surface", [0.21, -1.27, 0], 0.095, 0.7, skin),
+        ellipsoid2("left_foot", "Left foot", "detail", [-0.22, -1.72, 0.13], 0.12, [0.75, 0.34, 1.55], skin),
+        ellipsoid2("right_foot", "Right foot", "detail", [0.22, -1.72, 0.13], 0.12, [0.75, 0.34, 1.55], skin),
+        ellipsoid2("left_eye", "Left eye", "detail", [-0.075, 1.85, 0.2], 0.022, [1, 0.72, 0.32], "#050505"),
+        ellipsoid2("right_eye", "Right eye", "detail", [0.075, 1.85, 0.2], 0.022, [1, 0.72, 0.32], "#050505"),
+        capsule2("nose_bridge", "Nose bridge", "detail", [0, 1.78, 0.225], 0.018, 0.08, deepSkin, [Math.PI / 2, 0, 0]),
         box("mouth_line", "Mouth line", "detail", [0, 1.68, 0.205], [0.13, 0.012, 0.012], dark)
       ];
       if (/skeleton inside|visible skeleton|xray|x-ray|x ray/.test(q)) {
@@ -3129,26 +3309,26 @@ ${String(badText || "").slice(0, 9e3)}`
       const nodes = [
         box("phone_frame_plate", isIphone ? "iPhone rounded metal frame plate" : "Smartphone rounded metal frame plate", "structure", [0, 0, 0], [0.68, 0.052, 1.34], edge),
         box("phone_body_inset", "Thin dark phone body inset", "structure", [0, 0.018, 0], [0.61, 0.045, 1.25], body),
-        ellipsoid("corner_top_left", "Rounded top left corner cap", "surface", [-0.285, 0.032, -0.59], 0.07, [1, 0.18, 1], edge),
-        ellipsoid("corner_top_right", "Rounded top right corner cap", "surface", [0.285, 0.032, -0.59], 0.07, [1, 0.18, 1], edge),
-        ellipsoid("corner_bottom_left", "Rounded bottom left corner cap", "surface", [-0.285, 0.032, 0.59], 0.07, [1, 0.18, 1], edge),
-        ellipsoid("corner_bottom_right", "Rounded bottom right corner cap", "surface", [0.285, 0.032, 0.59], 0.07, [1, 0.18, 1], edge),
+        ellipsoid2("corner_top_left", "Rounded top left corner cap", "surface", [-0.285, 0.032, -0.59], 0.07, [1, 0.18, 1], edge),
+        ellipsoid2("corner_top_right", "Rounded top right corner cap", "surface", [0.285, 0.032, -0.59], 0.07, [1, 0.18, 1], edge),
+        ellipsoid2("corner_bottom_left", "Rounded bottom left corner cap", "surface", [-0.285, 0.032, 0.59], 0.07, [1, 0.18, 1], edge),
+        ellipsoid2("corner_bottom_right", "Rounded bottom right corner cap", "surface", [0.285, 0.032, 0.59], 0.07, [1, 0.18, 1], edge),
         box("phone_screen_glass", "Black glass display panel", "surface", [0, 0.057, 0.03], [0.55, 0.018, 1.12], glass),
         box("phone_wallpaper_glow", "Display wallpaper glow layer", "surface", [0, 0.069, 0.05], [0.45, 6e-3, 0.82], glow),
         box("phone_top_bezel", "Top display bezel", "surface", [0, 0.073, -0.53], [0.49, 0.012, 0.075], "#0b1012"),
         box("phone_bottom_bezel", "Bottom display bezel", "surface", [0, 0.073, 0.59], [0.47, 0.012, 0.055], "#0b1012"),
         box("phone_left_metal_rail", "Left polished metal rail", "surface", [-0.348, 0.034, 0], [0.025, 0.068, 1.12], edge),
         box("phone_right_metal_rail", "Right polished metal rail", "surface", [0.348, 0.034, 0], [0.025, 0.068, 1.12], edge),
-        box("phone_dynamic_island", isIphone ? "Dynamic island camera sensor cutout" : "Camera notch sensor cutout", "detail", [0, 0.085, -0.43], [0.2, 0.012, 0.04], "#020303"),
-        sphere("selfie_camera_dot", "Selfie camera dot", "detail", [0.11, 0.092, -0.43], 0.016, "#111827"),
+        box("phone_dynamic_island", isIphone ? "Dynamic island st.camera sensor cutout" : "Camera notch sensor cutout", "detail", [0, 0.085, -0.43], [0.2, 0.012, 0.04], "#020303"),
+        sphere("selfie_camera_dot", "Selfie st.camera dot", "detail", [0.11, 0.092, -0.43], 0.016, "#111827"),
         box("earpiece_slot", "Earpiece speaker slot", "detail", [0, 0.091, -0.49], [0.13, 8e-3, 0.012], "#1f2937"),
-        box("camera_bump", "Raised rear camera island bump", "structure", [-0.17, 0.096, -0.42], [0.25, 0.045, 0.28], isIphone ? "#20262c" : "#263238"),
-        cyl("camera_main_ring", "Main camera metal lens ring", "detail", [-0.22, 0.13, -0.48], 0.052, 0.016, edge),
-        cyl("camera_wide_ring", "Wide camera metal lens ring", "detail", [-0.11, 0.13, -0.48], 0.046, 0.016, edge),
-        cyl("camera_tele_ring", "Telephoto camera metal lens ring", "detail", [-0.22, 0.13, -0.36], 0.044, 0.016, edge),
-        cyl("camera_main_glass", "Main camera blue glass", "detail", [-0.22, 0.143, -0.48], 0.036, 8e-3, "#8fb7ff"),
-        cyl("camera_wide_glass", "Wide camera blue glass", "detail", [-0.11, 0.143, -0.48], 0.031, 8e-3, "#8fb7ff"),
-        cyl("camera_tele_glass", "Telephoto camera blue glass", "detail", [-0.22, 0.143, -0.36], 0.03, 8e-3, "#8fb7ff"),
+        box("camera_bump", "Raised rear st.camera island bump", "structure", [-0.17, 0.096, -0.42], [0.25, 0.045, 0.28], isIphone ? "#20262c" : "#263238"),
+        cyl("camera_main_ring", "Main st.camera metal lens ring", "detail", [-0.22, 0.13, -0.48], 0.052, 0.016, edge),
+        cyl("camera_wide_ring", "Wide st.camera metal lens ring", "detail", [-0.11, 0.13, -0.48], 0.046, 0.016, edge),
+        cyl("camera_tele_ring", "Telephoto st.camera metal lens ring", "detail", [-0.22, 0.13, -0.36], 0.044, 0.016, edge),
+        cyl("camera_main_glass", "Main st.camera blue glass", "detail", [-0.22, 0.143, -0.48], 0.036, 8e-3, "#8fb7ff"),
+        cyl("camera_wide_glass", "Wide st.camera blue glass", "detail", [-0.11, 0.143, -0.48], 0.031, 8e-3, "#8fb7ff"),
+        cyl("camera_tele_glass", "Telephoto st.camera blue glass", "detail", [-0.22, 0.143, -0.36], 0.03, 8e-3, "#8fb7ff"),
         cyl("camera_flash_disc", "Camera flash disc", "detail", [-0.1, 0.14, -0.36], 0.023, 8e-3, "#f5c97a"),
         sphere("lidar_sensor", "Small LiDAR sensor dot", "detail", [-0.16, 0.142, -0.42], 0.016, "#050505"),
         box("volume_up_button", "Volume up side button", "detail", [-0.372, 0.065, -0.16], [0.014, 0.027, 0.16], edge),
@@ -3162,7 +3342,7 @@ ${String(badText || "").slice(0, 9e3)}`
         ...foldable ? [
           box("fold_hinge_line", "Foldable phone hinge line", "detail", [0, 0.093, 0], [0.58, 0.01, 0.018], "#d7dde0")
         ] : [],
-        torus("phone_clearance_audit", "Phone floor clearance audit", "audit", [0, -0.02, 0], 0.73, 0.01, "#ff8f8f")
+        torus2("phone_clearance_audit", "Phone floor clearance audit", "audit", [0, -0.02, 0], 0.73, 0.01, "#ff8f8f")
       ];
       return { name: isIphone ? "Forged iPhone" : "Forged smartphone", nodes };
     }
@@ -3195,8 +3375,8 @@ ${String(badText || "").slice(0, 9e3)}`
       if (/iphone|phone|smartphone|mobile/.test(q)) {
         nodes.push(...prefixNodes(phonePlan(prompt).nodes.filter((node) => node.role !== "audit"), "phone", [-0.82, 0.36, 0.32], [0, 0.02, -0.35]));
       }
-      nodes.push(box("scene_clearance_audit", "Desktop scene clearance audit", "audit", [0, FLOOR_Y + 0.014, 0], [2.9, 0.028, 1.7], "#ff8f8f"));
-      return { name: "Forged electronics desk scene", nodes: nodes.slice(0, MAX_FORGE_NODES) };
+      nodes.push(box("scene_clearance_audit", "Desktop st.scene clearance audit", "audit", [0, FLOOR_Y + 0.014, 0], [2.9, 0.028, 1.7], "#ff8f8f"));
+      return { name: "Forged electronics desk st.scene", nodes: nodes.slice(0, MAX_FORGE_NODES2) };
     }
     function prefixNodes(nodes, prefix, offset, extraRotation) {
       return nodes.map((node) => {
@@ -3241,7 +3421,7 @@ ${String(badText || "").slice(0, 9e3)}`
         ...Array.from({ length: 4 }, (_, i) => sphere(`fastener_${i}`, `Fastener ${i + 1}`, "detail", [(i % 2 ? 1 : -1) * wide * 0.37, i > 1 ? 0.3 : -0.08, deep / 2 + 0.09], 0.035, "#8fb7ff")),
         ...Array.from({ length: 5 }, (_, i) => box(`vent_${i}`, `Vent slot ${i + 1}`, "detail", [-wide * 0.32 + i * wide * 0.16, -0.05, deep / 2 + 0.092], [0.07, 0.018, 0.02], "#050505")),
         box("floor_contact_audit", "Floor contact audit", "audit", [0, FLOOR_Y + 0.012, 0], [wide * 1.15, 0.025, deep * 1.12], "#ff8f8f"),
-        torus("clearance_audit", "Object clearance audit", "audit", [0, 0.08, 0], Math.max(wide, deep) * 0.64, 0.012, "#ff8f8f")
+        torus2("clearance_audit", "Object clearance audit", "audit", [0, 0.08, 0], Math.max(wide, deep) * 0.64, 0.012, "#ff8f8f")
       ];
       return { name: `Forged ${label}`, nodes };
     }
@@ -3261,173 +3441,49 @@ ${String(badText || "").slice(0, 9e3)}`
         return ((t ^ t >>> 14) >>> 0) / 4294967296;
       };
     }
-    function hLogoPlan() {
-      return {
-        name: "MiraXcode intro mark",
-        _introLogo: true,
-        nodes: [
-          {
-            id: "hcx_teal_halo",
-            name: "Teal halo layer",
-            role: "structure",
-            type: "logo_img",
-            position: [0.06, 0.2, -0.08],
-            rotation: [0, 0, 0],
-            scale: [1, 1, 1],
-            params: { width: 4.4, height: 2.86, src: "/assets/miraxcode-logo.png" },
-            color: "#4bd2be",
-            opacity: 0.26
-          },
-          {
-            id: "hcx_main",
-            name: "MiraXcode logo",
-            role: "surface",
-            type: "logo_img",
-            position: [0, 0.2, 0],
-            rotation: [0, 0, 0],
-            scale: [1, 1, 1],
-            params: { width: 4, height: 2.6, src: "/assets/miraxcode-logo.png" },
-            color: "#ffffff",
-            opacity: 0.98
-          },
-          {
-            id: "hcx_gold_sheen",
-            name: "Gold sheen overlay",
-            role: "detail",
-            type: "logo_img",
-            position: [-0.03, 0.22, 0.04],
-            rotation: [0, 0, 0],
-            scale: [1, 1, 1],
-            params: { width: 4.05, height: 2.63, src: "/assets/miraxcode-logo.png" },
-            color: "#c9a96e",
-            opacity: 0.22
-          }
-        ]
-      };
-    }
-    function chairPlan() {
-      return {
-        name: "Forged ergonomic chair",
-        nodes: [
-          box("seat", "Seat slab", "structure", [0, 0, 0], [1.7, 0.18, 1.45], "#4bd2be"),
-          box("back", "Curved back plane", "surface", [0, 0.92, -0.62], [1.75, 1.55, 0.18], "#f5c97a", [-0.28, 0, 0]),
-          cyl("leg_fl", "Front left leg", "structure", [-0.68, -0.78, 0.48], 0.07, 1.45, "#4bd2be"),
-          cyl("leg_fr", "Front right leg", "structure", [0.68, -0.78, 0.48], 0.07, 1.45, "#4bd2be"),
-          cyl("leg_bl", "Back left leg", "structure", [-0.68, -0.76, -0.48], 0.07, 1.38, "#4bd2be"),
-          cyl("leg_br", "Back right leg", "structure", [0.68, -0.76, -0.48], 0.07, 1.38, "#4bd2be"),
-          box("arm_l", "Left arm rest", "surface", [-1.02, 0.34, 0], [0.16, 0.16, 1.35], "#f5c97a"),
-          box("arm_r", "Right arm rest", "surface", [1.02, 0.34, 0], [0.16, 0.16, 1.35], "#f5c97a"),
-          torus("lumbar", "Lumbar detail", "detail", [0, 0.86, -0.75], 0.58, 0.035, "#8fb7ff", [Math.PI / 2, 0, 0]),
-          sphere("audit_marker", "Balance marker", "audit", [0, -1.46, 0], 0.09, "#ff8f8f")
-        ]
-      };
-    }
-    function roverPlan() {
-      return {
-        name: "Forged lunar rover",
-        nodes: [
-          box("body", "Pressure body", "structure", [0, 0.22, 0], [2.2, 0.55, 1.25], "#4bd2be"),
-          box("deck", "Instrument deck", "surface", [0, 0.64, -0.05], [1.55, 0.18, 0.92], "#f5c97a"),
-          cyl("wheel_fl", "Wheel front left", "structure", [-0.88, -0.24, 0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
-          cyl("wheel_fr", "Wheel front right", "structure", [0.88, -0.24, 0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
-          cyl("wheel_bl", "Wheel back left", "structure", [-0.88, -0.24, -0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
-          cyl("wheel_br", "Wheel back right", "structure", [0.88, -0.24, -0.72], 0.32, 0.22, "#4bd2be", [Math.PI / 2, 0, 0]),
-          cyl("mast", "Sensor mast", "detail", [0.48, 1.08, -0.25], 0.045, 1.05, "#8fb7ff"),
-          sphere("camera", "Camera head", "detail", [0.48, 1.68, -0.25], 0.18, "#8fb7ff"),
-          box("solar_l", "Left solar wing", "surface", [-1.42, 0.58, 0], [0.85, 0.06, 1.18], "#f5c97a"),
-          box("solar_r", "Right solar wing", "surface", [1.42, 0.58, 0], [0.85, 0.06, 1.18], "#f5c97a")
-        ]
-      };
-    }
-    function dronePlan(prompt) {
-      const q = String(prompt || "").toLowerCase();
-      const heavy = /cinema|camera|professional|heavy|large/.test(q);
-      const arm = heavy ? 1.38 : 1.14;
-      const gold = "#c9a96e";
-      const bright = "#f5d77a";
-      const dark = "#070a0d";
-      const teal = "#4bd2be";
-      const nodes = [
-        ellipsoid("fuselage_shell", "Dark rounded avionics body", "structure", [0, 0.02, 0], 0.42, [1.55, 0.36, 0.9], dark, [0, 0, 0], 0.94),
-        box("gold_body_frame", "Gold body frame", "surface", [0, 0.075, 0], [0.96, 0.09, 0.54], gold),
-        box("front_sensor_panel", "Front sensor panel", "surface", [0, 0.04, 0.44], [0.38, 0.16, 0.055], "#181210"),
-        cyl("main_camera_barrel", "Forward camera barrel", "detail", [0.18, 0.04, 0.51], 0.09, 0.09, gold, [Math.PI / 2, 0, 0]),
-        cyl("glass_camera_lens", "Glowing camera lens", "detail", [0.18, 0.04, 0.565], 0.055, 0.025, teal, [Math.PI / 2, 0, 0]),
-        sphere("status_led", "Pulsing gold status LED", "detail", [-0.18, 0.105, 0.48], 0.035, bright),
-        capsule("left_front_arm", "Left front carbon arm", "structure", [-arm * 0.42, 0.03, arm * 0.42], 0.035, arm * 1.1, gold, [0, Math.PI / 4, Math.PI / 2]),
-        capsule("right_front_arm", "Right front carbon arm", "structure", [arm * 0.42, 0.03, arm * 0.42], 0.035, arm * 1.1, gold, [0, -Math.PI / 4, Math.PI / 2]),
-        capsule("left_rear_arm", "Left rear carbon arm", "structure", [-arm * 0.42, 0.03, -arm * 0.42], 0.035, arm * 1.1, gold, [0, -Math.PI / 4, Math.PI / 2]),
-        capsule("right_rear_arm", "Right rear carbon arm", "structure", [arm * 0.42, 0.03, -arm * 0.42], 0.035, arm * 1.1, gold, [0, Math.PI / 4, Math.PI / 2]),
-        capsule("left_landing_strut", "Left landing strut", "structure", [-0.34, -0.34, 0.1], 0.025, 0.68, gold, [0.22, 0, 0]),
-        capsule("right_landing_strut", "Right landing strut", "structure", [0.34, -0.34, 0.1], 0.025, 0.68, gold, [-0.22, 0, 0]),
-        capsule("landing_skid", "Gold landing skid", "structure", [0, -0.72, 0.14], 0.03, 1.08, gold, [0, 0, Math.PI / 2])
-      ];
-      [
-        ["front_left", -arm, arm, 1],
-        ["front_right", arm, arm, -1],
-        ["rear_left", -arm, -arm, -1],
-        ["rear_right", arm, -arm, 1]
-      ].forEach(([id, x, z, spin], i) => {
-        nodes.push(cyl(`motor_${id}`, `${labelWords(id)} motor pod`, "structure", [x, 0.06, z], 0.13, 0.13, gold));
-        nodes.push(torus(`rotor_guard_${id}`, `${labelWords(id)} rotor halo guard`, "surface", [x, 0.09, z], 0.38, 0.018, gold));
-        nodes.push(cyl(`rotor_hub_${id}`, `${labelWords(id)} rotor hub`, "detail", [x, 0.12, z], 0.055, 0.045, bright));
-        nodes.push(box(`propeller_a_${id}`, `${labelWords(id)} spinning propeller blade A`, "detail", [x, 0.145, z], [0.7, 0.018, 0.055], bright, [0, i * 0.42, 0]));
-        nodes.push(box(`propeller_b_${id}`, `${labelWords(id)} spinning propeller blade B`, "detail", [x, 0.148, z], [0.055, 0.018, 0.7], bright, [0, spin * 0.32, 0]));
-        nodes.push(sphere(`rotor_glow_${id}`, `${labelWords(id)} rotor glow core`, "detail", [x, 0.18, z], 0.035, "#fff8c0"));
-      });
-      nodes.push(box("top_gold_rail", "Top gold electronics rail", "surface", [0, 0.28, -0.04], [0.72, 0.045, 0.16], gold));
-      nodes.push(box("battery_pack", "Rear battery pack", "structure", [0, 0.1, -0.42], [0.54, 0.18, 0.22], "#181210"));
-      nodes.push(box("battery_gold_cap", "Battery gold cap", "detail", [0, 0.13, -0.55], [0.46, 0.13, 0.035], gold));
-      return { name: heavy ? "Forged professional camera drone" : "Forged intro quad drone", nodes };
-    }
-    function labelWords(id) {
-      return String(id).replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-    }
-    function housePlan() {
-      return {
-        name: "Forged modular house",
-        nodes: [
-          box("base", "Main volume", "structure", [0, 0, 0], [2.5, 1.35, 1.75], "#4bd2be"),
-          cone("roof", "Pitched roof", "surface", [0, 1.05, 0], 1.55, 0.95, "#f5c97a", [0, Math.PI / 4, 0]),
-          box("door", "Recessed door", "detail", [0, -0.34, 0.9], [0.42, 0.78, 0.08], "#8fb7ff"),
-          box("window_l", "Left window", "detail", [-0.72, 0.18, 0.91], [0.42, 0.35, 0.07], "#8fb7ff"),
-          box("window_r", "Right window", "detail", [0.72, 0.18, 0.91], [0.42, 0.35, 0.07], "#8fb7ff"),
-          cyl("chimney", "Chimney", "surface", [0.82, 1.58, -0.35], 0.12, 0.75, "#f5c97a"),
-          box("audit_foundation", "Foundation audit plane", "audit", [0, -0.77, 0], [2.72, 0.06, 1.95], "#ff8f8f")
-        ]
-      };
-    }
-    function towerPlan() {
-      const nodes = [cyl("core", "Central tower core", "structure", [0, 0.75, 0], 0.55, 3.2, "#4bd2be")];
-      for (let i = 0; i < 6; i++) {
-        nodes.push(box(`floor_${i}`, `Cantilever floor ${i + 1}`, i % 2 ? "surface" : "structure", [0, -0.55 + i * 0.52, 0], [1.55 - i * 0.09, 0.08, 1.2 - i * 0.06], i % 2 ? "#f5c97a" : "#4bd2be", [0, i * 0.28, 0]));
-      }
-      nodes.push(cone("spire", "Signal spire", "detail", [0, 2.78, 0], 0.28, 0.9, "#8fb7ff"));
-      nodes.push(torus("audit_ring", "Overhang audit ring", "audit", [0, 1.02, 0], 1.05, 0.02, "#ff8f8f"));
-      return { name: "Forged tower study", nodes };
-    }
-    function mechanismPlan() {
-      return {
-        name: "Forged watch mechanism",
-        nodes: [
-          torus("outer", "Outer case ring", "structure", [0, 0, 0], 1.2, 0.08, "#4bd2be"),
-          torus("inner", "Inner gear ring", "surface", [0, 0, 0], 0.78, 0.045, "#f5c97a"),
-          cyl("hub", "Central hub", "structure", [0, 0, 0], 0.18, 0.16, "#4bd2be"),
-          ...Array.from({ length: 12 }, (_, i) => {
-            const a = i / 12 * Math.PI * 2;
-            return box(`tooth_${i}`, `Gear tooth ${i + 1}`, "detail", [Math.cos(a) * 0.78, 0, Math.sin(a) * 0.78], [0.12, 0.12, 0.26], "#8fb7ff", [0, -a, 0]);
-          }),
-          box("hand_h", "Hour hand", "surface", [0.25, 0.12, 0], [0.62, 0.04, 0.06], "#f5c97a", [0, 0, -0.3]),
-          box("hand_m", "Minute hand", "surface", [0, 0.14, -0.42], [0.05, 0.04, 0.86], "#f5c97a", [0, 0.2, 0])
-        ]
-      };
-    }
-    function sleep(ms) {
-      return new Promise((resolve) => setTimeout(resolve, ms));
-    }
+    return { runGodAgent, sleep, failForgeRun };
+  }
+
+  // src/js/modes/forge/wire.js
+  function createForgeWireApi(ctx) {
+    const {
+      $,
+      st,
+      runGodAgent,
+      resetView,
+      deleteSelectedPart,
+      duplicateSelectedPart,
+      alignSelectedToFloor,
+      resetSelectedPart,
+      setSnapEnabled,
+      setTransformMode,
+      selectWholeObject,
+      focusCameraOnSelection,
+      panCameraVertical,
+      exportForgeAsset,
+      importForgeAsset,
+      selectNodeById,
+      selectMesh,
+      updateSelectedPosition,
+      updateSelectedScale,
+      updateSelectedRotation,
+      autoAssignForgeModels,
+      newForgeProject,
+      saveCurrentProject: saveCurrentProject2,
+      openForgeProject,
+      deleteForgeProject,
+      loadForgeProjects,
+      syncModelSelectors,
+      renderForgeProjects,
+      updatePlanList,
+      initThree,
+      buildPlan,
+      renderAgents,
+      wireEvents: _noop
+    } = ctx;
     function wireEvents() {
-      if (eventsWired) return;
-      eventsWired = true;
+      if (st.eventsWired) return;
+      st.eventsWired = true;
       $("frgGodBtn")?.addEventListener("click", () => runGodAgent(false));
       $("frgMockBtn")?.addEventListener("click", () => runGodAgent(true));
       $("frgBtnCode")?.addEventListener("click", () => window.ForgeEditor?.toggle?.());
@@ -3467,7 +3523,7 @@ ${String(badText || "").slice(0, 9e3)}`
         else if (action === "duplicate") duplicateSelectedPart();
         else if (action === "floor") alignSelectedToFloor();
         else if (action === "reset") resetSelectedPart();
-        else if (action === "snap") setSnapEnabled(!snapEnabled);
+        else if (action === "snap") setSnapEnabled(!st.snapEnabled);
         else setTransformMode(action);
       });
       $("frgSelectionCard")?.addEventListener("change", (e) => {
@@ -3492,7 +3548,7 @@ ${String(badText || "").slice(0, 9e3)}`
         else if (tool === "delete") deleteSelectedPart();
         else if (tool === "duplicate") duplicateSelectedPart();
         else if (tool === "floor") alignSelectedToFloor();
-        else if (tool === "snap") setSnapEnabled(!snapEnabled);
+        else if (tool === "snap") setSnapEnabled(!st.snapEnabled);
         else if (tool === "import") $("frgAssetImport")?.click();
         else if (tool === "focus") focusCameraOnSelection();
         else if (tool === "camUp") panCameraVertical(0.35);
@@ -3510,13 +3566,13 @@ ${String(badText || "").slice(0, 9e3)}`
         if (file) importForgeAsset(file);
       });
       $("frgAutoRouteBtn")?.addEventListener("click", () => {
-        traceStartTime = Date.now();
+        st.traceStartTime = Date.now();
         const traceEntries = $("frgTraceEntries");
         if (traceEntries && !traceEntries.children.length) traceEntries.innerHTML = "";
         autoAssignForgeModels(($("frgPrompt")?.value || "").trim(), true);
       });
       $("frgNewProjectBtn")?.addEventListener("click", newForgeProject);
-      $("frgSaveProjectBtn")?.addEventListener("click", () => saveCurrentProject(true));
+      $("frgSaveProjectBtn")?.addEventListener("click", () => saveCurrentProject2(true));
       $("frgProjectsList")?.addEventListener("click", (e) => {
         const del = e.target.closest("[data-frg-project-delete]");
         if (del) {
@@ -3558,24 +3614,597 @@ ${String(badText || "").slice(0, 9e3)}`
       }
     }
     async function mount() {
-      mounted = true;
+      st.mounted = true;
       loadForgeProjects();
       syncModelSelectors();
       renderForgeProjects();
       updatePlanList(null);
       wireEvents();
       const ok = await initThree();
-      if (ok && !activePlan) buildPlan(hLogoPlan());
+      if (ok && !st.activePlan) buildPlan(hLogoPlan());
     }
     function destroy() {
-      mounted = false;
-      if (abortCtrl) abortCtrl.abort();
+      st.mounted = false;
+      if (st.abortCtrl) st.abortCtrl.abort();
       window.ForgeEditor?.destroy?.();
     }
+    return { wireEvents, mount, destroy };
+  }
+
+  // src/js/modes/forge/forge-mode.js
+  (function() {
+    "use strict";
+    const FORGE_PROVIDER_COOLDOWNS2 = /* @__PURE__ */ new Map();
+    let mounted = false;
+    let initialized = false;
+    let THREE = null;
+    let OrbitControls = null;
+    let TransformControls = null;
+    let GLTFLoader = null;
+    let GLTFExporter = null;
+    let STLExporter = null;
+    let OBJExporter = null;
+    let renderer = null;
+    let scene = null;
+    let camera = null;
+    let controls = null;
+    let modelGroup = null;
+    let particleGroup = null;
+    let starField = null;
+    let activePlan = null;
+    let raf = 0;
+    let flights = [];
+    let revealMeshes = [];
+    let logoMeshes = [];
+    let logoBobT = 0;
+    let scanMesh = null;
+    let abortCtrl = null;
+    let eventsWired = false;
+    let traceStartTime = Date.now();
+    let traceRunCount = 0;
+    let raycaster = null;
+    let pointer = null;
+    let transformControls = null;
+    let selectedMesh = null;
+    let selectedObjectWhole = null;
+    let selectionBox = null;
+    let transformMode = "translate";
+    let snapEnabled = false;
+    let underfloorTick = 0;
+    let forgeProjects = [];
+    let activeProjectId = null;
+    let projectSaveTimer = 0;
+    let activeReferenceBrief = "";
+    let activeForgeRoute = "parametric";
+    const $ = (id) => document.getElementById(id);
+    const st = {
+      get mounted() {
+        return mounted;
+      },
+      set mounted(v) {
+        mounted = v;
+      },
+      get initialized() {
+        return initialized;
+      },
+      set initialized(v) {
+        initialized = v;
+      },
+      get THREE() {
+        return THREE;
+      },
+      set THREE(v) {
+        THREE = v;
+      },
+      get OrbitControls() {
+        return OrbitControls;
+      },
+      set OrbitControls(v) {
+        OrbitControls = v;
+      },
+      get TransformControls() {
+        return TransformControls;
+      },
+      set TransformControls(v) {
+        TransformControls = v;
+      },
+      get GLTFLoader() {
+        return GLTFLoader;
+      },
+      set GLTFLoader(v) {
+        GLTFLoader = v;
+      },
+      get GLTFExporter() {
+        return GLTFExporter;
+      },
+      set GLTFExporter(v) {
+        GLTFExporter = v;
+      },
+      get STLExporter() {
+        return STLExporter;
+      },
+      set STLExporter(v) {
+        STLExporter = v;
+      },
+      get OBJExporter() {
+        return OBJExporter;
+      },
+      set OBJExporter(v) {
+        OBJExporter = v;
+      },
+      get renderer() {
+        return renderer;
+      },
+      set renderer(v) {
+        renderer = v;
+      },
+      get scene() {
+        return scene;
+      },
+      set scene(v) {
+        scene = v;
+      },
+      get camera() {
+        return camera;
+      },
+      set camera(v) {
+        camera = v;
+      },
+      get controls() {
+        return controls;
+      },
+      set controls(v) {
+        controls = v;
+      },
+      get modelGroup() {
+        return modelGroup;
+      },
+      set modelGroup(v) {
+        modelGroup = v;
+      },
+      get particleGroup() {
+        return particleGroup;
+      },
+      set particleGroup(v) {
+        particleGroup = v;
+      },
+      get starField() {
+        return starField;
+      },
+      set starField(v) {
+        starField = v;
+      },
+      get activePlan() {
+        return activePlan;
+      },
+      set activePlan(v) {
+        activePlan = v;
+      },
+      get raf() {
+        return raf;
+      },
+      set raf(v) {
+        raf = v;
+      },
+      get flights() {
+        return flights;
+      },
+      set flights(v) {
+        flights = v;
+      },
+      get revealMeshes() {
+        return revealMeshes;
+      },
+      set revealMeshes(v) {
+        revealMeshes = v;
+      },
+      get logoMeshes() {
+        return logoMeshes;
+      },
+      set logoMeshes(v) {
+        logoMeshes = v;
+      },
+      get logoBobT() {
+        return logoBobT;
+      },
+      set logoBobT(v) {
+        logoBobT = v;
+      },
+      get scanMesh() {
+        return scanMesh;
+      },
+      set scanMesh(v) {
+        scanMesh = v;
+      },
+      get abortCtrl() {
+        return abortCtrl;
+      },
+      set abortCtrl(v) {
+        abortCtrl = v;
+      },
+      get eventsWired() {
+        return eventsWired;
+      },
+      set eventsWired(v) {
+        eventsWired = v;
+      },
+      get traceStartTime() {
+        return traceStartTime;
+      },
+      set traceStartTime(v) {
+        traceStartTime = v;
+      },
+      get traceRunCount() {
+        return traceRunCount;
+      },
+      set traceRunCount(v) {
+        traceRunCount = v;
+      },
+      get raycaster() {
+        return raycaster;
+      },
+      set raycaster(v) {
+        raycaster = v;
+      },
+      get pointer() {
+        return pointer;
+      },
+      set pointer(v) {
+        pointer = v;
+      },
+      get transformControls() {
+        return transformControls;
+      },
+      set transformControls(v) {
+        transformControls = v;
+      },
+      get selectedMesh() {
+        return selectedMesh;
+      },
+      set selectedMesh(v) {
+        selectedMesh = v;
+      },
+      get selectedObjectWhole() {
+        return selectedObjectWhole;
+      },
+      set selectedObjectWhole(v) {
+        selectedObjectWhole = v;
+      },
+      get selectionBox() {
+        return selectionBox;
+      },
+      set selectionBox(v) {
+        selectionBox = v;
+      },
+      get transformMode() {
+        return transformMode;
+      },
+      set transformMode(v) {
+        transformMode = v;
+      },
+      get snapEnabled() {
+        return snapEnabled;
+      },
+      set snapEnabled(v) {
+        snapEnabled = v;
+      },
+      get underfloorTick() {
+        return underfloorTick;
+      },
+      set underfloorTick(v) {
+        underfloorTick = v;
+      },
+      get forgeProjects() {
+        return forgeProjects;
+      },
+      set forgeProjects(v) {
+        forgeProjects = v;
+      },
+      get activeProjectId() {
+        return activeProjectId;
+      },
+      set activeProjectId(v) {
+        activeProjectId = v;
+      },
+      get projectSaveTimer() {
+        return projectSaveTimer;
+      },
+      set projectSaveTimer(v) {
+        projectSaveTimer = v;
+      },
+      get activeReferenceBrief() {
+        return activeReferenceBrief;
+      },
+      set activeReferenceBrief(v) {
+        activeReferenceBrief = v;
+      },
+      get activeForgeRoute() {
+        return activeForgeRoute;
+      },
+      set activeForgeRoute(v) {
+        activeForgeRoute = v;
+      }
+    };
+    function forgePrefs() {
+      const style = $("frgStyle")?.value || "realistic";
+      const detail = $("frgDetail")?.value || "balanced";
+      const output = $("frgOutputTarget")?.value || "glb";
+      return { style, detail, output };
+    }
+    function updateStage2(stage, state, text) {
+      document.querySelectorAll("[data-frg-stage]").forEach((el) => {
+        const isTarget = el.dataset.frgStage === stage;
+        if (isTarget) {
+          el.classList.toggle("active", state !== "done");
+          el.classList.toggle("done", state === "done");
+          const label = el.querySelector("span");
+          if (label) label.textContent = text || state || "waiting";
+        } else if (state === "active") {
+          el.classList.remove("active");
+        }
+      });
+    }
+    function resetStages() {
+      ["input", "generate", "refine", "export"].forEach((stage, i) => {
+        const el = document.querySelector(`[data-frg-stage="${stage}"]`);
+        if (!el) return;
+        el.classList.toggle("active", i === 0);
+        el.classList.remove("done");
+        const label = el.querySelector("span");
+        if (label) label.textContent = i === 0 ? "prompt ready" : "waiting";
+      });
+    }
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+    function setStatus(text) {
+      const el = $("frgStatus");
+      if (el) el.textContent = text || "Idle";
+    }
+    function traceKind(kind) {
+      if (kind === "err") return "error";
+      if (kind === "ok") return "done";
+      if (kind === "boss" || kind === "run" || kind === "wait" || kind === "warn") return "running";
+      return "";
+    }
+    function log(label, message, kind, tokens) {
+      const host = $("frgTraceEntries");
+      if (!host) return;
+      const statusCls = kind || "wait";
+      const elapsed = ((Date.now() - traceStartTime) / 1e3).toFixed(1);
+      const line = document.createElement("div");
+      line.className = "frg-trace-entry";
+      line.innerHTML = `<span class="trace-time">[${elapsed}s]</span><span class="trace-agent trace-${statusCls}">${escapeHtml(label)}</span><span class="trace-msg trace-${statusCls}">${escapeHtml(message)}</span>` + (tokens ? `<span class="trace-tokens">${escapeHtml(String(tokens))}</span>` : "");
+      host.appendChild(line);
+      host.scrollTop = host.scrollHeight;
+      const summary = $("frgTraceSummary");
+      if (summary) summary.textContent = `${label}: ${message}`;
+      const dot = $("frgTraceDot");
+      if (dot) dot.className = "frg-trace-dot " + traceKind(statusCls);
+    }
+    function setAgentState(id, state) {
+      const el = document.querySelector(`[data-frg-agent="${id}"] .frg-agent-state`);
+      if (el) el.textContent = state;
+    }
+    function renderAgents() {
+      const host = $("frgAgents");
+      if (!host) return;
+      const options = modelOptionsHtml();
+      host.innerHTML = AGENTS.map((agent) => `
+      <div class="frg-agent" data-frg-agent="${agent.id}">
+        <span class="frg-agent-dot" style="color:${agent.color};background:${agent.color}"></span>
+        <span>
+          <span class="frg-agent-name">${escapeHtml(agent.name)}</span>
+          <span class="frg-agent-role">${escapeHtml(agent.role)}</span>
+        </span>
+        <span class="frg-agent-state">idle</span>
+        <select class="frg-agent-model" id="frgModel_${agent.id}" title="${escapeHtml(agent.name)} model">
+          ${options}
+        </select>
+      </div>
+    `).join("");
+    }
+    function modelOptionsHtml() {
+      const src = document.getElementById("model");
+      const current = src?.value || "";
+      const sourceOptions = Array.from(src?.options || []);
+      if (!sourceOptions.length) return `<option value="">Main model</option>`;
+      return [
+        `<option value="">Main model (${escapeHtml(src.options[src.selectedIndex]?.textContent || current || "selected")})</option>`,
+        ...sourceOptions.map((opt) => `<option value="${escapeHtml(opt.value)}">${escapeHtml(opt.textContent || opt.value)}</option>`)
+      ].join("");
+    }
+    function syncModelSelectors() {
+      const old = {};
+      AGENTS.forEach((agent) => {
+        old[agent.id] = $(`frgModel_${agent.id}`)?.value || "";
+      });
+      renderAgents();
+      AGENTS.forEach((agent) => {
+        const sel = $(`frgModel_${agent.id}`);
+        if (sel && old[agent.id] && Array.from(sel.options).some((o) => o.value === old[agent.id])) {
+          sel.value = old[agent.id];
+        }
+      });
+    }
+    let agentsRoutingApi;
+    function agentsRouting() {
+      if (!agentsRoutingApi) {
+        agentsRoutingApi = createForgeAgentsRoutingApi({ $, log, cooldowns: FORGE_PROVIDER_COOLDOWNS2 });
+      }
+      return agentsRoutingApi;
+    }
+    const isFreeModel = (...a) => agentsRouting().isFreeModel(...a);
+    const modelSizeScore = (...a) => agentsRouting().modelSizeScore(...a);
+    const modelStrengthScore = (...a) => agentsRouting().modelStrengthScore(...a);
+    const bestModelForProvider = (...a) => agentsRouting().bestModelForProvider(...a);
+    const providerFromValue2 = (...a) => agentsRouting().providerFromValue(...a);
+    const providerDisplayName = (...a) => agentsRouting().providerDisplayName(...a);
+    const forgeProviderCooldown = (...a) => agentsRouting().forgeProviderCooldown(...a);
+    const isForgeRoutingError = (...a) => agentsRouting().isForgeRoutingError(...a);
+    const cooldownMsForForgeError = (...a) => agentsRouting().cooldownMsForForgeError(...a);
+    const markForgeProviderFailure2 = (...a) => agentsRouting().markForgeProviderFailure(...a);
+    const skipCoolingCandidate2 = (...a) => agentsRouting().skipCoolingCandidate(...a);
+    const providerModelsForForge2 = (...a) => agentsRouting().providerModelsForForge(...a);
+    const autoAssignForgeModels = (...a) => agentsRouting().autoAssignForgeModels(...a);
+    function selectedModelFor(agentId) {
+      return $(`frgModel_${agentId}`)?.value || window._H?.selectedModel?.() || document.getElementById("model")?.value || "";
+    }
+    function modelLabel(value) {
+      if (!value) return "main model";
+      const opt = Array.from(document.getElementById("model")?.options || []).find((o) => o.value === value);
+      return (opt?.textContent || value).replace(/\s+/g, " ").slice(0, 42);
+    }
+    function updatePlanList(plan) {
+      const host = $("frgPlanList");
+      if (!host) return;
+      const nodes = renderableNodes2(plan?.nodes || []);
+      host.innerHTML = nodes.length ? nodes.map((node) => `
+      <div class="frg-plan-item${selectedMesh?.userData?.nodeId === node.id ? " selected" : ""}" data-node-id="${escapeHtml(node.id || "")}">
+        <b>${escapeHtml(node.name || node.id || node.type)}</b>
+        <span>${escapeHtml(node.role || "structure")} \xB7 ${escapeHtml(node.type || "box")}</span>
+      </div>
+    `).join("") : `<div class="frg-plan-item"><b>No mesh yet</b><span>Awaiting Parameter Agent</span></div>`;
+      $("frgPlanName").textContent = plan?.name || "Void ready";
+      $("frgNodeCount").textContent = `${nodes.length} mesh part${nodes.length === 1 ? "" : "s"}`;
+    }
+    function renderableNodes2(nodes) {
+      return (Array.isArray(nodes) ? nodes : []).filter((node) => node && node.role !== "audit");
+    }
+    let projectsApi, viewportApi, promptsApi, plansApi, agentsApi, wireApi;
+    function forgeBaseCtx() {
+      return {
+        $,
+        st,
+        escapeHtml,
+        setStatus,
+        log,
+        traceKind,
+        forgePrefs,
+        updateStage: updateStage2,
+        resetStages,
+        setAgentState,
+        renderAgents,
+        selectedModelFor,
+        modelLabel,
+        updatePlanList,
+        renderableNodes: renderableNodes2,
+        syncModelSelectors,
+        AGENTS,
+        autoAssignForgeModels
+      };
+    }
+    function initProjectsApi() {
+      if (projectsApi) return projectsApi;
+      projectsApi = createForgeProjectsApi({
+        ...forgeBaseCtx(),
+        buildPlan: (...a) => initViewportApi().buildPlan(...a),
+        renderAgents,
+        restoreModelRoutes: (...a) => initProjectsApi().restoreModelRoutes(...a),
+        clearScene: (...a) => initViewportApi().clearScene(...a)
+      });
+      return projectsApi;
+    }
+    function initPromptsApi() {
+      if (promptsApi) return promptsApi;
+      promptsApi = createForgePromptsApi();
+      return promptsApi;
+    }
+    function initPlansApi() {
+      if (plansApi) return plansApi;
+      plansApi = createForgePlansSamplesApi({ classifyForgePrompt: (...a) => initPromptsApi().classifyForgePrompt(...a) });
+      return plansApi;
+    }
+    function initViewportApi() {
+      if (viewportApi) return viewportApi;
+      viewportApi = createForgeViewportApi({
+        ...forgeBaseCtx(),
+        queueProjectSave: (...a) => initProjectsApi().queueProjectSave(...a)
+      });
+      return viewportApi;
+    }
+    function initAgentsApi() {
+      if (agentsApi) return agentsApi;
+      const P = () => initPromptsApi();
+      const S = () => initPlansApi();
+      const V = () => initViewportApi();
+      const Pr = () => initProjectsApi();
+      agentsApi = createForgeAgentsRunApi({
+        ...forgeBaseCtx(),
+        agentsRouting,
+        clearScene: (...a) => V().clearScene(...a),
+        initThree: (...a) => V().initThree(...a),
+        buildPlan: (...a) => V().buildPlan(...a),
+        queueProjectSave: (...a) => Pr().queueProjectSave(...a),
+        classifyForgePrompt: (...a) => P().classifyForgePrompt(...a),
+        needsTemplateAuthority: (...a) => P().needsTemplateAuthority(...a),
+        isKnifeLikePrompt: (...a) => P().isKnifeLikePrompt(...a),
+        isSpoonLikePrompt: (...a) => P().isSpoonLikePrompt(...a),
+        isSwordLikePrompt: (...a) => P().isSwordLikePrompt(...a),
+        isDroneLikePrompt: (...a) => P().isDroneLikePrompt(...a),
+        isPhonePrompt: (...a) => P().isPhonePrompt(...a),
+        isLaptopPrompt: (...a) => P().isLaptopPrompt(...a),
+        isSkeletonOnlyPrompt: (...a) => P().isSkeletonOnlyPrompt(...a),
+        hLogoPlan: (...a) => S().hLogoPlan(...a),
+        roverPlan: (...a) => S().roverPlan(...a),
+        dronePlan: (...a) => S().dronePlan(...a),
+        housePlan: (...a) => S().housePlan(...a),
+        towerPlan: (...a) => S().towerPlan(...a),
+        mechanismPlan: (...a) => S().mechanismPlan(...a)
+      });
+      return agentsApi;
+    }
+    function initWireApi() {
+      if (wireApi) return wireApi;
+      const V = () => initViewportApi();
+      const A = () => initAgentsApi();
+      const Pr = () => initProjectsApi();
+      wireApi = createForgeWireApi({
+        $,
+        st,
+        runGodAgent: (...a) => A().runGodAgent(...a),
+        resetView: (...a) => V().resetView(...a),
+        deleteSelectedPart: (...a) => V().deleteSelectedPart(...a),
+        duplicateSelectedPart: (...a) => V().duplicateSelectedPart(...a),
+        alignSelectedToFloor: (...a) => V().alignSelectedToFloor(...a),
+        resetSelectedPart: (...a) => V().resetSelectedPart(...a),
+        setSnapEnabled: (...a) => V().setSnapEnabled(...a),
+        setTransformMode: (...a) => V().setTransformMode(...a),
+        selectWholeObject: (...a) => V().selectWholeObject(...a),
+        focusCameraOnSelection: (...a) => V().focusCameraOnSelection(...a),
+        panCameraVertical: (...a) => V().panCameraVertical(...a),
+        exportForgeAsset: (...a) => V().exportForgeAsset(...a),
+        importForgeAsset: (...a) => V().importForgeAsset(...a),
+        selectNodeById: (...a) => V().selectNodeById(...a),
+        selectMesh: (...a) => V().selectMesh(...a),
+        updateSelectedPosition: (...a) => V().updateSelectedPosition(...a),
+        updateSelectedScale: (...a) => V().updateSelectedScale(...a),
+        updateSelectedRotation: (...a) => V().updateSelectedRotation(...a),
+        autoAssignForgeModels,
+        newForgeProject: (...a) => Pr().newForgeProject(...a),
+        saveCurrentProject: (...a) => Pr().saveCurrentProject(...a),
+        openForgeProject: (...a) => Pr().openForgeProject(...a),
+        deleteForgeProject: (...a) => Pr().deleteForgeProject(...a),
+        loadForgeProjects: (...a) => Pr().loadForgeProjects(...a),
+        syncModelSelectors,
+        renderForgeProjects: (...a) => Pr().renderForgeProjects(...a),
+        updatePlanList,
+        initThree: (...a) => V().initThree(...a),
+        buildPlan: (...a) => V().buildPlan(...a),
+        renderAgents,
+        hLogoPlan: (...a) => initPlansApi().hLogoPlan(...a)
+      });
+      return wireApi;
+    }
+    const loadForgeProjects = () => initProjectsApi().loadForgeProjects();
+    const buildPlan = (...a) => initViewportApi().buildPlan(...a);
+    const mount = (...a) => initWireApi().mount(...a);
+    const destroy = (...a) => initWireApi().destroy(...a);
+    const wireEvents = () => initWireApi().wireEvents();
     function debugState() {
       return {
         nodeCount: activePlan?.nodes?.length || 0,
-        underfloorCount: selectableMeshes().filter((mesh) => mesh.userData?.underFloor).length,
+        underfloorCount: initViewportApi().selectableMeshes().filter((mesh) => mesh.userData?.underFloor).length,
         activeProjectId
       };
     }

@@ -53,9 +53,16 @@ Builds all eight mode bundles plus the app shell.
 
 - `modes/systems/domain-config.js`, `render.js` — domain templates + preview render API
 
-## Forge slices (Wave 16)
+## Forge slices (Wave 16–17)
 
-- `modes/forge/agents-routing.js` — model auto-routing and cooldowns
+- `modes/forge/agents-routing.js` — model auto-routing and cooldowns (Wave 16)
+- `modes/forge/projects.js`, `viewport.js`, `prompts.js`, `plans-samples.js`, `agents-run.js`, `wire.js` — Wave 17
+- `modes/forge/forge-mode.js` — thin orchestrator + `st` bridge
+
+## Systems slices (Wave 17)
+
+- `modes/systems/spec-normalize.js`, `generate.js` — spec + AI pipeline
+- `modes/systems/system-maker.js` — orchestrator (render via `render.js`)
 
 ## Adding a new lazy mode
 
