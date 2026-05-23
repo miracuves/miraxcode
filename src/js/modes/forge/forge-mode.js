@@ -315,6 +315,7 @@ import { createForgeWireApi } from './wire.js';
     const Pr = () => initProjectsApi();
     agentsApi = createForgeAgentsRunApi({
       ...forgeBaseCtx(),
+      renderableNodes,
       agentsRouting,
       clearScene: (...a) => V().clearScene(...a),
       initThree: (...a) => V().initThree(...a),

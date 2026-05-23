@@ -59,6 +59,15 @@ Builds all eight mode bundles plus the app shell.
 - `modes/forge/projects.js`, `viewport.js`, `prompts.js`, `plans-samples.js`, `agents-run.js`, `wire.js` — Wave 17
 - `modes/forge/forge-mode.js` — thin orchestrator + `st` bridge
 
+## Messages (Wave 18)
+
+- `app/ui/messages/format.js` — markdown format + mermaid + copy handler
+- `app/ui/messages/render.js` — chat UI (uses format API)
+
+## Forge template plans (Wave 18)
+
+- `modes/forge/plans-templates.js` — procedural template plans + mesh geometry helpers
+
 ## Systems slices (Wave 17)
 
 - `modes/systems/spec-normalize.js`, `generate.js` — spec + AI pipeline

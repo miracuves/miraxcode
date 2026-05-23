@@ -22,6 +22,8 @@ import { createForgePromptsApi } from '../src/js/modes/forge/prompts.js';
 import { createForgePlansSamplesApi } from '../src/js/modes/forge/plans-samples.js';
 import { createForgeAgentsRunApi } from '../src/js/modes/forge/agents-run.js';
 import { createForgeWireApi } from '../src/js/modes/forge/wire.js';
+import { createForgePlansTemplatesApi } from '../src/js/modes/forge/plans-templates.js';
+import { createMessagesFormatApi } from '../src/js/app/ui/messages/format.js';
 
 test('forge constants and plan helpers', () => {
   assert.equal(AGENTS.length, 5);
@@ -61,6 +63,33 @@ test('systems domain-config detects restaurant', () => {
 
 test('systems render factory exports renderAll', () => {
   assert.equal(typeof createSystemsRenderApi, 'function');
+});
+
+test('wave 18 format and templates factories export', () => {
+  assert.equal(typeof createMessagesFormatApi, 'function');
+  assert.equal(typeof createForgePlansTemplatesApi, 'function');
+  const fmt = createMessagesFormatApi({ escapeHtml: (s) => s, msgs: null });
+  assert.equal(typeof fmt.formatContent, 'function');
+  assert.ok(fmt.formatContent('**hi**').includes('hi') || fmt.formatContent('hi'));
+});
+
+test('forge templates fallbackPlan returns knife nodes', () => {
+  const api = createForgePlansTemplatesApi({
+    log: () => {},
+    renderableNodes: (nodes) => nodes || [],
+    isKnifeLikePrompt: (p) => /knife/.test(p),
+    isSpoonLikePrompt: () => false,
+    isSwordLikePrompt: () => false,
+    isDroneLikePrompt: () => false,
+    isSkeletonOnlyPrompt: () => false,
+    roverPlan: () => ({ nodes: [] }),
+    dronePlan: () => ({ nodes: [] }),
+    housePlan: () => ({ nodes: [] }),
+    towerPlan: () => ({ nodes: [] }),
+    mechanismPlan: () => ({ nodes: [] }),
+  });
+  const plan = api.fallbackPlan('chef kitchen knife');
+  assert.ok(plan.nodes.length > 5);
 });
 
 test('wave 17 factory modules export create*Api', () => {
