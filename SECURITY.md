@@ -1,7 +1,7 @@
-# HashCortx — Security Architecture
+# MiraXcode — Security Architecture
 
 ## Threat Model
-HashCortx is a local desktop app that:
+MiraXcode is a local desktop app that:
 1. Calls AI provider APIs (user's own keys)
 2. Accesses the local filesystem (Code Mode only, with permission gates)
 3. Executes shell commands (Code Mode only, whitelisted, gated)
@@ -16,7 +16,7 @@ HashCortx is a local desktop app that:
 - Rust makes the HTTPS call, returns only the AI response
 
 ### Layer 2 — Hardened Runtime (Mac)
-- Prevents code injection into the HashCortx process
+- Prevents code injection into the MiraXcode process
 - Prevents library injection attacks
 - Prevents ptrace debugging in release builds
 
@@ -126,7 +126,7 @@ Applied to all user input before sending to AI. Shows WARNING dialog and blocks 
 - Deeply nested data structures designed to exhaust memory
 
 ## Audit Log
-Location: `~/Library/Application Support/HashCortx/audit.log`
+Location: `~/Library/Application Support/MiraXcode/audit.log`
 Format: `TIMESTAMP [scope] action path`
 Retention: Last 10,000 entries, rotated.
 The log is append-only from the app's perspective.
@@ -141,9 +141,9 @@ API Key: [OS Keychain] → [Rust reads at request time] → [HTTPS Authorization
          Key NEVER touches JS memory
 ```
 
-## What HashCortx Never Does
+## What MiraXcode Never Does
 - Never sends analytics or telemetry
-- Never phones home to any HashCortx server (there is none)
+- Never phones home to any MiraXcode server (there is none)
 - Never stores conversation history remotely
 - Never accesses files outside permitted scope
 - Never runs commands outside the allowlist

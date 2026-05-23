@@ -1,16 +1,16 @@
-# HashCortx — Architecture
+# MiraXCode — Architecture
 
 ## Overview
-HashCortx is a Tauri v2 desktop application (Mac/Windows/Linux).
-Frontend: HTML/CSS/JS (no framework, no build step needed in dev).
-Backend: Rust via Tauri — handles filesystem, shell, keychain, HTTP.
+MiraXCode is a Tauri v2 desktop application (macOS primary; Windows/Linux planned).
+Frontend: HTML/CSS/JS — main shell bundled with **esbuild** (`src/js/app/` → `app.bundle.js`).
+Backend: Rust via Tauri — filesystem, shell, keychain, native HTTP, audit log.
 
 ## Phase Roadmap
 | Phase | What ships |
 |-------|-----------|
 | 0 | Foundation: Tauri window, brand, docs, CI/CD |
 | 1 | Architecture refactor: split into core/ + platform/ |
-| 2 | All existing Hash_UI modes ported and working |
+| 2 | All modes ported; modular `src/js/app/` shell |
 | 3 | Permission Guard + audit log |
 | 4 | Code Mode (real filesystem + shell, gated) |
 | 5 | Internet browser (Tauri WebView) |
@@ -19,7 +19,7 @@ Backend: Rust via Tauri — handles filesystem, shell, keychain, HTTP.
 
 ## Directory Structure (target — built progressively)
 ```
-hashcortx/
+miraxcode/
 ├── src/
 │   ├── index.html                 Entry point
 │   ├── main.js                    Bootstrap

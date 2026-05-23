@@ -1,9 +1,9 @@
 ══════════════════════════════════════════════════════════════
-  HashCortX — Modes Guide
-  v2.0  ·  github.com/Hash-7777/HashCortX
+  MiraXCode — Modes Guide
+  v2.0  ·  github.com/miracuves/miraxcode
 ══════════════════════════════════════════════════════════════
 
-HashCortX has 11 modes, each built for a specific type of work.
+MiraXCode has 11 modes, each built for a specific type of work.
 They all share your API keys and model picker — switch freely.
 
 ──────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ tab and run them here.
 
 
 ──────────────────────────────────────────────────────────────
-3. CODE  (HashCortX Coder)
+3. CODE  (MiraXCode Coder)
 ──────────────────────────────────────────────────────────────
 A full coding agent that reads, writes, and edits files using
 real tools — not just text suggestions. It has its own chat
@@ -174,6 +174,6 @@ configured through the UI.
     from anywhere in the app.
 
 ══════════════════════════════════════════════════════════════
-  github.com/Hash-7777/HashCortX  ·  MIT License
-  Built by Seif Hashish  ·  HashCortX.com
+  github.com/miracuves/miraxcode  ·  MIT License
+  MiraXCode — Miracuves
 ══════════════════════════════════════════════════════════════

@@ -1,29 +1,28 @@
 <div align="center">
 
-# HashCortX
+# MiraXCode
 
-**The local-first AI workspace. Eleven modes. Ten providers. Zero telemetry.**
+**Local-first AI workspace · Eleven modes · Multi-provider · Zero telemetry**
 
-[Website](https://hashcortx.com) · [Latest Release](https://github.com/Hash-7777/HashCortX/releases/latest) · [Wiki](https://github.com/Hash-7777/HashCortX/wiki) · [Discussions](https://github.com/Hash-7777/HashCortX/discussions)
+[Repository](https://github.com/miracuves/miraxcode) · [Issues](https://github.com/miracuves/miraxcode/issues) · [Discussions](https://github.com/miracuves/miraxcode/discussions)
 
 ![License: MIT](https://img.shields.io/badge/license-MIT-39ff81.svg)
 ![Platform: macOS](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-39ff81.svg)
 ![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-39ff81.svg)
-![Size: 8.9 MB](https://img.shields.io/badge/dmg-8.9%20MB-39ff81.svg)
 
 </div>
 
-![HashCortx main interface](https://github.com/user-attachments/assets/120dfafa-a778-4758-8314-83dc41752a28)
+![MiraXCode main interface](https://github.com/user-attachments/assets/120dfafa-a778-4758-8314-83dc41752a28)
 
 ---
 
-## What is HashCortX?
+## What is MiraXCode?
 
-**HashCortX is a local-first, open-source AI desktop application for developers that combines a multi-provider chat workspace, an autonomous coding agent, multi-agent swarms, 9 pre-built specialist agents, financial document analysis, security scanning, 3D planning, and a virtual project desktop — into a single native 8.9 MB macOS app built with Tauri v2, Rust, and vanilla JavaScript.**
+**MiraXCode** is a local-first, open-source AI desktop application that combines a multi-provider chat workspace, an autonomous coding IDE, multi-agent swarms, specialist agents, financial analysis, security scanning, 3D planning, and a virtual project desktop — in one native app built with **Tauri v2**, **Rust**, and a modular **JavaScript** shell.
 
-API keys are stored in the OS Keychain (with a local cache for performance). Files never leave your machine. There is no HashCortX backend, no telemetry, no analytics, no accounts, and no subscriptions. With Ollama, the entire app runs air-gapped offline. With cloud providers, every request travels directly from your device to the provider you chose — nothing passes through HashCortX infrastructure, because HashCortX infrastructure does not exist.
+API keys live in the **OS keychain** (never in git or plaintext config). There is **no MiraXCode cloud backend**, no telemetry, no accounts, and no subscriptions. With **Ollama**, the app runs fully offline. With cloud providers, requests go **directly** from your machine to the provider you chose.
 
-**HashCortX is a free, open-source alternative to commercial AI coding tools** like Cursor, Claude Code, Continue, Aider, and Cline — with a wider feature set than any of them.
+MiraXCode is a free, MIT-licensed alternative to tools like Cursor, Claude Code, Continue, Aider, and Cline — with a broader built-in mode set and explicit local-first guarantees.
 
 ---
 
@@ -32,38 +31,26 @@ API keys are stored in the OS Keychain (with a local cache for performance). Fil
 | | |
 |---|---|
 | **Type** | Native AI desktop application |
-| **Platform** | macOS Apple Silicon (Windows and Linux planned) |
+| **Platform** | macOS Apple Silicon (Windows/Linux planned) |
 | **License** | MIT |
-| **Version** | v2.0.0 (May 2026) |
-| **Bundle size** | 8.9 MB |
-| **Stack** | Tauri v2 · Rust · vanilla JavaScript · macOS Keychain |
-| **AI providers** | Anthropic · OpenAI · Google · Groq · Cerebras · SambaNova · DeepSeek · Moonshot · Mistral · OpenRouter · Ollama (local) |
-| **Modes** | 11 specialized AI workspaces |
-| **Pre-built agents** | 9 specialists |
+| **Version** | v2.0.0 |
+| **Stack** | Tauri v2 · Rust · ES modules (esbuild) · Monaco · macOS Keychain |
+| **AI providers** | Anthropic · OpenAI · Google · Groq · Cerebras · SambaNova · DeepSeek · Moonshot/Kimi · Mistral · OpenRouter · NVIDIA NIM · Ollama (local) |
+| **Modes** | 11 specialized workspaces |
+| **Pre-built agents** | 9 specialists + custom Agent Maker |
 | **Telemetry** | None |
-| **Backend server** | None |
-| **Author** | [Seif Hashish](https://github.com/Hash-7777) |
+| **Backend** | None required (optional local Node sync for dev) |
 
 ---
 
-## Why HashCortX
+## Why MiraXCode
 
-- **Truly local-first.** No cloud backend, no auto-update, no telemetry, no accounts. The binary phones home to nothing.
-- **Multi-provider by design.** Ten cloud providers and Ollama for local models — all configured side-by-side, switched freely, with automatic provider failover in swarm runs.
-- **One app, eleven modes.** Coding, chat, swarms, research, financial analysis, security scanning, 3D planning, ERP generation, virtual OS — without juggling separate tools.
-- **OS-grade key storage.** API keys are stored in the macOS Keychain (primary) with a local WebKit cache for fast reads — never in `atelier` settings or repo config files. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
-- **Tiny footprint.** 8.9 MB — roughly 30× smaller than Electron-based AI desktop apps that ship at 100–300 MB.
-- **Open source under MIT.** Read every line. Fork it. Ship your own version.
-
----
-
-## About this project's development
-
-**Product, architecture, modes, philosophy, and every idea in this app are 100% by Seif Hashish.** The 11-mode structure, the local-first principle, the OS Keychain choice, the Permission Guard / Audit Log security model, the swarm-failover routing pattern, the pharma-informed source-grounding constraints in PubMed Agent, Drug Interaction, and Finance AI — every design decision was conceived and directed by the human author.
-
-**HashCortX was built with heavy AI assistance — approximately 30 million tokens consumed** across Claude, GPT, and other frontier models during the v2.0.0 build. AI handled the bulk of implementation, refactoring, and iteration under human direction. Architecture decisions, security model, mode boundaries, and final code review were the author's. This is disclosed because HashCortX is itself an AI tool — using AI to build it and hiding that fact would be inconsistent.
-
-All source is open at [Hash-7777/HashCortX](https://github.com/Hash-7777/HashCortX) and reviewable line by line.
+- **Truly local-first** — No product cloud, no analytics pipeline, no mandatory sign-in.
+- **Multi-provider BYOK** — Configure many providers side-by-side; cloud failover and swarm routing when a model fails or rate-limits.
+- **One app, eleven modes** — Chat, code, swarms, research, finance, security, 3D, ERP prototypes, virtual OS — without juggling separate products.
+- **OS-grade secrets** — Keychain-backed API storage; settings JSON strips key material on save. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
+- **Modular, testable shell** — Main UI split into `src/js/app/` factories (esbuild bundle) with smoke tests and CI.
+- **Open source** — Inspect, fork, and ship your own build under MIT.
 
 ---
 
@@ -79,179 +66,192 @@ All source is open at [Hash-7777/HashCortX](https://github.com/Hash-7777/HashCor
 
 ---
 
-## The 11 Modes
+## The 11 modes
 
 | # | Mode | What it does |
 |---|---|---|
-| 1 | **Chats** | Multi-provider chat workspace with projects, file attachments, slash commands, and chat history |
-| 2 | **Agents** | 9 pre-built specialist agents: Personal Assistant, Quick Assistant, Research Agent, Deep Research, Senior Engineer, Page Analyzer, PubMed Agent, Drug Interaction, ATS CV Auditor |
-| 3 | **Code (HashCoder)** | Full AI coding agent with file tree, project picker, real file-edit tools, shell access, and a browser panel |
-| 4 | **Split** | Side-by-side real-time comparison of two models on the same prompt |
-| 5 | **3D Forge** | Architecture-first 3D planning agent producing structured node/mesh plans for game levels, generative architecture, and spatial design |
-| 6 | **Finance AI** | Full-screen financial analysis studio for bank statements, CSVs, PDFs, and XLSX files — KPIs, charts, recommendations, never invents numbers |
-| 7 | **Sandbox** | Swarm-based security scanner for malware patterns, trojans, prompt injections, and suspicious logic in untrusted code or AI output |
-| 8 | **ERP / Systems Builder** | Generates working interactive prototypes — forms, tables, dashboards — from a workflow description |
-| 9 | **Agent Swarm** | Designer for multi-agent pipelines with voting mode, chain mode, and automatic provider failover when a model rate-limits or fails mid-run |
-| 10 | **Virtual OS** | Simulated project desktop where an AI agent creates, edits, and organizes files in a sandboxed workspace |
-| 11 | **Agent Maker** | No-code builder for custom agents with name, icon, system prompt, and curated tool sets |
+| 1 | **Chats** | Multi-provider chat with projects, attachments, slash commands, templates, exports (MD/JSON), and capped local persistence |
+| 2 | **Agents** | Nine built-in specialists + custom agents via Agent Maker |
+| 3 | **Code (MiraXCode Coder)** | IDE-style coding agent: Monaco editor, file tree, LSP client, diagnostics, project RAG, command palette, staged reads, shell tools |
+| 4 | **Split** | Side-by-side comparison of two models on the same prompt |
+| 5 | **3D Forge** | Architecture-first 3D planning (structured spatial plans) |
+| 6 | **Finance AI** | Bank statements, CSV/PDF/XLSX — KPIs and charts grounded in uploaded data |
+| 7 | **Sandbox** | Swarm-based security scan for suspicious patterns in code or AI output |
+| 8 | **ERP / Systems Builder** | Interactive prototypes (forms, tables, dashboards) from workflow descriptions |
+| 9 | **Agent Swarm** | Multi-agent pipelines with voting/chain modes and provider failover |
+| 10 | **Virtual OS** | Simulated desktop where an agent creates and organizes project files |
+| 11 | **Agent Maker** | No-code custom agents (name, icon, system prompt, tool sets) |
 
-Full descriptions: [Wiki → Features](https://github.com/Hash-7777/HashCortX/wiki/Features) · [MODES_GUIDE.txt](MODES_GUIDE.txt)
+Mode reference: [MODES_GUIDE.txt](MODES_GUIDE.txt) (also branded MiraXCode in-repo).
+
+---
+
+## Built-in agents
+
+Personal Assistant · Quick Assistant · Research Agent · Deep Research · Senior Engineer · Page Analyzer · PubMed Agent · Drug Interaction · ATS CV Auditor — plus user-defined agents from Agent Maker.
+
+Source-grounded constraints apply in research, PubMed, drug-interaction, and finance flows (no fabricated citations or numbers).
+
+---
+
+## Platform features (v2.0)
+
+### Chat shell (`src/js/app/`)
+
+- **esbuild modular shell** — 40+ modules: providers, features, UI, core wiring via `create*Api()` factories
+- **Projects / workspaces** — Per-project chats, instructions, memory mode, agent run traces
+- **Agent memory** — Fact store with synonym recall and auto-extract from conversation
+- **RAG** — Local knowledge base + optional project ingest (`CdrProjectRag`)
+- **MCP** — Server scan, tool discovery, prefs panel, OpenAI-compatible tool bridge
+- **Auto-router** — Heuristic routing (code / medical / news / reasoning) with Tavily, Google CSE, Wikipedia, PubMed, URL fetch
+- **Chat stream** — Streaming bubbles, compare mode, abort, context window indicator, compaction preference
+- **File ingest** — Images, PDFs, text attachments with composer context
+- **Templates & slash palette** — Prompt library with `{{var}}` fill-in
+- **Settings** — Key validation probes, usage chips, privacy-local toggle, optional backend secret sync (dev)
+- **UI polish** — Themed dialogs, selection toolbar (quote/explain/fix), global shortcuts, command palette
+
+### Providers
+
+- **Cloud catalog** — OpenAI, Gemini, Anthropic, Groq, OpenRouter, and more via unified `cloud:` model IDs
+- **Moonshot / Kimi** — Multi-base failover (`sk-ki…` Anthropic-compatible routes)
+- **NVIDIA NIM** — Dedicated SSE streaming path
+- **Ollama** — Local models, host presets, model unload / free-RAM preset
+- **Native HTTP** — Tauri-side requests and SSE where available
+- **Failover panel** — Per-provider cloud fallback preferences
+
+### Coder / IDE (`code-mode.js` + `cdr-*`)
+
+- **Monaco** editor (bundled vendor)
+- **LSP client**, diagnostics parser (TS/rust/etc.)
+- **Virtualized chat**, command palette, goto, mentions
+- **Project lint**, staged file reads, file-stage workflow
+- **Coder memory & skills**, Graphify integration hooks
+- **Agent stream** bridge to main shell `window._H`
+
+### Security & reliability (Rust + JS)
+
+- **Permission guard** — Denylist/allowlist before FS and shell from agents
+- **Audit log** — Append-only local log of guarded actions
+- **Keychain commands** — Rust-backed secret storage
+- **HcStorage** — Trimmed chat/message persistence caps
+- **HcHealth** — Local error capture only (no remote reporting)
+
+### Quality
+
+- **CI** — `.github/workflows/ci.yml` (build + tests)
+- **Tests** — `hc-storage`, `cdr-diagnostics`, `app-modules-smoke` (routing, memory, settings, MCP names, Kimi keys)
 
 ---
 
 ## Supported AI providers
 
-### Cloud providers (bring your own API key)
+### Cloud (bring your own API key)
 
 | Provider | Notes |
 |---|---|
-| **Anthropic** | Claude family (Opus, Sonnet, Haiku) |
+| **Anthropic** | Claude family |
 | **OpenAI** | GPT family |
-| **Google** | Gemini Pro, Flash |
-| **Groq** | Llama, Mixtral — fast inference |
+| **Google** | Gemini |
+| **Groq** | Fast Llama/Mixtral inference |
 | **Cerebras** | Ultra-fast inference |
-| **SambaNova** | Llama, DeepSeek hosting |
+| **SambaNova** | Hosted open models |
 | **DeepSeek** | V3, R1 |
-| **Moonshot** | Kimi |
+| **Moonshot** | Kimi (multi-base + code keys) |
 | **Mistral** | Mistral family |
-| **OpenRouter** | Meta-provider aggregating frontier models |
+| **OpenRouter** | Meta-provider gateway |
+| **NVIDIA NIM** | Cloud inference (when key configured) |
 
-### Local models
+### Local
 
 | Provider | Notes |
 |---|---|
-| **Ollama** | Any Ollama-hosted local model. No API key required. Air-gapped capable. |
+| **Ollama** | Any local model; no API key; air-gapped capable |
 
-API keys are stored in the macOS Keychain. They never touch disk in plaintext, never appear in environment variables, and are never transmitted anywhere except the corresponding provider's API.
+Keys are stored in the **macOS Keychain** (Tauri). They are not written to the repository and are cleared from `localStorage` settings on save.
 
 ---
 
 ## Install
 
-### Quick install (macOS, Apple Silicon)
+### macOS (Apple Silicon)
 
-1. Download `HashCortx-2.0.0-macOS-arm64.dmg` from the [latest release](https://github.com/Hash-7777/HashCortX/releases/latest)
-2. Open the DMG and drag HashCortX to `/Applications`
-3. On first launch: right-click → **Open** → **Open** (the v2.0.0 build is unsigned)
-4. Open **Settings → Providers** and add API keys for the providers you want to use
-5. Or skip API keys and use local models via Ollama
-
-### Bypass Gatekeeper (unsigned build workaround)
+1. Download the latest **MiraXcode** DMG from [Releases](https://github.com/miracuves/miraxcode/releases) when published
+2. Open the DMG and drag **MiraXcode** to `/Applications`
+3. On first launch with an unsigned build: right-click → **Open** → **Open**
+4. **Settings → Providers** — add API keys, or use Ollama only
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/HashCortx.app
+# Unsigned build quarantine workaround
+xattr -dr com.apple.quarantine /Applications/MiraXcode.app
 ```
-
-Code signing is planned for a future release.
 
 ---
 
 ## Build from source
 
 ```bash
-git clone https://github.com/Hash-7777/HashCortX.git
-cd HashCortX
+git clone https://github.com/miracuves/miraxcode.git
+cd miraxcode
 npm install
+npm run build:js    # bundle src/js/app → app.bundle.js
 npm run tauri dev
 ```
 
-Build a distributable:
+Release build:
 
 ```bash
 npm run tauri build
 ```
 
-Output: `src-tauri/target/release/bundle/dmg/`
+Tests:
+
+```bash
+npm test
+```
 
 ### Requirements
 
-- macOS, Node 18+, Rust toolchain (`rustup`), Xcode Command Line Tools.
+- macOS (primary), Node 18+, Rust (`rustup`), Xcode Command Line Tools
 
----
+### Project layout (high level)
 
-## Tech stack
+```
+miraxcode/
+├── src/                 # Frontend (HTML, CSS, JS modes)
+│   └── js/app/          # Modular main shell (esbuild entry)
+├── src-tauri/           # Rust commands, security, keychain
+├── docs/                # Architecture, production, wave notes
+└── tests/               # Node test runner smoke/unit tests
+```
 
-| Layer | Technology |
-|---|---|
-| **Framework** | Tauri v2 (Rust + native webview) |
-| **Backend** | Rust |
-| **Frontend** | Vanilla JavaScript (no React, no TypeScript, no bundler) |
-| **Native APIs** | macOS Keychain (via `keyring` crate), filesystem and shell via Tauri commands |
-| **Styling** | Plain CSS, JetBrains Mono / Berkeley Mono typography |
-| **Local models** | Ollama integration |
-
-The choice of vanilla JS (no React, no bundler) is deliberate — it keeps the bundle at 8.9 MB and the codebase auditable end-to-end.
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [src/js/app/README.md](src/js/app/README.md)
 
 ---
 
 ## Privacy and security
 
-- **No backend server.** Every AI request travels directly from your machine to the provider you configured. There is no HashCortX intermediary.
-- **No telemetry.** No analytics, no tracking, no usage reporting, no error-reporting backend. The binary has no network calls except to AI provider endpoints you explicitly configure.
-- **No accounts.** No sign-up, no login, no email collection.
-- **OS Keychain storage.** API keys live in the macOS Keychain. Never in config files. Never in plaintext.
-- **Permission Guard.** Filesystem and shell calls from the coding agent are intercepted by a denylist-based gatekeeper before execution. Every guarded action is logged to the built-in Audit Log.
-- **Source-grounded modes.** PubMed Agent, Drug Interaction, and Finance AI are constrained to never fabricate data.
-- **Air-gapped capable.** With Ollama, the app runs fully offline.
+- **No product backend** — AI traffic goes only to providers you configure
+- **No telemetry** — No usage analytics or remote crash pipeline
+- **Keychain-first secrets** — See [SECURITY.md](SECURITY.md)
+- **Permission guard + audit log** — Gated filesystem/shell for coding agents
+- **Air-gapped path** — Full offline use with Ollama
 
 ---
 
-## How HashCortX compares
+## How MiraXCode compares
 
-| | HashCortX | Cursor | Claude Code | Continue | Aider | Cline | Zed |
-|---|---|---|---|---|---|---|---|
-| Type | Native desktop app | VS Code fork | CLI | VS Code/JetBrains extension | Terminal CLI | VS Code extension | Native editor |
-| License | MIT | Proprietary | Proprietary | Apache 2.0 | Apache 2.0 | Apache 2.0 | GPL/AGPL |
-| Free | Yes (BYO key) | Subscription | Subscription/API | Yes | Yes | Yes | Yes |
-| Local-first | Yes | No | No | Yes | Yes | Yes | Yes |
-| OS Keychain | Yes | No | Yes | No | No | No | No |
-| Cloud providers | 10 | Limited | Anthropic only | Many | Many | Many | Several |
-| Local models (Ollama) | Yes | Limited | No | Yes | Yes | Yes | Yes |
-| Multi-agent swarms | Yes | No | No | No | No | No | No |
-| Modes beyond coding | Yes (11) | No | No | No | No | No | No |
-| Pre-built agents | 9 | None | None | None | None | None | None |
-| Telemetry | None | Yes | Yes (opt-out) | Opt-in | None | None | Opt-in |
-
-Detailed breakdown: [Wiki → Comparison](https://github.com/Hash-7777/HashCortX/wiki/Comparison)
-
----
-
-## FAQ
-
-### Is HashCortX free?
-Yes. MIT-licensed, no paid tier, no usage caps. You pay AI providers directly for their API usage, or use Ollama to avoid all AI costs.
-
-### Does HashCortX work offline?
-Yes, with Ollama. Cloud providers require internet.
-
-### Which operating systems are supported?
-macOS Apple Silicon in v2.0.0. Intel Mac, Windows, and Linux builds are planned.
-
-### Does HashCortX send my code or data anywhere?
-Only to AI providers you explicitly configure. There is no HashCortX server.
-
-### Can I use Claude, GPT, and Gemini at the same time?
-Yes. Configure all your keys at once and switch freely. In Agent Swarm mode, automatic provider failover kicks in when a model fails or rate-limits.
-
-### Was HashCortX built with AI?
-Yes — heavy AI assistance, approximately 30 million tokens consumed during development. All product ideas, architecture, and direction were by the human author. See [About this project's development](#about-this-projects-development).
-
-### How big is HashCortX?
-8.9 MB DMG. Roughly 30× smaller than Electron-based equivalents.
-
-Full FAQ: [Wiki → FAQ](https://github.com/Hash-7777/HashCortX/wiki/FAQ)
-
----
-
-## Roadmap
-
-- Code signing for the macOS build
-- Intel Mac, Windows, and Linux builds
-- Further extraction of monolithic source modules
-- Permission Guard coverage for Virtual OS and 3D Forge native calls
-- Additional pre-built specialist agents based on user requests
-
-Suggest features via [GitHub Issues](https://github.com/Hash-7777/HashCortX/issues/new/choose).
+| | MiraXCode | Cursor | Claude Code | Continue | Aider | Cline |
+|---|---|---|---|---|---|---|
+| Type | Native desktop | VS Code fork | CLI | IDE extension | Terminal | VS Code ext |
+| License | MIT | Proprietary | Proprietary | Apache 2.0 | Apache 2.0 | Apache 2.0 |
+| Local-first product cloud | No | No | No | N/A | Yes | Yes |
+| OS Keychain for keys | Yes | No | Partial | No | No | No |
+| Many cloud providers | Yes | Limited | Anthropic-focused | Yes | Yes | Yes |
+| Ollama / local | Yes | Limited | No | Yes | Yes | Yes |
+| Multi-agent swarms | Yes | No | No | No | No | No |
+| Non-coding modes | 11 | No | No | No | No | No |
+| Built-in specialist agents | 9+ | — | — | — | — | — |
+| Telemetry | None | Yes | Opt-out | Opt-in | None | None |
 
 ---
 
@@ -259,49 +259,57 @@ Suggest features via [GitHub Issues](https://github.com/Hash-7777/HashCortX/issu
 
 | Shortcut | Action |
 |---|---|
-| `Cmd/Ctrl + Shift + N` | Start a new chat from anywhere |
+| `Cmd/Ctrl + Shift + N` | New chat |
+| `Cmd/Ctrl + Shift + C` | Toggle Coder mode |
+| `Cmd/Ctrl + K` | Focus model picker |
+
+Command palette entries register when `MxCommandPalette` is loaded.
 
 ---
 
 ## Documentation
 
-- [Wiki Home](https://github.com/Hash-7777/HashCortX/wiki) — overview and entry point
-- [Features](https://github.com/Hash-7777/HashCortX/wiki/Features) — full descriptions of all 11 modes
-- [Supported Providers](https://github.com/Hash-7777/HashCortX/wiki/Supported-Providers) — provider list with model details
-- [Comparison](https://github.com/Hash-7777/HashCortX/wiki/Comparison) — vs Cursor, Claude Code, Continue, Aider, Cline, Zed
-- [Privacy and Security](https://github.com/Hash-7777/HashCortX/wiki/Privacy-and-Security) — full security architecture
-- [FAQ](https://github.com/Hash-7777/HashCortX/wiki/FAQ) — comprehensive Q&A
-- [MODES_GUIDE.txt](MODES_GUIDE.txt) — full mode reference
+| Doc | Contents |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Tauri layout, phases, directory map |
+| [docs/PRODUCTION.md](docs/PRODUCTION.md) | Storage caps, health, keychain behavior |
+| [docs/WAVE8.md](docs/WAVE8.md) | Shell modularization notes |
+| [SECURITY.md](SECURITY.md) | Guard, audit log, threat model |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and conventions |
+| [src/js/app/README.md](src/js/app/README.md) | Module map and init order |
+
+---
+
+## Roadmap
+
+- Signed macOS builds and GitHub Releases on [miracuves/miraxcode](https://github.com/miracuves/miraxcode)
+- Intel macOS, Windows, and Linux targets
+- Further split of `code-mode.js` and `virtual-os.js` into `modes/`
+- Optional TypeScript on `app/` modules
+- Expanded Permission Guard coverage in Virtual OS / 3D Forge
+
+Feature requests: [GitHub Issues](https://github.com/miracuves/miraxcode/issues).
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, architecture rules, and how to propose changes. Bug reports and feature requests via [GitHub Issues](https://github.com/Hash-7777/HashCortX/issues). Questions and ideas via [GitHub Discussions](https://github.com/Hash-7777/HashCortX/discussions).
+See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions that respect local-first principles (no mandatory cloud, no telemetry) are especially welcome.
 
 ---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
-
----
-
-## Author
-
-**Seif Hashish** — independent open-source developer with a pharma and clinical background. The pharma background informs the source-grounding constraints in HashCortX's PubMed Agent, Drug Interaction, and Finance AI modes.
-
-- GitHub: [@Hash-7777](https://github.com/Hash-7777)
-- Website: [hashcortx.com](https://hashcortx.com)
+MIT — see [LICENSE](LICENSE). Copyright **Miracuves**.
 
 ---
 
 <div align="center">
 
-**HashCortX**
+**MiraXCode**
 
-One UI · Agent Swarms · Zero Data Leak · Local-First · Open Source
+Local-first · Multi-provider · Agent swarms · Open source
 
-[Download](https://github.com/Hash-7777/HashCortX/releases/latest) · [Wiki](https://github.com/Hash-7777/HashCortX/wiki) · [Discussions](https://github.com/Hash-7777/HashCortX/discussions)
+[github.com/miracuves/miraxcode](https://github.com/miracuves/miraxcode)
 
 </div>

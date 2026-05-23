@@ -1,5 +1,5 @@
 // ==============================================================
-// HashCortx — Tauri build script
+// MiraXcode — Tauri build script
 //
 // Cargo runs this file BEFORE compiling the main crate, during
 // `cargo build` / `npm run tauri build` / `npm run tauri dev`.

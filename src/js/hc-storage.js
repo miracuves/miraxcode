@@ -1,5 +1,5 @@
 /**
- * HashCortX — production-safe localStorage layer.
+ * MiraXCode — production-safe localStorage layer.
  * Caps chat/history size, detects quota exhaustion, surfaces errors to the user.
  */
 (function () {

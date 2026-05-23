@@ -1,6 +1,6 @@
-# HashCortX — Production operations guide
+# MiraXCode — Production operations guide
 
-This document describes how the desktop app is hardened for daily use at scale (thousands of installs). There is no HashCortX cloud backend; reliability is entirely client-side.
+This document describes how the desktop app is hardened for daily use at scale. There is no MiraXCode cloud backend; reliability is entirely client-side.
 
 ## Architecture
 

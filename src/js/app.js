@@ -3,5 +3,5 @@
  * Built with: npm run build:js → src/js/app.bundle.js
  */
 console.warn(
-  '[HashCortX] src/js/app.js is deprecated. Load /js/app.bundle.js (run npm run build:js).',
+  '[MiraXCode] src/js/app.js is deprecated. Load /js/app.bundle.js (run npm run build:js).',
 );

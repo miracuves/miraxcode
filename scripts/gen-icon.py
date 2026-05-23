@@ -1,5 +1,5 @@
 """
-HashCortx icon generator
+MiraXcode icon generator
 Run: python3 scripts/gen-icon.py
 Output: src/assets/icon-master.png  (1024x1024, used by `npm run tauri icon`)
 

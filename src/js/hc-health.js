@@ -1,5 +1,5 @@
 /**
- * HashCortX — production error capture (local-only, no telemetry).
+ * MiraXCode — production error capture (local-only, no telemetry).
  * Ring buffer in localStorage + global handlers for support diagnostics.
  */
 (function () {
