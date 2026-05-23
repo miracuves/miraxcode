@@ -9,6 +9,11 @@ import { normalizePlan, box, vec3 } from '../src/js/modes/forge/plan.js';
 import { DOMAIN_BG, VALID_SCREENS, MAX_HISTORY } from '../src/js/modes/systems/constants.js';
 import { esc, slug, fieldType } from '../src/js/modes/systems/utils.js';
 import { PRESET_PROMPTS, FORGE_ARCHITECT_PROMPT } from '../src/js/app/ui/messages/presets.js';
+import { createMessagesRenderApi } from '../src/js/app/ui/messages/render.js';
+import { createMessagesTurnApi } from '../src/js/app/ui/messages/turn.js';
+import { detectDomain, DOMAIN_CONFIG } from '../src/js/modes/systems/domain-config.js';
+import { createForgeAgentsRoutingApi } from '../src/js/modes/forge/agents-routing.js';
+import { createSystemsRenderApi } from '../src/js/modes/systems/render.js';
 
 test('forge constants and plan helpers', () => {
   assert.equal(AGENTS.length, 5);
@@ -34,4 +39,25 @@ test('message presets export expected keys', () => {
   assert.ok(PRESET_PROMPTS.hashAi);
   assert.ok(PRESET_PROMPTS.forgeScaffold);
   assert.ok(FORGE_ARCHITECT_PROMPT.includes('3D Forge'));
+});
+
+test('messages render and turn factories are functions', () => {
+  assert.equal(typeof createMessagesRenderApi, 'function');
+  assert.equal(typeof createMessagesTurnApi, 'function');
+});
+
+test('systems domain-config detects restaurant', () => {
+  assert.equal(detectDomain('pizza restaurant POS'), 'restaurant');
+  assert.ok(DOMAIN_CONFIG.restaurant?.modules?.length > 0);
+});
+
+test('systems render factory exports renderAll', () => {
+  assert.equal(typeof createSystemsRenderApi, 'function');
+});
+
+test('forge agents routing scores free models lower on big tasks', () => {
+  const api = createForgeAgentsRoutingApi({ $: () => null, log: () => {}, cooldowns: new Map() });
+  const free = api.modelStrengthScore('cloud:groq:llama-free', 'Llama Free', true);
+  const pro = api.modelStrengthScore('cloud:openrouter:anthropic/claude-opus', 'Claude Opus', true);
+  assert.ok(pro > free);
 });

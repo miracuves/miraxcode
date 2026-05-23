@@ -69,6 +69,31 @@
   ];
 
   // src/js/modes/forge/plan.js
+  function vec3(v, fallback) {
+    return Array.isArray(v) && v.length >= 3 ? [Number(v[0]) || 0, Number(v[1]) || 0, Number(v[2]) || 0] : fallback.slice();
+  }
+  function normalizePlan(plan) {
+    const src = plan && typeof plan === "object" ? plan : { name: "Empty model", nodes: [] };
+    const nodes = Array.isArray(src.nodes) ? src.nodes : [];
+    return {
+      name: src.name || "Forged model",
+      glbUrl: typeof src.glbUrl === "string" ? src.glbUrl : "",
+      constraints: Array.isArray(src.constraints) ? src.constraints : [],
+      edges: Array.isArray(src.edges) ? src.edges : [],
+      nodes: nodes.slice(0, MAX_FORGE_NODES).map((node, i) => ({
+        id: String(node.id || `node_${i + 1}`),
+        name: String(node.name || node.id || `Node ${i + 1}`),
+        type: ["box", "cylinder", "capsule", "sphere", "cone", "torus", "lathe", "extrude", "logo", "logo_img", "mesh"].includes(node.type) ? node.type : "box",
+        role: ["structure", "surface", "detail", "audit"].includes(node.role) ? node.role : "structure",
+        position: vec3(node.position, [0, 0, 0]),
+        rotation: vec3(node.rotation, [0, 0, 0]),
+        scale: vec3(node.scale, [1, 1, 1]),
+        params: node.params && typeof node.params === "object" ? node.params : {},
+        color: node.color,
+        opacity: Number.isFinite(node.opacity) ? node.opacity : void 0
+      }))
+    };
+  }
   function box(id, name, role, position, size, color, rotation) {
     return { id, name, role, type: "box", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { width: size[0], height: size[1], depth: size[2] }, color };
   }
@@ -91,10 +116,176 @@
     return { id, name, role, type: "torus", position, rotation: rotation || [Math.PI / 2, 0, 0], scale: [1, 1, 1], params: { radius, tube }, color };
   }
 
+  // src/js/modes/forge/agents-routing.js
+  function createForgeAgentsRoutingApi(ctx) {
+    const { $, log, cooldowns } = ctx;
+    function isFreeModel(value, label) {
+      return /:free|\bfree\b/.test(`${value || ""} ${label || ""}`.toLowerCase());
+    }
+    function modelSizeScore(value, label) {
+      const s = `${value || ""} ${label || ""}`.toLowerCase();
+      let best = 0;
+      for (const match of s.matchAll(/(\d+(?:\.\d+)?)\s*b\b/g)) {
+        best = Math.max(best, Number(match[1]) || 0);
+      }
+      if (/gpt[-_\s]?oss.*120|120.*gpt[-_\s]?oss/.test(s)) best = Math.max(best, 120);
+      if (/405b|480b|671b/.test(s)) best = Math.max(best, Number((s.match(/(405|480|671)b/) || [0, 0])[1]) || 0);
+      return best;
+    }
+    function modelStrengthScore(value, label, bigTask) {
+      const s = `${value || ""} ${label || ""}`.toLowerCase();
+      let score = 0;
+      const size = modelSizeScore(value, label);
+      if (/gpt[-_\s]?oss/.test(s)) score += 95;
+      if (/pro|opus|sonnet|gpt-4|gpt-5|o3|o4|r1|v3|405b|235b|120b|70b|large|max|maverick|nemotron|hermes|qwen3|deepseek/.test(s)) score += 70;
+      if (size >= 120) score += 52;
+      else if (size >= 100) score += 38;
+      else if (size >= 70) score += bigTask ? 12 : 18;
+      if (size > 0 && size < 70) score -= bigTask ? 18 : 8;
+      if (/coder|code|dev|reason|thinking|instruct|chat/.test(s)) score += 18;
+      if (/vision|vl|multi/.test(s)) score += 10;
+      if (/flash|lite|mini|small|tiny|1b|1.5b|3b|7b|8b|instant/.test(s)) score -= bigTask ? 35 : 12;
+      if (isFreeModel(value, label)) score -= bigTask ? 28 : 10;
+      if (/local/.test(s)) score -= bigTask ? 12 : 0;
+      if (/nvidia|samba|openrouter|gemini|groq|cerebras/.test(s)) score += 8;
+      return score;
+    }
+    function bestModelForProvider(options, bigTask) {
+      return [...options].sort(
+        (a, b) => modelStrengthScore(b.value, b.label, bigTask) - modelStrengthScore(a.value, a.label, bigTask)
+      )[0] || null;
+    }
+    function providerFromValue(value) {
+      return value && value.startsWith("cloud:") ? value.split(":")[1] : "local";
+    }
+    function providerDisplayName(provider) {
+      const name = String(provider || "model").replace(/^sambanova$/i, "SambaNova");
+      if (name === "SambaNova") return name;
+      return name.replace(/(^|[-_\s])([a-z])/g, (_, sep, c) => `${sep}${c.toUpperCase()}`);
+    }
+    function forgeProviderCooldown(provider) {
+      const key = String(provider || "");
+      const entry = FORGE_PROVIDER_COOLDOWNS.get(key);
+      if (!entry) return null;
+      if (entry.until <= Date.now()) {
+        FORGE_PROVIDER_COOLDOWNS.delete(key);
+        return null;
+      }
+      return entry;
+    }
+    function isForgeRoutingError(err) {
+      const msg = String(err?.message || err || "").toLowerCase();
+      return /rate.?limit|quota|429|too many|free.?tier|api.?key|unauthori[sz]ed|forbidden|billing|credit|capacity|overloaded|unavailable|service.?unavailable|timed?.?out|timeout|failed to fetch|network|model.{0,16}not.{0,16}found|not configured|invalid key|missing key/.test(msg) || err?.name === "AbortError";
+    }
+    function cooldownMsForForgeError(err) {
+      const msg = String(err?.message || err || "").toLowerCase();
+      if (/api.?key|invalid key|missing key|unauthori[sz]ed|forbidden|not configured/.test(msg)) return 10 * 60 * 1e3;
+      if (/rate.?limit|quota|429|too many|free.?tier|billing|credit/.test(msg)) return 90 * 1e3;
+      if (/timed?.?out|timeout|capacity|overloaded|unavailable|failed to fetch|network/.test(msg) || err?.name === "AbortError") return 45 * 1e3;
+      return 0;
+    }
+    function markForgeProviderFailure(provider, err) {
+      if (!provider || !isForgeRoutingError(err)) return;
+      const ms = cooldownMsForForgeError(err);
+      if (!ms) return;
+      const until = Date.now() + ms;
+      const existing = forgeProviderCooldown(provider);
+      if (existing && existing.until >= until) return;
+      const reason = String(err?.message || err || "route failed").replace(/\s+/g, " ").slice(0, 82);
+      FORGE_PROVIDER_COOLDOWNS.set(String(provider), { until, reason });
+      log("Router", `Cooling down ${providerDisplayName(provider)} for ${Math.ceil(ms / 1e3)}s`, "warn", reason);
+    }
+    function skipCoolingCandidate(candidate, candidates) {
+      const healthyExists = candidates.some((route) => route?.provider && !forgeProviderCooldown(route.provider));
+      const cooldown = candidate?.provider ? forgeProviderCooldown(candidate.provider) : null;
+      if (!healthyExists || !cooldown) return false;
+      const seconds = Math.max(1, Math.ceil((cooldown.until - Date.now()) / 1e3));
+      log("Router", `Skipping ${providerDisplayName(candidate.provider)} route (${seconds}s cooldown)`, "wait", cooldown.reason || "");
+      return true;
+    }
+    function providerModelsForForge(bigTask, options = {}) {
+      const includeCooling = !!options.includeCooling;
+      const allOpts = Array.from(document.getElementById("model")?.options || []).map((o) => ({ value: o.value, label: o.textContent || o.label || o.value })).filter((o) => {
+        const provider = providerFromValue(o.value);
+        return o.value && !o.disabled && !o.value.startsWith("\u2500") && (includeCooling || !forgeProviderCooldown(provider));
+      });
+      const providerOptions = {};
+      allOpts.forEach((o) => {
+        const provider = providerFromValue(o.value);
+        if (!providerOptions[provider]) providerOptions[provider] = [];
+        providerOptions[provider].push(o);
+      });
+      const ranked = Object.entries(providerOptions).map(([provider, options2]) => {
+        const best = bestModelForProvider(options2, bigTask);
+        return [provider, best?.value || options2[0]?.value || "", best?.label || options2[0]?.label || ""];
+      }).filter(([, value]) => value).sort((a, b) => modelStrengthScore(b[1], b[2], bigTask) - modelStrengthScore(a[1], a[2], bigTask));
+      if (!ranked.length && !includeCooling) return providerModelsForForge(bigTask, { includeCooling: true });
+      return ranked;
+    }
+    function autoAssignForgeModels(prompt, force) {
+      const providerModels = providerModelsForForge(true);
+      const nonFreeProviderModels = providerModels.filter(([, value, label]) => !isFreeModel(value, label));
+      if (!providerModels.length) {
+        log("Parameter Agent", "No model options available for auto-routing", "warn");
+        return;
+      }
+      const roleProviderPreference = {
+        god: ["openrouter", "cerebras", "samba", "gemini", "groq", "local"],
+        structure: ["openrouter", "cerebras", "samba", "gemini", "groq", "local"],
+        surface: ["gemini", "openrouter", "samba", "groq", "cerebras", "local"],
+        detail: ["openrouter", "cerebras", "gemini", "samba", "groq", "local"],
+        audit: ["openrouter", "cerebras", "samba", "gemini", "groq", "local"]
+      };
+      const used = /* @__PURE__ */ new Set();
+      const usedValues = /* @__PURE__ */ new Set();
+      const assigned = [];
+      for (const agent of AGENTS) {
+        const sel = $(`frgModel_${agent.id}`);
+        if (!sel) continue;
+        const currentProvider = providerFromValue(sel.value);
+        const currentLabel = sel.options[sel.selectedIndex]?.textContent || "";
+        const currentCooling = forgeProviderCooldown(currentProvider);
+        if (!force && sel.value && !used.has(currentProvider) && !isFreeModel(sel.value, currentLabel) && !currentCooling) {
+          used.add(currentProvider);
+          usedValues.add(sel.value);
+          continue;
+        }
+        const preferred = roleProviderPreference[agent.id] || roleProviderPreference.god;
+        const bigEnough = nonFreeProviderModels.filter(([, value, label]) => modelSizeScore(value, label) >= 120);
+        const replacement = preferred.map((p) => bigEnough.find(([provider]) => provider === p && !used.has(provider))).find(Boolean) || bigEnough.find(([provider]) => !used.has(provider)) || preferred.map((p) => bigEnough.find(([provider, value]) => provider === p && !usedValues.has(value))).find(Boolean) || bigEnough.find(([, value]) => !usedValues.has(value)) || preferred.map((p) => nonFreeProviderModels.find(([provider]) => provider === p && !used.has(provider))).find(Boolean) || nonFreeProviderModels.find(([provider]) => !used.has(provider)) || preferred.map((p) => nonFreeProviderModels.find(([provider, value]) => provider === p && !usedValues.has(value))).find(Boolean) || nonFreeProviderModels.find(([, value]) => !usedValues.has(value)) || nonFreeProviderModels[0] || preferred.map((p) => providerModels.find(([provider]) => provider === p && !used.has(provider))).find(Boolean) || providerModels.find(([provider]) => !used.has(provider)) || providerModels[0];
+        if (replacement && Array.from(sel.options).some((o) => o.value === replacement[1])) {
+          sel.value = replacement[1];
+          used.add(replacement[0]);
+          usedValues.add(replacement[1]);
+          assigned.push(`${agent.name} \u2192 ${replacement[2] || replacement[1]}`);
+        }
+      }
+      if (assigned.length) {
+        log("Parameter Agent", `Auto-assigned ${assigned.length} model route(s)`, "boss");
+        assigned.forEach((line) => log("Router", line, "wait"));
+      }
+    }
+    return {
+      isFreeModel,
+      modelSizeScore,
+      modelStrengthScore,
+      bestModelForProvider,
+      providerFromValue,
+      providerDisplayName,
+      forgeProviderCooldown,
+      isForgeRoutingError,
+      cooldownMsForForgeError,
+      markForgeProviderFailure,
+      skipCoolingCandidate,
+      providerModelsForForge,
+      autoAssignForgeModels
+    };
+  }
+
   // src/js/modes/forge/forge-mode.js
   (function() {
     "use strict";
-    const FORGE_PROVIDER_COOLDOWNS = /* @__PURE__ */ new Map();
+    const FORGE_PROVIDER_COOLDOWNS2 = /* @__PURE__ */ new Map();
     let forgeProjects = [];
     let activeProjectId = null;
     let projectSaveTimer = 0;
@@ -319,152 +510,26 @@
         }
       });
     }
-    function isFreeModel(value, label) {
-      return /:free|\bfree\b/.test(`${value || ""} ${label || ""}`.toLowerCase());
-    }
-    function modelSizeScore(value, label) {
-      const s = `${value || ""} ${label || ""}`.toLowerCase();
-      let best = 0;
-      for (const match of s.matchAll(/(\d+(?:\.\d+)?)\s*b\b/g)) {
-        best = Math.max(best, Number(match[1]) || 0);
+    let agentsRoutingApi;
+    function agentsRouting() {
+      if (!agentsRoutingApi) {
+        agentsRoutingApi = createForgeAgentsRoutingApi({ $, log, cooldowns: FORGE_PROVIDER_COOLDOWNS2 });
       }
-      if (/gpt[-_\s]?oss.*120|120.*gpt[-_\s]?oss/.test(s)) best = Math.max(best, 120);
-      if (/405b|480b|671b/.test(s)) best = Math.max(best, Number((s.match(/(405|480|671)b/) || [0, 0])[1]) || 0);
-      return best;
+      return agentsRoutingApi;
     }
-    function modelStrengthScore(value, label, bigTask) {
-      const s = `${value || ""} ${label || ""}`.toLowerCase();
-      let score = 0;
-      const size = modelSizeScore(value, label);
-      if (/gpt[-_\s]?oss/.test(s)) score += 95;
-      if (/pro|opus|sonnet|gpt-4|gpt-5|o3|o4|r1|v3|405b|235b|120b|70b|large|max|maverick|nemotron|hermes|qwen3|deepseek/.test(s)) score += 70;
-      if (size >= 120) score += 52;
-      else if (size >= 100) score += 38;
-      else if (size >= 70) score += bigTask ? 12 : 18;
-      if (size > 0 && size < 70) score -= bigTask ? 18 : 8;
-      if (/coder|code|dev|reason|thinking|instruct|chat/.test(s)) score += 18;
-      if (/vision|vl|multi/.test(s)) score += 10;
-      if (/flash|lite|mini|small|tiny|1b|1.5b|3b|7b|8b|instant/.test(s)) score -= bigTask ? 35 : 12;
-      if (isFreeModel(value, label)) score -= bigTask ? 28 : 10;
-      if (/local/.test(s)) score -= bigTask ? 12 : 0;
-      if (/nvidia|samba|openrouter|gemini|groq|cerebras/.test(s)) score += 8;
-      return score;
-    }
-    function bestModelForProvider(options, bigTask) {
-      return [...options].sort(
-        (a, b) => modelStrengthScore(b.value, b.label, bigTask) - modelStrengthScore(a.value, a.label, bigTask)
-      )[0] || null;
-    }
-    function providerFromValue(value) {
-      return value && value.startsWith("cloud:") ? value.split(":")[1] : "local";
-    }
-    function providerDisplayName(provider) {
-      const name = String(provider || "model").replace(/^sambanova$/i, "SambaNova");
-      if (name === "SambaNova") return name;
-      return name.replace(/(^|[-_\s])([a-z])/g, (_, sep, c) => `${sep}${c.toUpperCase()}`);
-    }
-    function forgeProviderCooldown(provider) {
-      const key = String(provider || "");
-      const entry = FORGE_PROVIDER_COOLDOWNS.get(key);
-      if (!entry) return null;
-      if (entry.until <= Date.now()) {
-        FORGE_PROVIDER_COOLDOWNS.delete(key);
-        return null;
-      }
-      return entry;
-    }
-    function isForgeRoutingError(err) {
-      const msg = String(err?.message || err || "").toLowerCase();
-      return /rate.?limit|quota|429|too many|free.?tier|api.?key|unauthori[sz]ed|forbidden|billing|credit|capacity|overloaded|unavailable|service.?unavailable|timed?.?out|timeout|failed to fetch|network|model.{0,16}not.{0,16}found|not configured|invalid key|missing key/.test(msg) || err?.name === "AbortError";
-    }
-    function cooldownMsForForgeError(err) {
-      const msg = String(err?.message || err || "").toLowerCase();
-      if (/api.?key|invalid key|missing key|unauthori[sz]ed|forbidden|not configured/.test(msg)) return 10 * 60 * 1e3;
-      if (/rate.?limit|quota|429|too many|free.?tier|billing|credit/.test(msg)) return 90 * 1e3;
-      if (/timed?.?out|timeout|capacity|overloaded|unavailable|failed to fetch|network/.test(msg) || err?.name === "AbortError") return 45 * 1e3;
-      return 0;
-    }
-    function markForgeProviderFailure(provider, err) {
-      if (!provider || !isForgeRoutingError(err)) return;
-      const ms = cooldownMsForForgeError(err);
-      if (!ms) return;
-      const until = Date.now() + ms;
-      const existing = forgeProviderCooldown(provider);
-      if (existing && existing.until >= until) return;
-      const reason = String(err?.message || err || "route failed").replace(/\s+/g, " ").slice(0, 82);
-      FORGE_PROVIDER_COOLDOWNS.set(String(provider), { until, reason });
-      log("Router", `Cooling down ${providerDisplayName(provider)} for ${Math.ceil(ms / 1e3)}s`, "warn", reason);
-    }
-    function skipCoolingCandidate(candidate, candidates) {
-      const healthyExists = candidates.some((route) => route?.provider && !forgeProviderCooldown(route.provider));
-      const cooldown = candidate?.provider ? forgeProviderCooldown(candidate.provider) : null;
-      if (!healthyExists || !cooldown) return false;
-      const seconds = Math.max(1, Math.ceil((cooldown.until - Date.now()) / 1e3));
-      log("Router", `Skipping ${providerDisplayName(candidate.provider)} route (${seconds}s cooldown)`, "wait", cooldown.reason || "");
-      return true;
-    }
-    function providerModelsForForge(bigTask, options = {}) {
-      const includeCooling = !!options.includeCooling;
-      const allOpts = Array.from(document.getElementById("model")?.options || []).map((o) => ({ value: o.value, label: o.textContent || o.label || o.value })).filter((o) => {
-        const provider = providerFromValue(o.value);
-        return o.value && !o.disabled && !o.value.startsWith("\u2500") && (includeCooling || !forgeProviderCooldown(provider));
-      });
-      const providerOptions = {};
-      allOpts.forEach((o) => {
-        const provider = providerFromValue(o.value);
-        if (!providerOptions[provider]) providerOptions[provider] = [];
-        providerOptions[provider].push(o);
-      });
-      const ranked = Object.entries(providerOptions).map(([provider, options2]) => {
-        const best = bestModelForProvider(options2, bigTask);
-        return [provider, best?.value || options2[0]?.value || "", best?.label || options2[0]?.label || ""];
-      }).filter(([, value]) => value).sort((a, b) => modelStrengthScore(b[1], b[2], bigTask) - modelStrengthScore(a[1], a[2], bigTask));
-      if (!ranked.length && !includeCooling) return providerModelsForForge(bigTask, { includeCooling: true });
-      return ranked;
-    }
-    function autoAssignForgeModels(prompt, force) {
-      const providerModels = providerModelsForForge(true);
-      const nonFreeProviderModels = providerModels.filter(([, value, label]) => !isFreeModel(value, label));
-      if (!providerModels.length) {
-        log("Parameter Agent", "No model options available for auto-routing", "warn");
-        return;
-      }
-      const roleProviderPreference = {
-        god: ["openrouter", "cerebras", "samba", "gemini", "groq", "local"],
-        structure: ["openrouter", "cerebras", "samba", "gemini", "groq", "local"],
-        surface: ["gemini", "openrouter", "samba", "groq", "cerebras", "local"],
-        detail: ["openrouter", "cerebras", "gemini", "samba", "groq", "local"],
-        audit: ["openrouter", "cerebras", "samba", "gemini", "groq", "local"]
-      };
-      const used = /* @__PURE__ */ new Set();
-      const usedValues = /* @__PURE__ */ new Set();
-      const assigned = [];
-      for (const agent of AGENTS) {
-        const sel = $(`frgModel_${agent.id}`);
-        if (!sel) continue;
-        const currentProvider = providerFromValue(sel.value);
-        const currentLabel = sel.options[sel.selectedIndex]?.textContent || "";
-        const currentCooling = forgeProviderCooldown(currentProvider);
-        if (!force && sel.value && !used.has(currentProvider) && !isFreeModel(sel.value, currentLabel) && !currentCooling) {
-          used.add(currentProvider);
-          usedValues.add(sel.value);
-          continue;
-        }
-        const preferred = roleProviderPreference[agent.id] || roleProviderPreference.god;
-        const bigEnough = nonFreeProviderModels.filter(([, value, label]) => modelSizeScore(value, label) >= 120);
-        const replacement = preferred.map((p) => bigEnough.find(([provider]) => provider === p && !used.has(provider))).find(Boolean) || bigEnough.find(([provider]) => !used.has(provider)) || preferred.map((p) => bigEnough.find(([provider, value]) => provider === p && !usedValues.has(value))).find(Boolean) || bigEnough.find(([, value]) => !usedValues.has(value)) || preferred.map((p) => nonFreeProviderModels.find(([provider]) => provider === p && !used.has(provider))).find(Boolean) || nonFreeProviderModels.find(([provider]) => !used.has(provider)) || preferred.map((p) => nonFreeProviderModels.find(([provider, value]) => provider === p && !usedValues.has(value))).find(Boolean) || nonFreeProviderModels.find(([, value]) => !usedValues.has(value)) || nonFreeProviderModels[0] || preferred.map((p) => providerModels.find(([provider]) => provider === p && !used.has(provider))).find(Boolean) || providerModels.find(([provider]) => !used.has(provider)) || providerModels[0];
-        if (replacement && Array.from(sel.options).some((o) => o.value === replacement[1])) {
-          sel.value = replacement[1];
-          used.add(replacement[0]);
-          usedValues.add(replacement[1]);
-          assigned.push(`${agent.name} \u2192 ${replacement[2] || replacement[1]}`);
-        }
-      }
-      if (assigned.length) {
-        log("Parameter Agent", `Auto-assigned ${assigned.length} model route(s)`, "boss");
-        assigned.forEach((line) => log("Router", line, "wait"));
-      }
-    }
+    const isFreeModel = (...a) => agentsRouting().isFreeModel(...a);
+    const modelSizeScore = (...a) => agentsRouting().modelSizeScore(...a);
+    const modelStrengthScore = (...a) => agentsRouting().modelStrengthScore(...a);
+    const bestModelForProvider = (...a) => agentsRouting().bestModelForProvider(...a);
+    const providerFromValue = (...a) => agentsRouting().providerFromValue(...a);
+    const providerDisplayName = (...a) => agentsRouting().providerDisplayName(...a);
+    const forgeProviderCooldown = (...a) => agentsRouting().forgeProviderCooldown(...a);
+    const isForgeRoutingError = (...a) => agentsRouting().isForgeRoutingError(...a);
+    const cooldownMsForForgeError = (...a) => agentsRouting().cooldownMsForForgeError(...a);
+    const markForgeProviderFailure = (...a) => agentsRouting().markForgeProviderFailure(...a);
+    const skipCoolingCandidate = (...a) => agentsRouting().skipCoolingCandidate(...a);
+    const providerModelsForForge = (...a) => agentsRouting().providerModelsForForge(...a);
+    const autoAssignForgeModels = (...a) => agentsRouting().autoAssignForgeModels(...a);
     function selectedModelFor(agentId) {
       return $(`frgModel_${agentId}`)?.value || window._H?.selectedModel?.() || document.getElementById("model")?.value || "";
     }
@@ -948,7 +1013,7 @@
         return;
       }
       clearScene();
-      activePlan = normalizePlan2(plan);
+      activePlan = normalizePlan(plan);
       window.ForgeEditor?.setPlanJson?.(activePlan);
       const nodes = renderableNodes(activePlan.nodes);
       nodes.forEach((node, i) => addNodeMesh(node, i, nodes.length));
@@ -1365,7 +1430,7 @@
           log("Pipeline", "Imported asset had no supported mesh parts", "warn");
           return;
         }
-        const current = activePlan?.nodes?.length ? normalizePlan2(activePlan) : { name: `Imported ${file.name.replace(/\.[^.]+$/, "")}`, nodes: [] };
+        const current = activePlan?.nodes?.length ? normalizePlan(activePlan) : { name: `Imported ${file.name.replace(/\.[^.]+$/, "")}`, nodes: [] };
         current.nodes = current.nodes.concat(nodes).slice(0, MAX_FORGE_NODES);
         current.name = current.name || `Imported ${file.name.replace(/\.[^.]+$/, "")}`;
         buildPlan(current);
@@ -1430,31 +1495,6 @@
     function selectNodeById(nodeId) {
       const mesh = selectableMeshes().find((obj) => obj.userData.nodeId === nodeId);
       if (mesh) selectMesh(mesh);
-    }
-    function normalizePlan2(plan) {
-      const src = plan && typeof plan === "object" ? plan : { name: "Empty model", nodes: [] };
-      const nodes = Array.isArray(src.nodes) ? src.nodes : [];
-      return {
-        name: src.name || "Forged model",
-        glbUrl: typeof src.glbUrl === "string" ? src.glbUrl : "",
-        constraints: Array.isArray(src.constraints) ? src.constraints : [],
-        edges: Array.isArray(src.edges) ? src.edges : [],
-        nodes: nodes.slice(0, MAX_FORGE_NODES).map((node, i) => ({
-          id: String(node.id || `node_${i + 1}`),
-          name: String(node.name || node.id || `Node ${i + 1}`),
-          type: ["box", "cylinder", "capsule", "sphere", "cone", "torus", "lathe", "extrude", "logo", "logo_img", "mesh"].includes(node.type) ? node.type : "box",
-          role: ["structure", "surface", "detail", "audit"].includes(node.role) ? node.role : "structure",
-          position: vec32(node.position, [0, 0, 0]),
-          rotation: vec32(node.rotation, [0, 0, 0]),
-          scale: vec32(node.scale, [1, 1, 1]),
-          params: node.params && typeof node.params === "object" ? node.params : {},
-          color: node.color,
-          opacity: Number.isFinite(node.opacity) ? node.opacity : void 0
-        }))
-      };
-    }
-    function vec32(v, fallback) {
-      return Array.isArray(v) && v.length >= 3 ? [Number(v[0]) || 0, Number(v[1]) || 0, Number(v[2]) || 0] : fallback.slice();
     }
     function randomSpherePoint(radius) {
       const u = Math.random();
@@ -1667,7 +1707,7 @@
         }
         plan = enforceSingleMainModel(prompt, plan, prefs);
         plan = ensurePlanRichness(prompt, plan, false);
-        plan = normalizePlan2(plan);
+        plan = normalizePlan(plan);
         plan.route = routeBrief.route;
       }
       updateStage("refine", "done", plan.route === "anatomical" ? "sdf smoothed" : "post-process done");
@@ -1772,7 +1812,7 @@
           if (res.ok) {
             const data = await res.json();
             if (data?.ok && data.plan) {
-              const plan2 = normalizePlan2(data.plan);
+              const plan2 = normalizePlan(data.plan);
               plan2.route = route;
               plan2.rawKernelPlan = paramPlan;
               if (data.glbUrl) {
@@ -2210,11 +2250,11 @@ Current plan: ${existing}` }
         arr = parseJsonPayload(await repairForgeJson("array", prompt, text, signal, model), "array");
       }
       if (!Array.isArray(arr)) return [];
-      return normalizePlan2({ name: plan.name, nodes: arr }).nodes.filter((node) => node.role === role).map((node, i) => ({ ...node, id: `${role}_${Date.now()}_${i}_${node.id}` })).slice(0, prefs?.detail === "high" ? 14 : prefs?.detail === "fast" ? 5 : 9);
+      return normalizePlan({ name: plan.name, nodes: arr }).nodes.filter((node) => node.role === role).map((node, i) => ({ ...node, id: `${role}_${Date.now()}_${i}_${node.id}` })).slice(0, prefs?.detail === "high" ? 14 : prefs?.detail === "fast" ? 5 : 9);
     }
     function parsePlan(text) {
       const parsed = parseJsonPayload(text, "object");
-      const plan = normalizePlan2(parsed);
+      const plan = normalizePlan(parsed);
       if (plan.nodes.length < 2) throw new Error("plan had fewer than 2 nodes");
       return plan;
     }
@@ -2225,7 +2265,7 @@ Current plan: ${existing}` }
       return /\b(cat|kitten|dog|puppy|horse|lion|tiger|wolf|fox|bear|rabbit|deer|cow|bull|goat|sheep|elephant|giraffe|zebra|animal)\b/i.test(String(prompt || ""));
     }
     function reconstructMeshStructure(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (!isAnimalPrompt(prompt)) return normalized;
       const text = normalized.nodes.map((n) => `${n.id} ${n.name} ${n.type}`).join(" ").toLowerCase();
       const hasMeshSkin = /\bmesh_skin\b|smooth .* mesh|torso_mesh|head_mesh/.test(text);
@@ -2286,7 +2326,7 @@ Current plan: ${existing}` }
       return next;
     }
     function reconstructSkullStructure(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (!isSkullPrompt(prompt)) return normalized;
       const text = normalized.nodes.map((n) => `${n.id} ${n.name} ${n.type}`).join(" ").toLowerCase();
       const hasSkullMesh = /\bmesh_cranium\b|smooth cranium mesh|orbital socket mesh/.test(text);
@@ -2335,7 +2375,7 @@ Current plan: ${existing}` }
       return { ...normalized, name: "Anatomical mesh skull", nodes: nodes.slice(0, MAX_FORGE_NODES) };
     }
     function reconstructSpoonStructure(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (!isSpoonLikePrompt(prompt)) return normalized;
       const text = normalized.nodes.map((n) => `${n.id} ${n.name} ${n.type}`).join(" ").toLowerCase();
       const hasSpoonMesh = /\b(concave .*bowl|spoon_bowl|tapered .*handle|spoon_handle)\b/.test(text);
@@ -2564,7 +2604,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return genericPlan(prompt);
     }
     function ensurePlanRichness(prompt, plan, allowLocalTemplates) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (!allowLocalTemplates) return normalized;
       const q = String(prompt || "").toLowerCase();
       const minNodes = (/iphone|phone|smartphone|mobile/.test(q) || /laptop|macbook|notebook|computer/.test(q)) && /table|desk|workbench/.test(q) ? 48 : /person|human|humanoid|character|man|woman|body|anatomy|skeleton/.test(q) ? 40 : /iphone|phone|smartphone|mobile|laptop|macbook|notebook|computer/.test(q) ? 22 : /table|desk|workbench|bench|dining/.test(q) ? 22 : needsTemplateAuthority(q) ? 18 : /long|complex|detailed|advanced|cad|blender|mechanism|machine/.test(q) ? 16 : 12;
@@ -2580,7 +2620,7 @@ ${String(badText || "").slice(0, 9e3)}`
     }
     function isToolPlanSane(prompt, plan) {
       const q = String(prompt || "").toLowerCase();
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (isDroneLikePrompt(q)) return isDronePlanSane(plan);
       if (isSpoonLikePrompt(q)) return isSpoonPlanSane(plan);
       if (!isKnifeLikePrompt(q) && !isSwordLikePrompt(q)) return true;
@@ -2608,7 +2648,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return longestAll >= 1.2 && !verticalDominance && !bladeTooChunky;
     }
     function isDronePlanSane(plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       const nodes = renderableNodes(normalized.nodes);
       const rotorNodes = nodes.filter((node) => /rotor|prop|propeller|guard|motor/i.test(`${node.id} ${node.name}`));
       const bodyNodes = nodes.filter((node) => /body|core|fuselage|avionics|camera|lens/i.test(`${node.id} ${node.name}`));
@@ -2626,7 +2666,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return Math.max(size[0], size[2]) >= 1.8 && size[1] < Math.max(size[0], size[2]) * 0.75;
     }
     function isPhonePlanSane(plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 16) return false;
       const text = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
@@ -2642,28 +2682,28 @@ ${String(badText || "").slice(0, 9e3)}`
       return hasBody && hasScreen && cameraNodes.length >= 3 && controlNodes.length >= 4 && thinEnough && longEnough;
     }
     function isLaptopPlanSane(plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 18) return false;
       const text = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
       return /base|chassis/.test(text) && /screen|display|lid/.test(text) && /keyboard|key/.test(text) && /trackpad|touchpad/.test(text) && /hinge/.test(text);
     }
     function reconstructPhoneStructure(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (isPhonePlanSane(normalized)) return normalized;
       const rebuilt = phonePlan(prompt);
       log("Geometry Kernel", `Rebuilt phone-specific product model \xB7 ${renderableNodes(rebuilt.nodes).length} part(s)`, "warn");
       return rebuilt;
     }
     function reconstructLaptopStructure(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (isLaptopPlanSane(normalized)) return normalized;
       const rebuilt = laptopPlan(prompt);
       log("Geometry Kernel", `Rebuilt laptop-specific product model \xB7 ${renderableNodes(rebuilt.nodes).length} part(s)`, "warn");
       return rebuilt;
     }
     function reconstructKnownObjectStructure(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (isDroneLikePrompt(prompt) && !isDronePlanSane(normalized)) {
         const rebuilt = dronePlan(prompt);
         log("Geometry Kernel", `Rebuilt drone-specific engineering model \xB7 ${renderableNodes(rebuilt.nodes).length} part(s)`, "warn");
@@ -2677,10 +2717,10 @@ ${String(badText || "").slice(0, 9e3)}`
       return normalized;
     }
     function isSpoonPlanSane(plan) {
-      return normalizePlan2(plan).nodes.length > 0;
+      return normalizePlan(plan).nodes.length > 0;
     }
     function enforceSingleMainModel(prompt, plan) {
-      let normalized = normalizePlan2(plan);
+      let normalized = normalizePlan(plan);
       if (isPhonePrompt(prompt) && !isPhonePlanSane(normalized)) {
         normalized = reconstructPhoneStructure(prompt, normalized);
       }
@@ -2704,7 +2744,7 @@ ${String(badText || "").slice(0, 9e3)}`
     }
     function isAnimalPlanSane(prompt, plan) {
       if (!isAnimalPrompt(prompt)) return true;
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 14) return false;
       const labels = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
@@ -2718,7 +2758,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return stats.clusterCount <= 1 || stats.largestCount >= nodes.length - 2;
     }
     function keepLargestConnectedModel(prompt, plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       if (allowsMultipleForgeSubjects(prompt)) return normalized;
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 4) return normalized;
@@ -2743,7 +2783,7 @@ ${String(badText || "").slice(0, 9e3)}`
         return {
           node,
           index,
-          center: vec32(node.position, [0, 0, 0]),
+          center: vec3(node.position, [0, 0, 0]),
           radius
         };
       });
@@ -2787,7 +2827,7 @@ ${String(badText || "").slice(0, 9e3)}`
       };
     }
     function centerAndGroundPlan(plan) {
-      const normalized = normalizePlan2(plan);
+      const normalized = normalizePlan(plan);
       const nodes = renderableNodes(normalized.nodes);
       const box2 = boundsForNodes(nodes);
       if (!box2) return normalized;

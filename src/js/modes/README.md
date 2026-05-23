@@ -45,9 +45,17 @@ Builds all eight mode bundles plus the app shell.
 - `modes/forge/constants.js`, `plan.js` — shared forge geometry helpers
 - `modes/systems/constants.js`, `utils.js` — domain themes and pure helpers
 
-## Messages (app shell, Wave 15)
+## Messages (app shell, Wave 15–16)
 
-- `app/ui/messages/presets.js`, `impl.js` — chat UI factory (no `new Function`)
+- `app/ui/messages/presets.js`, `render.js`, `turn.js`, `impl.js` — chat UI factory (no `new Function`)
+
+## Systems slices (Wave 16)
+
+- `modes/systems/domain-config.js`, `render.js` — domain templates + preview render API
+
+## Forge slices (Wave 16)
+
+- `modes/forge/agents-routing.js` — model auto-routing and cooldowns
 
 ## Adding a new lazy mode
 
