@@ -1,173 +1,167 @@
 <div align="center">
 
+<img src="docs/screenshots/main-chats.png" alt="MiraXCode" width="720"/>
+
 # MiraXCode
 
-**Local-first AI workspace · Eleven modes · Multi-provider · Zero telemetry**
+**Local-first AI workspace · Eleven modes · Thirteen cloud providers · Zero telemetry**
 
-[Repository](https://github.com/miracuves/miraxcode) · [Issues](https://github.com/miracuves/miraxcode/issues) · [Discussions](https://github.com/miracuves/miraxcode/discussions)
+[Repository](https://github.com/miracuves/miraxcode) · [Issues](https://github.com/miracuves/miraxcode/issues) · [Discussions](https://github.com/miracuves/miraxcode/discussions) · [Miracuves](https://www.miracuves.com)
 
-![License: MIT](https://img.shields.io/badge/license-MIT-39ff81.svg)
-![Platform: macOS](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-39ff81.svg)
-![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-39ff81.svg)
+![License: MIT](https://img.shields.io/badge/license-MIT-ffffff.svg?style=flat-square)
+![Platform: macOS](https://img.shields.io/badge/platform-macOS%20Apple%20Silicon-ffffff.svg?style=flat-square)
+![Version: 2.0.0](https://img.shields.io/badge/version-2.0.0-ffffff.svg?style=flat-square)
 
 </div>
-
-![MiraXCode main interface](https://github.com/user-attachments/assets/120dfafa-a778-4758-8314-83dc41752a28)
 
 ---
 
 ## What is MiraXCode?
 
-**MiraXCode** is a local-first, open-source AI desktop application that combines a multi-provider chat workspace, an autonomous coding IDE, multi-agent swarms, specialist agents, financial analysis, security scanning, 3D planning, and a virtual project desktop — in one native app built with **Tauri v2**, **Rust**, and a modular **JavaScript** shell.
+**MiraXCode** is a native desktop AI application (Tauri v2 + Rust + modular JavaScript) that unifies chat, coding, swarms, research, finance, security scanning, 3D planning, ERP prototyping, and a virtual project OS — with **bring-your-own-key** access to major model providers and optional **fully offline** use via Ollama.
 
-API keys live in the **OS keychain** (never in git or plaintext config). There is **no MiraXCode cloud backend**, no telemetry, no accounts, and no subscriptions. With **Ollama**, the app runs fully offline. With cloud providers, requests go **directly** from your machine to the provider you chose.
+- **No MiraXCode cloud** — requests go straight to providers you configure  
+- **OS keychain** for API keys (stripped from settings JSON on save)  
+- **No telemetry** — no accounts, no usage pipeline  
+- **Aura monochrome UI** — black/grey/white, Cursor-inspired density and typography (Inter + JetBrains Mono)
 
-MiraXCode is a free, MIT-licensed alternative to tools like Cursor, Claude Code, Continue, Aider, and Cline — with a broader built-in mode set and explicit local-first guarantees.
-
----
-
-## Key facts
-
-| | |
-|---|---|
-| **Type** | Native AI desktop application |
-| **Platform** | macOS Apple Silicon (Windows/Linux planned) |
-| **License** | MIT |
-| **Version** | v2.0.0 |
-| **Stack** | Tauri v2 · Rust · ES modules (esbuild) · Monaco · macOS Keychain |
-| **AI providers** | Anthropic · OpenAI · Google · Groq · Cerebras · SambaNova · DeepSeek · Moonshot/Kimi · Mistral · OpenRouter · NVIDIA NIM · Ollama (local) |
-| **Modes** | 11 specialized workspaces |
-| **Pre-built agents** | 9 specialists + custom Agent Maker |
-| **Telemetry** | None |
-| **Backend** | None required (optional local Node sync for dev) |
-
----
-
-## Why MiraXCode
-
-- **Truly local-first** — No product cloud, no analytics pipeline, no mandatory sign-in.
-- **Multi-provider BYOK** — Configure many providers side-by-side; cloud failover and swarm routing when a model fails or rate-limits.
-- **One app, eleven modes** — Chat, code, swarms, research, finance, security, 3D, ERP prototypes, virtual OS — without juggling separate products.
-- **OS-grade secrets** — Keychain-backed API storage; settings JSON strips key material on save. See [docs/PRODUCTION.md](docs/PRODUCTION.md).
-- **Modular, testable shell** — Main UI split into `src/js/app/` factories (esbuild bundle) with smoke tests and CI.
-- **Open source** — Inspect, fork, and ship your own build under MIT.
+Maintained by **[Miracuves](https://www.miracuves.com)**. See [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 ---
 
 ## Screenshots
 
-![Code mode with file explorer and agent chat](https://github.com/user-attachments/assets/00a538b5-bf12-4a24-aa23-3bc3a191840a)
+| Main workspace (Chats) | MiraXCode Coder (IDE) |
+|---|---|
+| ![Chats](docs/screenshots/main-chats.png) | ![Coder](docs/screenshots/coder-mode.png) |
 
-![Agent Swarm orchestration](https://github.com/user-attachments/assets/a07931d6-6e4c-4221-9ab2-cb3668fc70e2)
+| Settings & providers | Agents / swarm |
+|---|---|
+| ![Settings](docs/screenshots/settings-providers.png) | ![Agents](docs/screenshots/agents-swarm.png) |
 
-![Finance AI analysis studio](https://github.com/user-attachments/assets/5e2cdc5c-854a-4331-a786-97a6337f0121)
+| Full workspace overview |
+|---|
+| ![Overview](docs/screenshots/workspace-overview.png) |
 
-![3D Forge spatial planning](https://github.com/user-attachments/assets/305cd8ef-d77f-4f52-9bbb-c0c0ede2ac75)
+---
+
+## Supported providers
+
+### Cloud LLM providers (API key in Settings → APIs)
+
+Each row below has a **connectivity test**, **keychain storage**, and (where applicable) a **live model catalog** in the app.
+
+| Provider | Key field | Notes |
+|---|---|---|
+| **Groq** | `groqKey` | Fast Llama / OSS models |
+| **Google Gemini** | `geminiKey` | Gemini 2.x + image generation models |
+| **OpenAI** | `openaiKey` | GPT-4o family, o3-mini |
+| **Anthropic** | `anthropicKey` | Claude Sonnet / Opus 4, Claude 3.5 |
+| **Moonshot (Kimi)** | `moonshotKey` | Multi-base failover; `sk-ki…` Anthropic-compatible routes |
+| **DeepSeek** | `deepseekKey` | V3 chat + R1 reasoner |
+| **Mistral** | `mistralKey` | Mistral Large, Codestral, Medium |
+| **Cerebras** | `cerebrasKey` | Ultra-fast Llama inference |
+| **SambaNova** | `sambaKey` | Large open-weight hosting (Llama 4, 405B, DeepSeek, …) |
+| **OpenRouter** | `openRouterKey` | Meta-gateway; **live free-model fetch** on startup |
+| **NVIDIA NIM** | `nvidiaKey` | `integrate.api.nvidia.com` — Nemotron, DeepSeek, Llama NIMs |
+| **MiniMax** | `minimaxKey` | M2.7, M2.1, M1, Text-01 |
+| **GLM (Z.AI Coding Plan)** | `glmKey` | GLM-5.1, GLM-5, GLM-4.7, GLM-4.5-air via Z.AI API |
+
+### Local inference
+
+| Provider | Setup |
+|---|---|
+| **Ollama** | Any model on your host — presets for localhost / LAN; **Free RAM** unloads tracked models |
+
+### Research & routing (optional keys)
+
+Used by the auto-router and specialist agents — not chat LLMs themselves:
+
+| Service | Key fields | Used for |
+|---|---|---|
+| **Tavily** | `tavilyKey` | Web search in agent tools / router |
+| **Google Custom Search** | `googleKey` + `googleCx` | Web search fallback |
+| **Wikipedia / PubMed** | — | Built-in public APIs in routing layer |
+
+Cloud model IDs use the `cloud:<provider>:<model>` scheme with **per-provider failover** preferences in Settings.
 
 ---
 
 ## The 11 modes
 
-| # | Mode | What it does |
+| # | Mode | Purpose |
 |---|---|---|
-| 1 | **Chats** | Multi-provider chat with projects, attachments, slash commands, templates, exports (MD/JSON), and capped local persistence |
-| 2 | **Agents** | Nine built-in specialists + custom agents via Agent Maker |
-| 3 | **Code (MiraXCode Coder)** | IDE-style coding agent: Monaco editor, file tree, LSP client, diagnostics, project RAG, command palette, staged reads, shell tools |
-| 4 | **Split** | Side-by-side comparison of two models on the same prompt |
-| 5 | **3D Forge** | Architecture-first 3D planning (structured spatial plans) |
-| 6 | **Finance AI** | Bank statements, CSV/PDF/XLSX — KPIs and charts grounded in uploaded data |
-| 7 | **Sandbox** | Swarm-based security scan for suspicious patterns in code or AI output |
-| 8 | **ERP / Systems Builder** | Interactive prototypes (forms, tables, dashboards) from workflow descriptions |
-| 9 | **Agent Swarm** | Multi-agent pipelines with voting/chain modes and provider failover |
-| 10 | **Virtual OS** | Simulated desktop where an agent creates and organizes project files |
-| 11 | **Agent Maker** | No-code custom agents (name, icon, system prompt, tool sets) |
+| 1 | **Chats** | Multi-provider chat, projects, attachments, slash commands, templates, exports |
+| 2 | **Agents** | Built-in specialists + custom agents (Agent Maker) |
+| 3 | **Code (MiraXCode Coder)** | Monaco IDE, LSP, diagnostics, project RAG, command palette, agent tools, shell |
+| 4 | **Split** | Two models, same prompt, side by side |
+| 5 | **3D Forge** | Spatial / architecture planning agent |
+| 6 | **Finance AI** | Statements & spreadsheets — grounded KPIs, no invented numbers |
+| 7 | **Sandbox** | Swarm security scan on untrusted code / AI output |
+| 8 | **ERP / Systems Builder** | Interactive prototypes from workflow descriptions |
+| 9 | **Agent Swarm** | Multi-agent pipelines, voting/chain, provider failover |
+| 10 | **Virtual OS** | Simulated desktop file workspace for agents |
+| 11 | **Agent Maker** | No-code agent builder (prompt, icon, tools) |
 
-Mode reference: [MODES_GUIDE.txt](MODES_GUIDE.txt) (also branded MiraXCode in-repo).
-
----
-
-## Built-in agents
-
-Personal Assistant · Quick Assistant · Research Agent · Deep Research · Senior Engineer · Page Analyzer · PubMed Agent · Drug Interaction · ATS CV Auditor — plus user-defined agents from Agent Maker.
-
-Source-grounded constraints apply in research, PubMed, drug-interaction, and finance flows (no fabricated citations or numbers).
+Details: [MODES_GUIDE.txt](MODES_GUIDE.txt)
 
 ---
 
-## Platform features (v2.0)
+## Built-in agents (9)
 
-### Chat shell (`src/js/app/`)
-
-- **esbuild modular shell** — 40+ modules: providers, features, UI, core wiring via `create*Api()` factories
-- **Projects / workspaces** — Per-project chats, instructions, memory mode, agent run traces
-- **Agent memory** — Fact store with synonym recall and auto-extract from conversation
-- **RAG** — Local knowledge base + optional project ingest (`CdrProjectRag`)
-- **MCP** — Server scan, tool discovery, prefs panel, OpenAI-compatible tool bridge
-- **Auto-router** — Heuristic routing (code / medical / news / reasoning) with Tavily, Google CSE, Wikipedia, PubMed, URL fetch
-- **Chat stream** — Streaming bubbles, compare mode, abort, context window indicator, compaction preference
-- **File ingest** — Images, PDFs, text attachments with composer context
-- **Templates & slash palette** — Prompt library with `{{var}}` fill-in
-- **Settings** — Key validation probes, usage chips, privacy-local toggle, optional backend secret sync (dev)
-- **UI polish** — Themed dialogs, selection toolbar (quote/explain/fix), global shortcuts, command palette
-
-### Providers
-
-- **Cloud catalog** — OpenAI, Gemini, Anthropic, Groq, OpenRouter, and more via unified `cloud:` model IDs
-- **Moonshot / Kimi** — Multi-base failover (`sk-ki…` Anthropic-compatible routes)
-- **NVIDIA NIM** — Dedicated SSE streaming path
-- **Ollama** — Local models, host presets, model unload / free-RAM preset
-- **Native HTTP** — Tauri-side requests and SSE where available
-- **Failover panel** — Per-provider cloud fallback preferences
-
-### Coder / IDE (`code-mode.js` + `cdr-*`)
-
-- **Monaco** editor (bundled vendor)
-- **LSP client**, diagnostics parser (TS/rust/etc.)
-- **Virtualized chat**, command palette, goto, mentions
-- **Project lint**, staged file reads, file-stage workflow
-- **Coder memory & skills**, Graphify integration hooks
-- **Agent stream** bridge to main shell `window._H`
-
-### Security & reliability (Rust + JS)
-
-- **Permission guard** — Denylist/allowlist before FS and shell from agents
-- **Audit log** — Append-only local log of guarded actions
-- **Keychain commands** — Rust-backed secret storage
-- **HcStorage** — Trimmed chat/message persistence caps
-- **HcHealth** — Local error capture only (no remote reporting)
-
-### Quality
-
-- **CI** — `.github/workflows/ci.yml` (build + tests)
-- **Tests** — `hc-storage`, `cdr-diagnostics`, `app-modules-smoke` (routing, memory, settings, MCP names, Kimi keys)
-
----
-
-## Supported AI providers
-
-### Cloud (bring your own API key)
-
-| Provider | Notes |
+| Agent | Role |
 |---|---|
-| **Anthropic** | Claude family |
-| **OpenAI** | GPT family |
-| **Google** | Gemini |
-| **Groq** | Fast Llama/Mixtral inference |
-| **Cerebras** | Ultra-fast inference |
-| **SambaNova** | Hosted open models |
-| **DeepSeek** | V3, R1 |
-| **Moonshot** | Kimi (multi-base + code keys) |
-| **Mistral** | Mistral family |
-| **OpenRouter** | Meta-provider gateway |
-| **NVIDIA NIM** | Cloud inference (when key configured) |
+| **MiraXcode** | Personal assistant — memory, web, Python sandbox, exports |
+| **MiraXcode Lite** | Fast lightweight assistant |
+| **Researcher** | Web + memory research |
+| **Deep Research** | Long-form multi-step research |
+| **Coder** | Engineering-focused coding agent |
+| **URL Reader** | Fetch and analyze pages |
+| **Published Papers Researcher** | PubMed-grounded literature |
+| **Medical Lexi-Check** | Drug / interaction checking (source-grounded) |
+| **ATS CV Auditor** | Resume / ATS analysis |
 
-### Local
+Custom agents can be added in **Agent Maker** with curated tool sets.
 
-| Provider | Notes |
-|---|---|
-| **Ollama** | Any local model; no API key; air-gapped capable |
+---
 
-Keys are stored in the **macOS Keychain** (Tauri). They are not written to the repository and are cleared from `localStorage` settings on save.
+## Platform features (shipped in this repo)
+
+### Shell (`src/js/app/` — esbuild bundle)
+
+- **40+ modules** — providers, features, UI, core; `bootstrap.js` wiring + stable `window._H` bridge  
+- **Projects** — workspaces, instructions, memory mode, agent run traces  
+- **Memory** — fact store, synonym recall, auto-extract from chat  
+- **RAG** — local KB + project ingest (`CdrProjectRag`)  
+- **MCP** — server scan, tool discovery, agent tool bridge  
+- **Routing** — classify prompts → local vs NVIDIA + search; Tavily / Google / Wiki / PubMed  
+- **Chat stream** — streaming, compare, abort, context indicator, compaction  
+- **File ingest** — images, PDFs, text in composer  
+- **Templates & slash palette** — prompt library with `{{var}}`  
+- **Settings** — API key tests, usage chips, backend sync (optional dev server), privacy-local  
+- **Dialogs, shortcuts, command palette** — selection toolbar (quote / explain / fix)
+
+### Coder / IDE
+
+- **Monaco** editor (bundled)  
+- **LSP client**, **diagnostics** (TS, Rust, …)  
+- **Command palette**, goto, mentions, virtualized chat  
+- **Project lint**, staged reads, file-stage workflow  
+- **Coder memory & skills**, Graphify hooks  
+- **Native HTTP / SSE** in Tauri for provider calls
+
+### Security & ops
+
+- **Permission guard** + **audit log** (Rust)  
+- **HcStorage** — capped chat persistence  
+- **HcHealth** — local-only error capture  
+- **CI** — build + `npm test` (storage, diagnostics, module smoke tests)
+
+### UI
+
+- **Aura theme** — monochrome panels, dot grid, white primary actions  
+- **Neutral lock** — no stray accent colors in chrome  
+- **MiraXCode branding** — logo across shell, about, dock icon (`npm run icons`)
 
 ---
 
@@ -175,13 +169,12 @@ Keys are stored in the **macOS Keychain** (Tauri). They are not written to the r
 
 ### macOS (Apple Silicon)
 
-1. Download the latest **MiraXcode** DMG from [Releases](https://github.com/miracuves/miraxcode/releases) when published
-2. Open the DMG and drag **MiraXcode** to `/Applications`
-3. On first launch with an unsigned build: right-click → **Open** → **Open**
-4. **Settings → Providers** — add API keys, or use Ollama only
+1. Download **MiraXcode** from [Releases](https://github.com/miracuves/miraxcode/releases) when available  
+2. Drag to `/Applications`  
+3. First launch (unsigned build): right-click → **Open** → **Open**  
+4. **Settings → APIs** — add keys, or use **Ollama** only  
 
 ```bash
-# Unsigned build quarantine workaround
 xattr -dr com.apple.quarantine /Applications/MiraXcode.app
 ```
 
@@ -193,11 +186,11 @@ xattr -dr com.apple.quarantine /Applications/MiraXcode.app
 git clone https://github.com/miracuves/miraxcode.git
 cd miraxcode
 npm install
-npm run build:js    # bundle src/js/app → app.bundle.js
+npm run build:js
 npm run tauri dev
 ```
 
-Release build:
+Release:
 
 ```bash
 npm run tauri build
@@ -209,49 +202,31 @@ Tests:
 npm test
 ```
 
-### Requirements
-
-- macOS (primary), Node 18+, Rust (`rustup`), Xcode Command Line Tools
-
-### Project layout (high level)
-
-```
-miraxcode/
-├── src/                 # Frontend (HTML, CSS, JS modes)
-│   └── js/app/          # Modular main shell (esbuild entry)
-├── src-tauri/           # Rust commands, security, keychain
-├── docs/                # Architecture, production, wave notes
-└── tests/               # Node test runner smoke/unit tests
-```
-
-Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [src/js/app/README.md](src/js/app/README.md)
+**Requirements:** macOS (primary), Node 18+, Rust, Xcode CLT.
 
 ---
 
-## Privacy and security
+## Tech stack
 
-- **No product backend** — AI traffic goes only to providers you configure
-- **No telemetry** — No usage analytics or remote crash pipeline
-- **Keychain-first secrets** — See [SECURITY.md](SECURITY.md)
-- **Permission guard + audit log** — Gated filesystem/shell for coding agents
-- **Air-gapped path** — Full offline use with Ollama
+| Layer | Technology |
+|---|---|
+| Shell | Tauri v2, Rust |
+| Frontend | ES modules → **esbuild** → `app.bundle.js` |
+| Modes | `code-mode.js`, `virtual-os.js`, `forge-mode.js`, … |
+| Editor | Monaco |
+| Secrets | macOS Keychain (`keyring` crate) |
+| Styles | Aura / UI v3 CSS layers on design tokens |
 
 ---
 
-## How MiraXCode compares
+## Privacy
 
-| | MiraXCode | Cursor | Claude Code | Continue | Aider | Cline |
-|---|---|---|---|---|---|---|
-| Type | Native desktop | VS Code fork | CLI | IDE extension | Terminal | VS Code ext |
-| License | MIT | Proprietary | Proprietary | Apache 2.0 | Apache 2.0 | Apache 2.0 |
-| Local-first product cloud | No | No | No | N/A | Yes | Yes |
-| OS Keychain for keys | Yes | No | Partial | No | No | No |
-| Many cloud providers | Yes | Limited | Anthropic-focused | Yes | Yes | Yes |
-| Ollama / local | Yes | Limited | No | Yes | Yes | Yes |
-| Multi-agent swarms | Yes | No | No | No | No | No |
-| Non-coding modes | 11 | No | No | No | No | No |
-| Built-in specialist agents | 9+ | — | — | — | — | — |
-| Telemetry | None | Yes | Opt-out | Opt-in | None | None |
+- Direct provider HTTPS only — no MiraXCode intermediary  
+- Keys in keychain; not in git  
+- Guarded FS/shell for coding agents  
+- Full offline path with Ollama  
+
+[SECURITY.md](SECURITY.md) · [docs/PRODUCTION.md](docs/PRODUCTION.md)
 
 ---
 
@@ -263,53 +238,35 @@ Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · [src/js/app/README.md](
 | `Cmd/Ctrl + Shift + C` | Toggle Coder mode |
 | `Cmd/Ctrl + K` | Focus model picker |
 
-Command palette entries register when `MxCommandPalette` is loaded.
-
 ---
 
 ## Documentation
 
-| Doc | Contents |
+| Doc | Topic |
 |---|---|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Tauri layout, phases, directory map |
-| [docs/PRODUCTION.md](docs/PRODUCTION.md) | Storage caps, health, keychain behavior |
-| [docs/WAVE8.md](docs/WAVE8.md) | Shell modularization notes |
-| [SECURITY.md](SECURITY.md) | Guard, audit log, threat model |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup and conventions |
-| [src/js/app/README.md](src/js/app/README.md) | Module map and init order |
-
----
-
-## Roadmap
-
-- Signed macOS builds and GitHub Releases on [miracuves/miraxcode](https://github.com/miracuves/miraxcode)
-- Intel macOS, Windows, and Linux targets
-- Further split of `code-mode.js` and `virtual-os.js` into `modes/`
-- Optional TypeScript on `app/` modules
-- Expanded Permission Guard coverage in Virtual OS / 3D Forge
-
-Feature requests: [GitHub Issues](https://github.com/miracuves/miraxcode/issues).
+| [src/js/app/README.md](src/js/app/README.md) | Module map & boot order |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Repo layout |
+| [docs/WAVE8.md](docs/WAVE8.md) | Shell modularization |
+| [docs/BRAND.md](docs/BRAND.md) | Naming |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [CONTRIBUTORS.md](CONTRIBUTORS.md) | Maintainers |
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Contributions that respect local-first principles (no mandatory cloud, no telemetry) are especially welcome.
+Contributions welcome under MIT. Maintained by **Miracuves** — see [CONTRIBUTING.md](CONTRIBUTING.md). Please do not submit third-party branding or unrelated author credits in docs.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Copyright **Miracuves**.
+MIT — [LICENSE](LICENSE). Copyright **Miracuves** (2026).
 
 ---
 
 <div align="center">
 
-**MiraXCode**
-
-Local-first · Multi-provider · Agent swarms · Open source
-
-[github.com/miracuves/miraxcode](https://github.com/miracuves/miraxcode)
+**MiraXCode** · [github.com/miracuves/miraxcode](https://github.com/miracuves/miraxcode)
 
 </div>

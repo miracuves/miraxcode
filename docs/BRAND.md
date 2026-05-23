@@ -24,6 +24,12 @@
 - Not a fork of HashCortX marketing — this is the current product name
 - Not a data collection product
 
+## Maintainer
+
+**Miracuves** — [miracuves.com](https://www.miracuves.com) · GitHub org [miracuves](https://github.com/miracuves)
+
+Do not use former personal or third-party author names in README, CONTRIBUTING, or package metadata.
+
 ## Legacy names
 
-Older docs or paths may reference **HashCortX** / **HashCortx**. Treat those as deprecated; use **MiraXCode** in all user-facing text.
+Older docs may reference **HashCortX**. Treat as deprecated; use **MiraXCode** in user-facing text.
