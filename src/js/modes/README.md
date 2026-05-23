@@ -7,6 +7,11 @@ Heavy UI modes live under `modes/` and ship as **esbuild IIFE bundles** (same as
 | Main shell | `app/index.js` | `app.bundle.js` | Eager in `index.html` |
 | Coder | `modes/code/index.js` | `code-mode.bundle.js` | Eager after app bundle |
 | Virtual OS | `modes/virtual-os/index.js` | `virtual-os.bundle.js` | Lazy via `mode-loader.js` |
+| Forge | `modes/forge/index.js` | `forge.bundle.js` | Lazy |
+| Agent maker | `modes/agent-maker/index.js` | `agent-maker.bundle.js` | Lazy |
+| Finance | `modes/finance/index.js` | `finance.bundle.js` | Lazy |
+| Sandbox | `modes/sandbox/index.js` | `sandbox.bundle.js` | Lazy |
+| Systems | `modes/systems/index.js` | `systems.bundle.js` | Lazy |
 
 ## Coder (`modes/code/`)
 
@@ -33,7 +38,7 @@ Depends on `window._H` from the main shell and the `cdr-*` helper scripts loaded
 npm run build:js
 ```
 
-Builds all three bundles.
+Builds all eight mode bundles plus the app shell.
 
 ## Adding a new lazy mode
 

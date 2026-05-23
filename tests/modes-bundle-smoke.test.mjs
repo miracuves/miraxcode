@@ -1,5 +1,5 @@
 /**
- * Wave 9 — ensure mode bundles are produced by esbuild (pretest runs build:js).
+ * Wave 9+14 — ensure mode bundles are produced by esbuild (pretest runs build:js).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,6 +14,11 @@ const bundles = [
   'app.bundle.js',
   'code-mode.bundle.js',
   'virtual-os.bundle.js',
+  'forge.bundle.js',
+  'agent-maker.bundle.js',
+  'finance.bundle.js',
+  'sandbox.bundle.js',
+  'systems.bundle.js',
 ];
 
 for (const name of bundles) {
@@ -34,4 +39,19 @@ test('code-mode.bundle.js references CoderMode and _registeredModes', () => {
 test('virtual-os.bundle.js references VoidStudio', () => {
   const src = fs.readFileSync(path.join(jsDir, 'virtual-os.bundle.js'), 'utf8');
   assert.ok(src.includes('VoidStudio'), 'expected VoidStudio export');
+});
+
+test('lazy mode bundles register globals', () => {
+  const checks = [
+    ['forge.bundle.js', 'ForgeMode'],
+    ['agent-maker.bundle.js', 'SwarmMaker'],
+    ['finance.bundle.js', 'FinanceMode'],
+    ['sandbox.bundle.js', 'SandboxMode'],
+    ['systems.bundle.js', 'SystemMaker'],
+  ];
+  for (const [file, symbol] of checks) {
+    const src = fs.readFileSync(path.join(jsDir, file), 'utf8');
+    assert.ok(src.includes(symbol), `${file} should reference ${symbol}`);
+    assert.ok(src.includes('_registeredModes'), `${file} should register mode`);
+  }
 });

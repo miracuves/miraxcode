@@ -3,11 +3,11 @@
   'use strict';
 
   const MODE_SCRIPTS = {
-    finance: '/js/finance-mode.js',
-    sandbox: '/js/sandbox.js',
-    'agent-maker': '/js/swarm-maker.js',
-    systems: '/js/system-maker.js',
-    forge: '/js/forge-mode.js',
+    finance: '/js/finance.bundle.js',
+    sandbox: '/js/sandbox.bundle.js',
+    'agent-maker': '/js/agent-maker.bundle.js',
+    systems: '/js/systems.bundle.js',
+    forge: '/js/forge.bundle.js',
     'virtual-os': '/js/virtual-os.bundle.js',
   };
 
