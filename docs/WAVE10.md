@@ -28,11 +28,14 @@
 | `void-studio.js` | VoidStudio IIFE (desktop, finder, agent — still large) |
 | `register.js` | `_registeredModes['virtual-os']` |
 
-## Wave 11 (planned)
+## Wave 11
 
-- Extract `createCoderMode(deps)` → `explorer.js`, `tabs.js`, `agent-run.js`, `terminal.js`
-- Extract Void storage + finder + chat agent modules
-- Remove legacy `src/js/code-mode.js` / `virtual-os.js` copies once diffs are stable
+See `docs/WAVE11.md` — `coder-mode.js` + thin `install.js`; legacy root scripts are deprecation stubs.
+
+## Wave 12 (planned)
+
+- `tabs.js`, `terminal.js`, `explorer.js`, `agent-run.js` under `modes/code/`
+- Void `storage.js`, `finder.js`, `chat.js`
 
 ## Verify
 

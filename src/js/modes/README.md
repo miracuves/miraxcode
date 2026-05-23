@@ -10,7 +10,8 @@ Heavy UI modes live under `modes/` and ship as **esbuild IIFE bundles** (same as
 
 ## Coder (`modes/code/`)
 
-- `install.js` — shared state, model chips, **CoderMode IIFE** (Wave 11 will split further).
+- `install.js` — thin orchestrator (`modelRef`, legacy bridge, register).
+- `coder-mode.js` — **CoderMode IIFE** (`createCoderMode`; Wave 12 splits tabs/terminal/explorer/agent).
 - `constants.js`, `dom-utils.js`, `tool-blocks.js`, `router.js`, `legacy-bridge.js`, `stats-poll.js`, `register.js`
 - `index.js` — calls `installCodeMode()`.
 

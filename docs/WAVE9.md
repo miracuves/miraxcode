@@ -20,7 +20,7 @@ src/js/modes/
     register.js        # _registeredModes["virtual-os"]
 ```
 
-Legacy `src/js/code-mode.js` and `src/js/virtual-os.js` remain as reference copies until Wave 10; the app loads bundles only.
+Legacy `src/js/code-mode.js` and `src/js/virtual-os.js` are deprecation stubs; the app loads bundles only.
 
 ## Build outputs
 
