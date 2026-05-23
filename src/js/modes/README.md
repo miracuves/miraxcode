@@ -10,14 +10,16 @@ Heavy UI modes live under `modes/` and ship as **esbuild IIFE bundles** (same as
 
 ## Coder (`modes/code/`)
 
-- `install.js` — full Coder mode (legacy `HC_CODE`, `CoderMode`, registration). Split into smaller files in Wave 10.
+- `install.js` — shared state, model chips, **CoderMode IIFE** (Wave 11 will split further).
+- `constants.js`, `dom-utils.js`, `tool-blocks.js`, `router.js`, `legacy-bridge.js`, `stats-poll.js`, `register.js`
 - `index.js` — calls `installCodeMode()`.
 
 Depends on `window._H` from the main shell and the `cdr-*` helper scripts loaded before the bundle in `index.html`.
 
 ## Virtual OS (`modes/virtual-os/`)
 
-- `void-studio.js` — `VoidStudio` implementation (IndexedDB virtual desktop).
+- `void-studio.js` — `VoidStudio` IIFE (IndexedDB desktop; Wave 11 splits storage/finder/agent).
+- `utils.js`, `zip.js` — shared helpers and export ZIP builder.
 - `register.js` — `_registeredModes['virtual-os']`.
 - `index.js` — wires register after studio loads.
 

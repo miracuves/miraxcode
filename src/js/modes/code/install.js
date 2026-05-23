@@ -1,20 +1,12 @@
+import { $, esc, baseName, setExplorerRootLabel, setRouterChip, relativeFromRoot as relFromRoot } from './dom-utils.js';
+import { injectAllToolBlocks } from './tool-blocks.js';
+import { callWithRouter } from './router.js';
+import { createLegacyBridge } from './legacy-bridge.js';
+import { registerCodeMode, scheduleCoderBoot, initSharedDom } from './register.js';
+import { startStatsPolling } from './stats-poll.js';
+
 export function installCodeMode() {
-// MiraXCode Coder mode — Wave 9 (modes/code/install.js)
-
-  const $ = id => document.getElementById(id);
-
-  const TOOL_ICONS = {
-    read_file:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
-    write_file:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`,
-    patch_file:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>`,
-    list_dir:     `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
-    delete_file:  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
-    search_files: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`,
-    shell_run:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
-    fuzzy_find:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/><line x1="11" y1="8" x2="11" y2="14"/></svg>`,
-    grep_code:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><circle cx="18" cy="17" r="3"/><line x1="20.5" y1="19.5" x2="22" y2="21"/></svg>`,
-  };
-  const TOOL_ICON_DEFAULT = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>`;
+// MiraXCode Coder mode — Wave 10 (modes/code/install.js)
 
   // ── Shared state ───────────────────────────────────────────
   const sharedState = { projectRoot: null, activeFile: null, homeDir: null };
@@ -23,41 +15,8 @@ export function installCodeMode() {
   /** Active Coder tab model id — module scope so context chip helpers can read it. */
   let coderModel = null;
 
-  function esc(s) {
-    return String(s || '')
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  }
-
-  function baseName(path) {
-    return String(path || '').split('/').filter(Boolean).pop() || String(path || '');
-  }
-
   function relativeFromRoot(path) {
-    const raw = String(path || '');
-    const root = String(sharedState.projectRoot || '').replace(/\/$/, '');
-    return root && raw.startsWith(root + '/') ? raw.slice(root.length + 1) : raw;
-  }
-
-  function setExplorerRootLabel(path) {
-    const rootEl = $('cdrExplorerRoot');
-    if (!rootEl) return;
-    if (!path) {
-      rootEl.textContent = 'No project open';
-      rootEl.title = '';
-      return;
-    }
-    rootEl.innerHTML = `<strong>${esc(baseName(path))}</strong><span>${esc(path)}</span>`;
-    rootEl.title = path;
-  }
-
-  function setRouterChip(label, tooltip) {
-    const chip = document.getElementById('cdrRouterChip');
-    if (chip) {
-      chip.textContent = label || 'Auto';
-      chip.title = tooltip || '';
-      chip.style.display = label ? '' : 'none';
-    }
+    return relFromRoot(path, sharedState.projectRoot);
   }
 
     function setStatus(text, cls) {
@@ -112,208 +71,6 @@ export function installCodeMode() {
       chip.classList.toggle('warn', u.pct >= 70 && u.pct < 88);
       chip.classList.toggle('hot', u.pct >= 88);
     }
-
-  // ── Slim tool row renderer (v1.6 inline style) ─────────────
-  function toolBlockHtml(rec) {
-    const { name, args, result, ms, ok } = rec;
-    const icon = TOOL_ICONS[name] || TOOL_ICON_DEFAULT;
-    const pathArg = args?.path || args?.dir || args?.file || '';
-    const resultText = String(result || '');
-    const isErr = !ok || resultText.includes('"error"');
-    const statusClass = isErr ? 'err' : ok ? 'ok' : '';
-    const statusText  = isErr ? 'Failed' : `${ms}ms`;
-    const safeId = 'tb_' + Math.random().toString(36).slice(2, 9);
-    const argsJson = esc(JSON.stringify(args || {}, null, 2).slice(0, 500));
-    const resultPreview = esc(resultText.slice(0, 600)) + (resultText.length > 600 ? '\n…' : '');
-    return `
-<div class="cdr-tool-row ${statusClass}" data-tool-toggle="${safeId}">
-  ${icon}
-  <span class="cdr-tool-name">${esc(name)}</span>
-  <span class="cdr-tool-target">${esc(pathArg)}</span>
-  <span class="cdr-tool-status">${esc(statusText)}</span>
-</div>
-<div class="cdr-tool-details" id="${safeId}">
-  ${argsJson !== '{}' ? `<div style="margin-bottom:6px"><b>Args</b><pre>${argsJson}</pre></div>` : ''}
-  <div><b>Result</b><pre>${resultPreview}</pre></div>
-</div>`;
-  }
-
-  function injectAllToolBlocks() {
-    const H = window._H;
-    if (!H) return;
-    const messages = H.state?.messages;
-    if (!messages) return;
-    document.querySelectorAll('#cdrMessages .cdr-msg.assistant').forEach(wrap => {
-      const idx = parseInt(wrap.dataset.idx, 10);
-      if (isNaN(idx)) return;
-      const msg = messages[idx];
-      if (!msg?._toolBlocks?.length) return;
-      const bubble = wrap.querySelector('.bubble');
-      if (!bubble) return;
-      if (bubble.dataset.tbCount === String(msg._toolBlocks.length)) return;
-      bubble.dataset.tbCount = String(msg._toolBlocks.length);
-      bubble.querySelectorAll('.hc-tool-blocks-wrap').forEach(el => el.remove());
-      const wrapper = document.createElement('div');
-      wrapper.className = 'hc-tool-blocks-wrap';
-      wrapper.innerHTML = msg._toolBlocks.map(toolBlockHtml).join('');
-      // Wire click handlers for slim tool row expand/collapse
-      wrapper.querySelectorAll('.cdr-tool-row[data-tool-toggle]').forEach(row => {
-        row.addEventListener('click', () => {
-          const id = row.dataset.toolToggle;
-          const details = document.getElementById(id);
-          if (details) {
-            const isOpen = details.style.display === 'block';
-            details.style.display = isOpen ? 'none' : 'block';
-            row.classList.toggle('open', !isOpen);
-          }
-        });
-      });
-      // Hide details by default
-      wrapper.querySelectorAll('.cdr-tool-details').forEach(d => { d.style.display = 'none'; });
-      bubble.insertBefore(wrapper, bubble.firstChild);
-    });
-  }
-
-  // ── Legacy HC_CODE API (kept for hashcoder.js bridge compatibility) ──
-  function buildMessages() {
-    const H = window._H;
-    const msgs = (H.buildOllamaMessages && H.buildOllamaMessages()) || [];
-    const projectCtx = sharedState.projectRoot ? `\nProject root: ${sharedState.projectRoot}` : '';
-    const sysMsgIdx = msgs.findIndex(m => m.role === 'system');
-    const fullSys = (HC?.code?.SYSTEM_PROMPT || '') + projectCtx;
-    if (sysMsgIdx >= 0) msgs[sysMsgIdx].content = fullSys + '\n\n' + msgs[sysMsgIdx].content;
-    else msgs.unshift({ role: 'system', content: fullSys });
-    return msgs;
-  }
-
-  function buildLegacyTools() {
-    return (HC?.code?.TOOL_DEFINITIONS || []).map(t => ({
-      type: 'function',
-      function: {
-        name: t.name,
-        description: t.description,
-        parameters: {
-          type: 'object',
-          properties: Object.fromEntries(
-            Object.entries(t.parameters).map(([k, v]) =>
-              [k, (v && typeof v === 'object' && v.type) ? v : { type: 'string', description: String(v) }]
-            )
-          ),
-          required: Object.keys(t.parameters).filter(k => !['reason', 'cwd', 'file_ext'].includes(k)),
-        }
-      }
-    }));
-  }
-
-    let _statsInterval = null;
-    function startStatsPolling() {
-      if (!window.__TAURI__) return;
-      const widget = document.getElementById('cdrStatsWidget');
-      if (!widget) return;
-      widget.style.display = 'flex';
-      updateStats();
-      if (_statsInterval) clearInterval(_statsInterval);
-      _statsInterval = setInterval(updateStats, 2000);
-    }
-
-    async function updateStats() {
-      if (!window.__TAURI__) return;
-      try {
-        const s = await window.__TAURI__.core.invoke('system_stats');
-        const cpuEl = document.getElementById('cdrStatCpu');
-        const ramEl = document.getElementById('cdrStatRam');
-        const gpuEl = document.getElementById('cdrStatGpu');
-        if (cpuEl) {
-          const cpuColor = s.cpu_avg > 80 ? 'var(--rose)' : s.cpu_avg > 50 ? '#eab308' : 'var(--muted)';
-          cpuEl.style.color = cpuColor;
-          cpuEl.textContent = `CPU ${s.cpu_avg.toFixed(0)}%`;
-        }
-        if (ramEl) {
-          const ramColor = s.ram_pct > 90 ? 'var(--rose)' : s.ram_pct > 70 ? '#eab308' : 'var(--muted)';
-          ramEl.style.color = ramColor;
-          ramEl.textContent = `RAM ${s.ram_used_gb.toFixed(1)}/${s.ram_total_gb.toFixed(0)}G`;
-        }
-        if (gpuEl && s.gpu_name) {
-          gpuEl.style.display = '';
-          const vram = s.gpu_vram_used_gb != null ? ` ${s.gpu_vram_used_gb.toFixed(1)}/${s.gpu_vram_total_gb?.toFixed(0) || '?'}G` : '';
-          gpuEl.textContent = `GPU${vram}`;
-        }
-      } catch {}
-    }
-
-  // Tier ordering — keep quality high during failover.
-  function sortChainByQuality(chain) {
-    const TIER = { frontier: 4, large: 3, medium: 2, small: 1 };
-    function tierFor(m) {
-      const s = (m.model || '').toLowerCase();
-      if (/gpt-4o|claude-(opus|4|5)|gemini-2\.5-pro|kimi-k2|deepseek-v3|llama-4|400b|405b/i.test(s)) return 'frontier';
-      if (/70b|72b|sonnet|gemini-2\.5-flash|qwen2\.5/i.test(s)) return 'large';
-      if (/8b|9b|13b|34b|haiku|mini|flash-lite|3\.2/i.test(s)) return 'medium';
-      return 'small';
-    }
-    return chain
-      .map((m, i) => ({ m, i, t: TIER[tierFor(m)] || 0, fails: _routerStreaks.get(m.label + ':' + m.model) || 0 }))
-      .sort((a, b) => {
-        // Primary (i===0) is the user's explicit choice — never demote it.
-        if (a.i === 0) return -1;
-        if (b.i === 0) return 1;
-        // Among fallbacks, demote heavy-failers.
-        if (a.fails >= 3 && b.fails < 3) return 1;
-        if (b.fails >= 3 && a.fails < 3) return -1;
-        return b.t - a.t;
-      })
-      .map(x => x.m);
-  }
-
-  async function legacyRun(assistant, { signal, onStatus }) {
-    const H = window._H;
-    if (!H) throw new Error('_H bridge not ready');
-    assistant._toolBlocks = [];
-    const tools    = buildLegacyTools();
-    const messages = buildMessages();
-    const temperature = H.selectedTemperature ? Math.min(H.selectedTemperature(), 0.4) : 0.2;
-    const MAX_ITER = 8;
-    let iter = 0, finalText = '';
-    while (iter < MAX_ITER) {
-      iter++;
-      onStatus(`Thinking (step ${iter})…`, 'thinking');
-      if (signal?.aborted) break;
-      const turn = await callWithRouter(messages, tools, temperature, signal);
-      if (turn && turn.tool_calls && turn.tool_calls.length) {
-        H.appendAssistantToolCallTurn(messages, turn.content, turn.tool_calls);
-        for (const call of turn.tool_calls) {
-          if (signal?.aborted) return;
-          onStatus(`${call.name}…`, 'running');
-          const t0 = performance.now();
-          let resultStr, ok = true;
-          try {
-            const def = (HC?.code?.TOOL_DEFINITIONS || []).find(t => t.name === call.name);
-            if (!def) throw new Error('Unknown tool: ' + call.name);
-            const raw = await def.fn(call.arguments || {});
-            /* Guard against null return (Tauri commands often return null on success) —
-               show {"ok":true} so the model/UI never sees the literal string "null" */
-            if (raw == null) resultStr = '{"ok":true}';
-            else resultStr = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2);
-          } catch (e) { resultStr = JSON.stringify({ error: String(e?.message || e) }); ok = false; }
-          const ms = Math.round(performance.now() - t0);
-          assistant._toolBlocks.push({ name: call.name, args: call.arguments || {}, result: resultStr, ms, ok });
-          const pathArg = call.arguments?.path || call.arguments?.dir;
-          if (pathArg) sharedState.activeFile = pathArg;
-          onStatus(`${call.name} done (${assistant._toolBlocks.length} tool${assistant._toolBlocks.length > 1 ? 's' : ''} used)`, 'done');
-          H.appendToolResult(messages, call, resultStr);
-        }
-        continue;
-      }
-      finalText = turn.content || '';
-      assistant.content = finalText;
-      H.updateLastBubble && H.updateLastBubble(finalText);
-      return finalText;
-    }
-    onStatus('Max iterations reached — finalizing', 'warn');
-    assistant.content = finalText || '(Max iterations reached.)';
-    H.updateLastBubble && H.updateLastBubble(assistant.content);
-    return finalText;
-  }
 
   // ══════════════════════════════════════════════════════════════
   // CoderMode — Full-screen chat agent overlay (Claude Code style)
@@ -879,46 +636,6 @@ export function installCodeMode() {
     }
 
     // ── State persistence ─────────────────────────────────────
-    function resolveCoderAdapter(rawModel) {
-      const H = window._H;
-      if (!rawModel) return { kind: 'ollama', model: 'llama3' };
-      if (rawModel.startsWith('cloud:') && H?.selectAgentAdapter) {
-        return H.selectAgentAdapter(rawModel);
-      }
-      return { kind: 'ollama', model: rawModel || 'llama3' };
-    }
-
-    async function callWithRouter(messages, tools, temperature, signal, modelOverride, onToken) {
-      const H = window._H;
-      if (!H) throw new Error('window._H bridge not available');
-      const rawModel = modelOverride || H.selectedModel() || '';
-      const adapter = resolveCoderAdapter(rawModel);
-      const common = { messages, tools, temperature, signal, onToken };
-
-      if (adapter.kind === 'openai') {
-        if (onToken && H.agentTurnOpenAIStream) {
-          return H.agentTurnOpenAIStream({ provider: adapter.provider, model: adapter.model, ...common });
-        }
-        return H.agentTurnOpenAI({ provider: adapter.provider, model: adapter.model, messages, tools, temperature, signal });
-      }
-      if (adapter.kind === 'gemini') {
-        if (onToken && H.agentTurnGeminiStream) {
-          return H.agentTurnGeminiStream({ model: adapter.model, ...common });
-        }
-        return H.agentTurnGemini({ model: adapter.model, messages, tools, temperature, signal });
-      }
-      if (adapter.kind === 'anthropic') {
-        if (onToken && H.agentTurnAnthropicStream) {
-          return H.agentTurnAnthropicStream({ model: adapter.model, ...common });
-        }
-        return H.agentTurnAnthropic({ model: adapter.model, messages, tools, temperature, signal });
-      }
-      if (onToken && H.agentTurnOllamaStream) {
-        return H.agentTurnOllamaStream({ model: adapter.model, ...common });
-      }
-      return H.agentTurnOllama({ model: adapter.model, messages, tools, temperature, signal });
-    }
-
     function saveCoderState() {
       _tabMgr.save();
       try {
@@ -3968,55 +3685,7 @@ Pick the best response or merge them into one final answer. Provide the complete
     return { mount, destroy, remount };
   })();
 
-  // ── Wire audit modal close (shared) ──────────────────────────
-  function initSharedDom() {
-    const auditClose = document.getElementById('hcAuditClose');
-    const auditModal = document.getElementById('hcAuditModal');
-    if (auditClose) auditClose.addEventListener('click', () => auditModal?.classList.remove('open'));
-    if (auditModal) auditModal.addEventListener('click', e => { if (e.target === auditModal) auditModal.classList.remove('open'); });
-  }
-
-  function init() {
-    if (!window._H) { setTimeout(init, 150); return; }
-    initSharedDom();
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-  // ── Public exports ─────────────────────────────────────────
-  window.CoderMode = CoderMode;
-
-  (window._registeredModes = window._registeredModes || {})["code"] = {
-    label:     "Coder",
-    bodyClass: "coder-mode",
-    appClass:  null,
-    fullscreen: true,
-    btnId:     "tabCode",
-    mount:     () => { window.CoderMode?.mount?.(); window.CoderMode?.remount?.(); },
-    destroy:   () => window.CoderMode?.destroy?.(),
-  };
-
-  // Legacy HC_CODE kept for backward compat (used by hashcoder.js tools)
-  window.HC_CODE = {
-    run: legacyRun,
-    pickProject: async () => {
-      if (!window.HC?.isTauri) return;
-      try {
-        const folder = await HC.invoke('plugin:dialog|open', { directory: true, multiple: false, title: 'Open Project Folder' }).catch(() => null);
-        if (folder && typeof folder === 'string') sharedState.projectRoot = folder;
-      } catch {}
-    },
-    showAuditLog: async () => {
-      const modal = document.getElementById('hcAuditModal');
-      if (modal) modal.classList.add('open');
-    },
-    afterRender: injectAllToolBlocks,
-    get state() { return sharedState; },
-  };
-
-
+  const { legacyRun } = createLegacyBridge(sharedState);
+  registerCodeMode({ CoderMode, legacyRun, sharedState });
+  scheduleCoderBoot(initSharedDom);
 }

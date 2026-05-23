@@ -35,8 +35,11 @@ Legacy `src/js/code-mode.js` and `src/js/virtual-os.js` remain as reference copi
 - `index.html` loads `code-mode.bundle.js` (eager, after app bundle).
 - `mode-loader.js` lazy-loads `virtual-os.bundle.js`.
 
-## Wave 10 (planned)
+## Wave 10
 
-- Split `coder-mode-impl.js` into explorer, tabs, agent-run, terminal.
+See `docs/WAVE10.md` — extracted router, legacy bridge, tool blocks, zip/utils; CoderMode IIFE remains in `install.js`.
+
+## Wave 11 (planned)
+
+- Split CoderMode IIFE into explorer, tabs, agent-run, terminal (`createCoderMode(deps)`).
 - Split `void-studio.js` into storage, finder, desktop, chat agent.
-- Optional TypeScript on `modes/` only.
