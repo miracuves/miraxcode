@@ -1,83 +1,33 @@
+import {
+  ROLE_COLORS,
+  AGENTS,
+  FLOOR_Y,
+  MAX_FORGE_NODES,
+  PROJECT_STORE_KEY,
+  FORGE_REFERENCE_SOURCES,
+  FORGE_BLOCKED_REFERENCE_DOMAINS,
+  FORGE_ALLOWED_MODEL_PROVIDERS,
+} from './constants.js';
+import {
+  normalizePlan,
+  vec3,
+  box,
+  cyl,
+  capsule,
+  sphere,
+  ellipsoid,
+  cone,
+  torus,
+  lathe,
+  logo,
+  serializeGeometry,
+  meshNodesFromScene,
+  safeFileName,
+} from './plan.js';
+
 (function () {
   "use strict";
 
-  const ROLE_COLORS = {
-    structure: 0x4bd2be,
-    surface: 0xf5c97a,
-    detail: 0x8fb7ff,
-    audit: 0xff8f8f,
-  };
-
-  const AGENTS = [
-    { id: "god",      name: "Parameter Agent", role: "one JSON geometry call",         color: "#e7fbf7" },
-    { id: "structure",name: "Structure Agent", role: "load-bearing / support parts",   color: "#9ff4e7" },
-    { id: "surface",  name: "Surface Agent",   role: "silhouette / material panels",   color: "#f5c97a" },
-    { id: "detail",   name: "Detail Agent",    role: "handles, bolts, seams, grooves", color: "#8fb7ff" },
-    { id: "audit",    name: "Audit Agent",     role: "clearance / balance / symmetry", color: "#ff8f8f" },
-  ];
-
-  let mounted = false;
-  let initialized = false;
-  let THREE = null;
-  let OrbitControls = null;
-  let TransformControls = null;
-  let GLTFLoader = null;
-  let GLTFExporter = null;
-  let STLExporter = null;
-  let OBJExporter = null;
-  let renderer = null;
-  let scene = null;
-  let camera = null;
-  let controls = null;
-  let modelGroup = null;
-  let particleGroup = null;
-  let starField = null;
-  let activePlan = null;
-  let raf = 0;
-  let flights = [];
-  let revealMeshes = [];
-  let logoMeshes = [];
-  let logoBobT = 0;
-  let scanMesh = null;
-  let abortCtrl = null;
-  let eventsWired = false;
-  let traceStartTime = Date.now();
-  let traceRunCount = 0;
-  let raycaster = null;
-  let pointer = null;
-  let transformControls = null;
-  let selectedMesh = null;
-  let selectedObjectWhole = false;
-  let selectionBox = null;
-  let transformMode = "translate";
-  let snapEnabled = false;
-  let underfloorTick = 0;
-  const FLOOR_Y = -1.15;
-  const MAX_FORGE_NODES = 96;
-  const PROJECT_STORE_KEY = "hashui_forge_projects";
-  const FORGE_REFERENCE_SOURCES = [
-    "sketchfab.com",
-    "grabcad.com",
-    "thingiverse.com",
-    "printables.com",
-    "cgtrader.com",
-    "turbosquid.com",
-    "free3d.com",
-    "blendswap.com",
-    "polyhaven.com",
-    "blenderartists.org",
-  ];
-  const FORGE_BLOCKED_REFERENCE_DOMAINS = [
-    "youtube.com",
-    "youtu.be",
-    "facebook.com",
-    "instagram.com",
-    "pinterest.com",
-    "tiktok.com",
-    "x.com",
-    "twitter.com",
-  ];
-  const FORGE_ALLOWED_MODEL_PROVIDERS = new Set(["groq", "gemini", "cerebras", "samba", "sambanova", "openrouter", "minimax", "glm", "nvidia", "local"]);
   const FORGE_PROVIDER_COOLDOWNS = new Map();
   let forgeProjects = [];
   let activeProjectId = null;
@@ -3600,41 +3550,6 @@ Do not add floating decorations or abstract markers. Structure must add load-bea
     };
   }
 
-  function box(id, name, role, position, size, color, rotation) {
-    return { id, name, role, type: "box", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { width: size[0], height: size[1], depth: size[2] }, color };
-  }
-
-  function cyl(id, name, role, position, radius, height, color, rotation) {
-    return { id, name, role, type: "cylinder", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 36 }, color };
-  }
-
-  function capsule(id, name, role, position, radius, length, color, rotation, scale, opacity) {
-    return { id, name, role, type: "capsule", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, length, capSegments: 10, radialSegments: 24 }, color, opacity };
-  }
-
-  function sphere(id, name, role, position, radius, color) {
-    return { id, name, role, type: "sphere", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { radius }, color };
-  }
-
-  function ellipsoid(id, name, role, position, radius, scale, color, rotation, opacity) {
-    return { id, name, role, type: "sphere", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, widthSegments: 32, heightSegments: 18 }, color, opacity };
-  }
-
-  function cone(id, name, role, position, radius, height, color, rotation) {
-    return { id, name, role, type: "cone", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 4 }, color };
-  }
-
-  function torus(id, name, role, position, radius, tube, color, rotation) {
-    return { id, name, role, type: "torus", position, rotation: rotation || [Math.PI / 2, 0, 0], scale: [1, 1, 1], params: { radius, tube }, color };
-  }
-
-  function lathe(id, name, role, position, points, color, scale, rotation, opacity) {
-    return { id, name, role, type: "lathe", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { points, segments: 48 }, color, opacity };
-  }
-
-  function logo(id, name, role, position, width, height, style, opacity) {
-    return { id, name, role, type: "logo", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { width, height, text: "H", fontSize: 860, ...(style || {}) }, color: style?.color || "#c9a96e", opacity };
-  }
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));

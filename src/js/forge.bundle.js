@@ -28,84 +28,72 @@
     mod
   ));
 
+  // src/js/modes/forge/constants.js
+  var ROLE_COLORS = {
+    structure: 4969150,
+    surface: 16107898,
+    detail: 9418751,
+    audit: 16748431
+  };
+  var AGENTS = [
+    { id: "god", name: "Parameter Agent", role: "one JSON geometry call", color: "#e7fbf7" },
+    { id: "structure", name: "Structure Agent", role: "load-bearing / support parts", color: "#9ff4e7" },
+    { id: "surface", name: "Surface Agent", role: "silhouette / material panels", color: "#f5c97a" },
+    { id: "detail", name: "Detail Agent", role: "handles, bolts, seams, grooves", color: "#8fb7ff" },
+    { id: "audit", name: "Audit Agent", role: "clearance / balance / symmetry", color: "#ff8f8f" }
+  ];
+  var FLOOR_Y = -1.15;
+  var MAX_FORGE_NODES = 96;
+  var PROJECT_STORE_KEY = "hashui_forge_projects";
+  var FORGE_REFERENCE_SOURCES = [
+    "sketchfab.com",
+    "grabcad.com",
+    "thingiverse.com",
+    "printables.com",
+    "cgtrader.com",
+    "turbosquid.com",
+    "free3d.com",
+    "blendswap.com",
+    "polyhaven.com",
+    "blenderartists.org"
+  ];
+  var FORGE_BLOCKED_REFERENCE_DOMAINS = [
+    "youtube.com",
+    "youtu.be",
+    "facebook.com",
+    "instagram.com",
+    "pinterest.com",
+    "tiktok.com",
+    "x.com",
+    "twitter.com"
+  ];
+
+  // src/js/modes/forge/plan.js
+  function box(id, name, role, position, size, color, rotation) {
+    return { id, name, role, type: "box", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { width: size[0], height: size[1], depth: size[2] }, color };
+  }
+  function cyl(id, name, role, position, radius, height, color, rotation) {
+    return { id, name, role, type: "cylinder", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 36 }, color };
+  }
+  function capsule(id, name, role, position, radius, length, color, rotation, scale, opacity) {
+    return { id, name, role, type: "capsule", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, length, capSegments: 10, radialSegments: 24 }, color, opacity };
+  }
+  function sphere(id, name, role, position, radius, color) {
+    return { id, name, role, type: "sphere", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { radius }, color };
+  }
+  function ellipsoid(id, name, role, position, radius, scale, color, rotation, opacity) {
+    return { id, name, role, type: "sphere", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, widthSegments: 32, heightSegments: 18 }, color, opacity };
+  }
+  function cone(id, name, role, position, radius, height, color, rotation) {
+    return { id, name, role, type: "cone", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 4 }, color };
+  }
+  function torus(id, name, role, position, radius, tube, color, rotation) {
+    return { id, name, role, type: "torus", position, rotation: rotation || [Math.PI / 2, 0, 0], scale: [1, 1, 1], params: { radius, tube }, color };
+  }
+
   // src/js/modes/forge/forge-mode.js
   (function() {
     "use strict";
-    const ROLE_COLORS = {
-      structure: 4969150,
-      surface: 16107898,
-      detail: 9418751,
-      audit: 16748431
-    };
-    const AGENTS = [
-      { id: "god", name: "Parameter Agent", role: "one JSON geometry call", color: "#e7fbf7" },
-      { id: "structure", name: "Structure Agent", role: "load-bearing / support parts", color: "#9ff4e7" },
-      { id: "surface", name: "Surface Agent", role: "silhouette / material panels", color: "#f5c97a" },
-      { id: "detail", name: "Detail Agent", role: "handles, bolts, seams, grooves", color: "#8fb7ff" },
-      { id: "audit", name: "Audit Agent", role: "clearance / balance / symmetry", color: "#ff8f8f" }
-    ];
-    let mounted = false;
-    let initialized = false;
-    let THREE = null;
-    let OrbitControls = null;
-    let TransformControls = null;
-    let GLTFLoader = null;
-    let GLTFExporter = null;
-    let STLExporter = null;
-    let OBJExporter = null;
-    let renderer = null;
-    let scene = null;
-    let camera = null;
-    let controls = null;
-    let modelGroup = null;
-    let particleGroup = null;
-    let starField = null;
-    let activePlan = null;
-    let raf = 0;
-    let flights = [];
-    let revealMeshes = [];
-    let logoMeshes = [];
-    let logoBobT = 0;
-    let scanMesh = null;
-    let abortCtrl = null;
-    let eventsWired = false;
-    let traceStartTime = Date.now();
-    let traceRunCount = 0;
-    let raycaster = null;
-    let pointer = null;
-    let transformControls = null;
-    let selectedMesh = null;
-    let selectedObjectWhole = false;
-    let selectionBox = null;
-    let transformMode = "translate";
-    let snapEnabled = false;
-    let underfloorTick = 0;
-    const FLOOR_Y = -1.15;
-    const MAX_FORGE_NODES = 96;
-    const PROJECT_STORE_KEY = "hashui_forge_projects";
-    const FORGE_REFERENCE_SOURCES = [
-      "sketchfab.com",
-      "grabcad.com",
-      "thingiverse.com",
-      "printables.com",
-      "cgtrader.com",
-      "turbosquid.com",
-      "free3d.com",
-      "blendswap.com",
-      "polyhaven.com",
-      "blenderartists.org"
-    ];
-    const FORGE_BLOCKED_REFERENCE_DOMAINS = [
-      "youtube.com",
-      "youtu.be",
-      "facebook.com",
-      "instagram.com",
-      "pinterest.com",
-      "tiktok.com",
-      "x.com",
-      "twitter.com"
-    ];
-    const FORGE_ALLOWED_MODEL_PROVIDERS = /* @__PURE__ */ new Set(["groq", "gemini", "cerebras", "samba", "sambanova", "openrouter", "minimax", "glm", "nvidia", "local"]);
     const FORGE_PROVIDER_COOLDOWNS = /* @__PURE__ */ new Map();
     let forgeProjects = [];
     let activeProjectId = null;
@@ -960,7 +948,7 @@
         return;
       }
       clearScene();
-      activePlan = normalizePlan(plan);
+      activePlan = normalizePlan2(plan);
       window.ForgeEditor?.setPlanJson?.(activePlan);
       const nodes = renderableNodes(activePlan.nodes);
       nodes.forEach((node, i) => addNodeMesh(node, i, nodes.length));
@@ -1328,7 +1316,7 @@
         return;
       }
       updateStage("export", "active", `writing ${kind.toUpperCase()}`);
-      const base = safeFileName(activePlan?.name || $("frgPrompt")?.value || "3d-forge-model");
+      const base = safeFileName2(activePlan?.name || $("frgPrompt")?.value || "3d-forge-model");
       try {
         if (kind === "glb") {
           if (activePlan?.glbUrl) {
@@ -1372,12 +1360,12 @@
         const loader = new GLTFLoader();
         const gltf = await loader.loadAsync(url);
         URL.revokeObjectURL(url);
-        const nodes = meshNodesFromScene(gltf.scene, file.name);
+        const nodes = meshNodesFromScene2(gltf.scene, file.name);
         if (!nodes.length) {
           log("Pipeline", "Imported asset had no supported mesh parts", "warn");
           return;
         }
-        const current = activePlan?.nodes?.length ? normalizePlan(activePlan) : { name: `Imported ${file.name.replace(/\.[^.]+$/, "")}`, nodes: [] };
+        const current = activePlan?.nodes?.length ? normalizePlan2(activePlan) : { name: `Imported ${file.name.replace(/\.[^.]+$/, "")}`, nodes: [] };
         current.nodes = current.nodes.concat(nodes).slice(0, MAX_FORGE_NODES);
         current.name = current.name || `Imported ${file.name.replace(/\.[^.]+$/, "")}`;
         buildPlan(current);
@@ -1387,7 +1375,7 @@
         log("Pipeline", `Import failed \xB7 ${err.message || err}`, "err");
       }
     }
-    function meshNodesFromScene(root, fileName) {
+    function meshNodesFromScene2(root, fileName) {
       const nodes = [];
       let totalVertices = 0;
       root.updateMatrixWorld(true);
@@ -1395,7 +1383,7 @@
         if (!obj.isMesh || !obj.geometry || nodes.length >= 32 || totalVertices > 6e4) return;
         const geo = obj.geometry.clone();
         geo.applyMatrix4(obj.matrixWorld);
-        const serialized = serializeGeometry(geo);
+        const serialized = serializeGeometry2(geo);
         geo.dispose?.();
         if (!serialized) return;
         totalVertices += serialized.positions.length / 3;
@@ -1414,7 +1402,7 @@
       });
       return nodes;
     }
-    function serializeGeometry(geometry) {
+    function serializeGeometry2(geometry) {
       const pos = geometry.getAttribute("position");
       if (!pos || pos.count < 3 || pos.count > 25e3) return null;
       const normal = geometry.getAttribute("normal");
@@ -1426,7 +1414,7 @@
         indices: geometry.index ? Array.from(geometry.index.array) : void 0
       };
     }
-    function safeFileName(name) {
+    function safeFileName2(name) {
       return String(name || "3d-forge-model").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "3d-forge-model";
     }
     function downloadBlob(name, blob) {
@@ -1443,7 +1431,7 @@
       const mesh = selectableMeshes().find((obj) => obj.userData.nodeId === nodeId);
       if (mesh) selectMesh(mesh);
     }
-    function normalizePlan(plan) {
+    function normalizePlan2(plan) {
       const src = plan && typeof plan === "object" ? plan : { name: "Empty model", nodes: [] };
       const nodes = Array.isArray(src.nodes) ? src.nodes : [];
       return {
@@ -1456,16 +1444,16 @@
           name: String(node.name || node.id || `Node ${i + 1}`),
           type: ["box", "cylinder", "capsule", "sphere", "cone", "torus", "lathe", "extrude", "logo", "logo_img", "mesh"].includes(node.type) ? node.type : "box",
           role: ["structure", "surface", "detail", "audit"].includes(node.role) ? node.role : "structure",
-          position: vec3(node.position, [0, 0, 0]),
-          rotation: vec3(node.rotation, [0, 0, 0]),
-          scale: vec3(node.scale, [1, 1, 1]),
+          position: vec32(node.position, [0, 0, 0]),
+          rotation: vec32(node.rotation, [0, 0, 0]),
+          scale: vec32(node.scale, [1, 1, 1]),
           params: node.params && typeof node.params === "object" ? node.params : {},
           color: node.color,
           opacity: Number.isFinite(node.opacity) ? node.opacity : void 0
         }))
       };
     }
-    function vec3(v, fallback) {
+    function vec32(v, fallback) {
       return Array.isArray(v) && v.length >= 3 ? [Number(v[0]) || 0, Number(v[1]) || 0, Number(v[2]) || 0] : fallback.slice();
     }
     function randomSpherePoint(radius) {
@@ -1679,7 +1667,7 @@
         }
         plan = enforceSingleMainModel(prompt, plan, prefs);
         plan = ensurePlanRichness(prompt, plan, false);
-        plan = normalizePlan(plan);
+        plan = normalizePlan2(plan);
         plan.route = routeBrief.route;
       }
       updateStage("refine", "done", plan.route === "anatomical" ? "sdf smoothed" : "post-process done");
@@ -1784,7 +1772,7 @@
           if (res.ok) {
             const data = await res.json();
             if (data?.ok && data.plan) {
-              const plan2 = normalizePlan(data.plan);
+              const plan2 = normalizePlan2(data.plan);
               plan2.route = route;
               plan2.rawKernelPlan = paramPlan;
               if (data.glbUrl) {
@@ -2222,11 +2210,11 @@ Current plan: ${existing}` }
         arr = parseJsonPayload(await repairForgeJson("array", prompt, text, signal, model), "array");
       }
       if (!Array.isArray(arr)) return [];
-      return normalizePlan({ name: plan.name, nodes: arr }).nodes.filter((node) => node.role === role).map((node, i) => ({ ...node, id: `${role}_${Date.now()}_${i}_${node.id}` })).slice(0, prefs?.detail === "high" ? 14 : prefs?.detail === "fast" ? 5 : 9);
+      return normalizePlan2({ name: plan.name, nodes: arr }).nodes.filter((node) => node.role === role).map((node, i) => ({ ...node, id: `${role}_${Date.now()}_${i}_${node.id}` })).slice(0, prefs?.detail === "high" ? 14 : prefs?.detail === "fast" ? 5 : 9);
     }
     function parsePlan(text) {
       const parsed = parseJsonPayload(text, "object");
-      const plan = normalizePlan(parsed);
+      const plan = normalizePlan2(parsed);
       if (plan.nodes.length < 2) throw new Error("plan had fewer than 2 nodes");
       return plan;
     }
@@ -2237,7 +2225,7 @@ Current plan: ${existing}` }
       return /\b(cat|kitten|dog|puppy|horse|lion|tiger|wolf|fox|bear|rabbit|deer|cow|bull|goat|sheep|elephant|giraffe|zebra|animal)\b/i.test(String(prompt || ""));
     }
     function reconstructMeshStructure(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (!isAnimalPrompt(prompt)) return normalized;
       const text = normalized.nodes.map((n) => `${n.id} ${n.name} ${n.type}`).join(" ").toLowerCase();
       const hasMeshSkin = /\bmesh_skin\b|smooth .* mesh|torso_mesh|head_mesh/.test(text);
@@ -2298,7 +2286,7 @@ Current plan: ${existing}` }
       return next;
     }
     function reconstructSkullStructure(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (!isSkullPrompt(prompt)) return normalized;
       const text = normalized.nodes.map((n) => `${n.id} ${n.name} ${n.type}`).join(" ").toLowerCase();
       const hasSkullMesh = /\bmesh_cranium\b|smooth cranium mesh|orbital socket mesh/.test(text);
@@ -2347,7 +2335,7 @@ Current plan: ${existing}` }
       return { ...normalized, name: "Anatomical mesh skull", nodes: nodes.slice(0, MAX_FORGE_NODES) };
     }
     function reconstructSpoonStructure(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (!isSpoonLikePrompt(prompt)) return normalized;
       const text = normalized.nodes.map((n) => `${n.id} ${n.name} ${n.type}`).join(" ").toLowerCase();
       const hasSpoonMesh = /\b(concave .*bowl|spoon_bowl|tapered .*handle|spoon_handle)\b/.test(text);
@@ -2576,7 +2564,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return genericPlan(prompt);
     }
     function ensurePlanRichness(prompt, plan, allowLocalTemplates) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (!allowLocalTemplates) return normalized;
       const q = String(prompt || "").toLowerCase();
       const minNodes = (/iphone|phone|smartphone|mobile/.test(q) || /laptop|macbook|notebook|computer/.test(q)) && /table|desk|workbench/.test(q) ? 48 : /person|human|humanoid|character|man|woman|body|anatomy|skeleton/.test(q) ? 40 : /iphone|phone|smartphone|mobile|laptop|macbook|notebook|computer/.test(q) ? 22 : /table|desk|workbench|bench|dining/.test(q) ? 22 : needsTemplateAuthority(q) ? 18 : /long|complex|detailed|advanced|cad|blender|mechanism|machine/.test(q) ? 16 : 12;
@@ -2592,7 +2580,7 @@ ${String(badText || "").slice(0, 9e3)}`
     }
     function isToolPlanSane(prompt, plan) {
       const q = String(prompt || "").toLowerCase();
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (isDroneLikePrompt(q)) return isDronePlanSane(plan);
       if (isSpoonLikePrompt(q)) return isSpoonPlanSane(plan);
       if (!isKnifeLikePrompt(q) && !isSwordLikePrompt(q)) return true;
@@ -2620,7 +2608,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return longestAll >= 1.2 && !verticalDominance && !bladeTooChunky;
     }
     function isDronePlanSane(plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       const nodes = renderableNodes(normalized.nodes);
       const rotorNodes = nodes.filter((node) => /rotor|prop|propeller|guard|motor/i.test(`${node.id} ${node.name}`));
       const bodyNodes = nodes.filter((node) => /body|core|fuselage|avionics|camera|lens/i.test(`${node.id} ${node.name}`));
@@ -2638,7 +2626,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return Math.max(size[0], size[2]) >= 1.8 && size[1] < Math.max(size[0], size[2]) * 0.75;
     }
     function isPhonePlanSane(plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 16) return false;
       const text = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
@@ -2654,28 +2642,28 @@ ${String(badText || "").slice(0, 9e3)}`
       return hasBody && hasScreen && cameraNodes.length >= 3 && controlNodes.length >= 4 && thinEnough && longEnough;
     }
     function isLaptopPlanSane(plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 18) return false;
       const text = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
       return /base|chassis/.test(text) && /screen|display|lid/.test(text) && /keyboard|key/.test(text) && /trackpad|touchpad/.test(text) && /hinge/.test(text);
     }
     function reconstructPhoneStructure(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (isPhonePlanSane(normalized)) return normalized;
       const rebuilt = phonePlan(prompt);
       log("Geometry Kernel", `Rebuilt phone-specific product model \xB7 ${renderableNodes(rebuilt.nodes).length} part(s)`, "warn");
       return rebuilt;
     }
     function reconstructLaptopStructure(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (isLaptopPlanSane(normalized)) return normalized;
       const rebuilt = laptopPlan(prompt);
       log("Geometry Kernel", `Rebuilt laptop-specific product model \xB7 ${renderableNodes(rebuilt.nodes).length} part(s)`, "warn");
       return rebuilt;
     }
     function reconstructKnownObjectStructure(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (isDroneLikePrompt(prompt) && !isDronePlanSane(normalized)) {
         const rebuilt = dronePlan(prompt);
         log("Geometry Kernel", `Rebuilt drone-specific engineering model \xB7 ${renderableNodes(rebuilt.nodes).length} part(s)`, "warn");
@@ -2689,10 +2677,10 @@ ${String(badText || "").slice(0, 9e3)}`
       return normalized;
     }
     function isSpoonPlanSane(plan) {
-      return normalizePlan(plan).nodes.length > 0;
+      return normalizePlan2(plan).nodes.length > 0;
     }
     function enforceSingleMainModel(prompt, plan) {
-      let normalized = normalizePlan(plan);
+      let normalized = normalizePlan2(plan);
       if (isPhonePrompt(prompt) && !isPhonePlanSane(normalized)) {
         normalized = reconstructPhoneStructure(prompt, normalized);
       }
@@ -2716,7 +2704,7 @@ ${String(badText || "").slice(0, 9e3)}`
     }
     function isAnimalPlanSane(prompt, plan) {
       if (!isAnimalPrompt(prompt)) return true;
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 14) return false;
       const labels = nodes.map((node) => `${node.id} ${node.name} ${node.type}`).join(" ").toLowerCase();
@@ -2730,7 +2718,7 @@ ${String(badText || "").slice(0, 9e3)}`
       return stats.clusterCount <= 1 || stats.largestCount >= nodes.length - 2;
     }
     function keepLargestConnectedModel(prompt, plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       if (allowsMultipleForgeSubjects(prompt)) return normalized;
       const nodes = renderableNodes(normalized.nodes);
       if (nodes.length < 4) return normalized;
@@ -2755,7 +2743,7 @@ ${String(badText || "").slice(0, 9e3)}`
         return {
           node,
           index,
-          center: vec3(node.position, [0, 0, 0]),
+          center: vec32(node.position, [0, 0, 0]),
           radius
         };
       });
@@ -2799,7 +2787,7 @@ ${String(badText || "").slice(0, 9e3)}`
       };
     }
     function centerAndGroundPlan(plan) {
-      const normalized = normalizePlan(plan);
+      const normalized = normalizePlan2(plan);
       const nodes = renderableNodes(normalized.nodes);
       const box2 = boundsForNodes(nodes);
       if (!box2) return normalized;
@@ -3393,33 +3381,6 @@ ${String(badText || "").slice(0, 9e3)}`
           box("hand_m", "Minute hand", "surface", [0, 0.14, -0.42], [0.05, 0.04, 0.86], "#f5c97a", [0, 0.2, 0])
         ]
       };
-    }
-    function box(id, name, role, position, size, color, rotation) {
-      return { id, name, role, type: "box", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { width: size[0], height: size[1], depth: size[2] }, color };
-    }
-    function cyl(id, name, role, position, radius, height, color, rotation) {
-      return { id, name, role, type: "cylinder", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 36 }, color };
-    }
-    function capsule(id, name, role, position, radius, length, color, rotation, scale, opacity) {
-      return { id, name, role, type: "capsule", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, length, capSegments: 10, radialSegments: 24 }, color, opacity };
-    }
-    function sphere(id, name, role, position, radius, color) {
-      return { id, name, role, type: "sphere", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { radius }, color };
-    }
-    function ellipsoid(id, name, role, position, radius, scale, color, rotation, opacity) {
-      return { id, name, role, type: "sphere", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { radius, widthSegments: 32, heightSegments: 18 }, color, opacity };
-    }
-    function cone(id, name, role, position, radius, height, color, rotation) {
-      return { id, name, role, type: "cone", position, rotation: rotation || [0, 0, 0], scale: [1, 1, 1], params: { radius, height, segments: 4 }, color };
-    }
-    function torus(id, name, role, position, radius, tube, color, rotation) {
-      return { id, name, role, type: "torus", position, rotation: rotation || [Math.PI / 2, 0, 0], scale: [1, 1, 1], params: { radius, tube }, color };
-    }
-    function lathe(id, name, role, position, points, color, scale, rotation, opacity) {
-      return { id, name, role, type: "lathe", position, rotation: rotation || [0, 0, 0], scale: scale || [1, 1, 1], params: { points, segments: 48 }, color, opacity };
-    }
-    function logo(id, name, role, position, width, height, style, opacity) {
-      return { id, name, role, type: "logo", position, rotation: [0, 0, 0], scale: [1, 1, 1], params: { width, height, text: "H", fontSize: 860, ...style || {} }, color: style?.color || "#c9a96e", opacity };
     }
     function sleep(ms) {
       return new Promise((resolve) => setTimeout(resolve, ms));

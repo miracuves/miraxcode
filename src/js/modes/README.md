@@ -40,6 +40,15 @@ npm run build:js
 
 Builds all eight mode bundles plus the app shell.
 
+## Forge / Systems (Wave 15 slices)
+
+- `modes/forge/constants.js`, `plan.js` — shared forge geometry helpers
+- `modes/systems/constants.js`, `utils.js` — domain themes and pure helpers
+
+## Messages (app shell, Wave 15)
+
+- `app/ui/messages/presets.js`, `impl.js` — chat UI factory (no `new Function`)
+
 ## Adding a new lazy mode
 
 1. Add `src/js/modes/<name>/index.js`.
