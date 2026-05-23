@@ -5,10 +5,8 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const watch = process.argv.includes('--watch');
 
-const ctx = await esbuild.context({
+const shared = {
   absWorkingDir: __dirname,
-  entryPoints: ['src/js/app/index.js'],
-  outfile: 'src/js/app.bundle.js',
   bundle: true,
   format: 'iife',
   platform: 'browser',
@@ -16,13 +14,23 @@ const ctx = await esbuild.context({
   sourcemap: true,
   logLevel: 'info',
   legalComments: 'none',
-});
+};
 
-if (watch) {
-  await ctx.watch();
-  console.log('[esbuild] watching src/js/app → src/js/app.bundle.js');
-} else {
-  await ctx.rebuild();
-  await ctx.dispose();
-  console.log('[esbuild] built src/js/app.bundle.js');
+const entryPoints = [
+  { in: 'src/js/app/index.js', out: 'app.bundle' },
+  { in: 'src/js/modes/code/index.js', out: 'code-mode.bundle' },
+  { in: 'src/js/modes/virtual-os/index.js', out: 'virtual-os.bundle' },
+];
+
+async function buildAll() {
+  if (watch) {
+    const ctx = await esbuild.context({ ...shared, entryPoints, outdir: 'src/js' });
+    await ctx.watch();
+    console.log('[esbuild] watching app + code-mode + virtual-os → src/js/*.bundle.js');
+    return;
+  }
+  await esbuild.build({ ...shared, entryPoints, outdir: 'src/js' });
+  console.log('[esbuild] built app.bundle.js, code-mode.bundle.js, virtual-os.bundle.js');
 }
+
+await buildAll();

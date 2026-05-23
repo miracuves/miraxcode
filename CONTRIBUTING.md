@@ -22,7 +22,7 @@ npm test
 ## Architecture conventions
 
 - Main chat shell: `src/js/app/` — add `create*Api(deps)` modules, wire from `bootstrap.js`
-- Preserve **`window._H`** for `code-mode.js`, `swarm-maker.js`, and other modes
+- Preserve **`window._H`** for `code-mode.bundle.js`, `swarm-maker.js`, and other modes
 - Never commit API keys, `.env`, or `data/secrets.json`
 - Rust FS/shell paths should use the permission guard where applicable
 

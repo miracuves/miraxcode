@@ -2,6 +2,10 @@ node_modules/
 target/
 src/js/app.bundle.js
 src/js/app.bundle.js.map
+src/js/code-mode.bundle.js
+src/js/code-mode.bundle.js.map
+src/js/virtual-os.bundle.js
+src/js/virtual-os.bundle.js.map
 
 # Secrets and local runtime data (never commit API keys)
 .env

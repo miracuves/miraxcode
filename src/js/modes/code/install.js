@@ -1,14 +1,5 @@
-// =============================================================
-// LEGACY REFERENCE — app loads src/js/code-mode.bundle.js (see src/js/modes/code/).
-// code-mode.js — MiraXCode Coder Mode (Full-screen God Agent)
-//
-// Loaded after app.js. Uses window._H bridge for API access.
-// Exposes window.CoderMode for app.js lifecycle calls.
-// Exposes window.HC_CODE for legacy hashcoder.js tool access.
-// =============================================================
-
-(function () {
-  'use strict';
+export function installCodeMode() {
+// MiraXCode Coder mode — Wave 9 (modes/code/install.js)
 
   const $ = id => document.getElementById(id);
 
@@ -4027,4 +4018,5 @@ Pick the best response or merge them into one final answer. Provide the complete
     get state() { return sharedState; },
   };
 
-})();
+
+}

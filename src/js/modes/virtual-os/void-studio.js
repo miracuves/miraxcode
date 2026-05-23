@@ -1,8 +1,4 @@
-// LEGACY REFERENCE — app lazy-loads src/js/virtual-os.bundle.js (see src/js/modes/virtual-os/).
-// ============================================================================
-// VOID STUDIO - isolated virtual project desktop
-// Browser-local only. Generated paths are virtual until the user exports a ZIP.
-// ============================================================================
+// MiraXCode Virtual OS — Wave 9
 
 const VoidStudio = (() => {
   const DB_NAME = "hashui_void_studio_v1";
@@ -3827,12 +3823,3 @@ ${tree}`;
 
 window.VoidStudio = VoidStudio;
 
-(window._registeredModes = window._registeredModes || {})["virtual-os"] = {
-  label:     "Virtual OS",
-  bodyClass: "virtual-os-mode",
-  appClass:  null,
-  fullscreen: true,
-  btnId:     "tabVirtualOS",
-  mount:     () => window.VoidStudio?.mount?.(),
-  destroy:   () => window.VoidStudio?.destroy?.(),
-};

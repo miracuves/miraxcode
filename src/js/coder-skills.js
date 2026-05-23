@@ -1,6 +1,6 @@
 /**
  * Discover installed agent skills on the system (Cursor, Claude, agents dirs).
- * Loaded before code-mode.js — exposes window.HC.coderSkills
+ * Loaded before code-mode.bundle.js — exposes window.HC.coderSkills
  */
 (function () {
   "use strict";

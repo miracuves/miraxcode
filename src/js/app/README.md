@@ -52,7 +52,7 @@ npm run build:js      # → src/js/app.bundle.js (+ .map)
 npm run watch:js      # rebuild on change
 ```
 
-`index.html` loads `/js/app.bundle.js` before `code-mode.js` and other modes.
+`index.html` loads `/js/app.bundle.js` before `/js/code-mode.bundle.js` and other modes.
 
 ## Adding a module
 
@@ -72,7 +72,7 @@ npm run watch:js      # rebuild on change
 | 7 | `file-ingest`, `templates`, `composer-extras`, `chat-stream`, `moonshot`, `nvidia-stream`, `local-ollama`, `fallback-panel` |
 | 8 | `dialogs`, `settings-runtime`, `backend-sync`, `boot-bridge` + `tests/app-modules-smoke.test.mjs` |
 
-See `docs/WAVE8.md` for wave 9 targets (`code-mode.js`, `virtual-os.js`).
+See `docs/WAVE9.md` — modes live under `src/js/modes/` (`code-mode.bundle.js`, `virtual-os.bundle.js`).
 
 `bootstrap.js` wires factories via `create*Api()`. After `createCloudFetchApi()`: **`createMoonshotApi()`** → **`createCloudCatalogApi()`** (moonshot fetchers + `isFallbackDisabled`) → **`createNvidiaStreamApi()`** → **`createLocalOllamaApi()`** (`wireHostPresets()`, then boot calls `loadModels()`) → **`createSettingsApiKeysApi()`**. Init `createProjectsApi()` after `SAVED`, then `createMemoryApi()` (`currentProject`). Call `createChatSidebarApi()` once `chatBelongsToCurrentProject` exists; use `chatWire` and assign `render`, `renderPending`, `setActiveTitle`, `abort`, `renderActiveAgentChip` after `createMessagesApi()`. Pass `renderMemoryPane: () => renderMemoryPane()` into `createSettingsShellApi()` (stub until `createMemoryPaneApi()` runs). Call `createTemplatesApi()` + `wireTemplateEvents(input)` after `createSettingsShellApi()`. Call `createMessagesApi()` then `createChatStreamApi()` (needs `runAssistantTurn` from messages, `buildReplyWrappedContent` / `diffBlockHtml` / `FORGE_ARCHITECT_PROMPT` from messages return). Call `createMemoryPaneApi()` after `updateContextIndicator` from chat-stream. Then `createComposerExtrasApi().wireComposerExtras()` (needs `send`, `abort`, `buildOllamaMessages`, routing/RAG). Stub `streamChat` / `buildOllamaMessages` / bubble helpers with forwarders before `createAgentTurnsApi` and `createMessagesApi`. Declare `let renderAgentsList` before `createRagApi({ renderAgentsList: () => renderAgentsList() })`. Call `createFileIngestApi()` after RAG (`addToRAG`); stub `let renderPending = () => {}` first, then reassign from `createMessagesApi()`. Call `createRoutingApi()` after file ingest; `createAgentToolsApi()` after routing; `createAgentTurnsApi()` after `streamChat`. Call `createMessagesApi()` then `createTabsApi()` (needs `render`, bucket stash/restore), then `createAgentsPanelApi()` (needs `setTab` from tabs). Exports `window._H` for other modes (`setTab`, `safeExitMode`, `registerMode`, `ingestImagesFromList`, `ingestFilesFromList`, …).
 

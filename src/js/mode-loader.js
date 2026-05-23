@@ -8,7 +8,7 @@
     'agent-maker': '/js/swarm-maker.js',
     systems: '/js/system-maker.js',
     forge: '/js/forge-mode.js',
-    'virtual-os': '/js/virtual-os.js',
+    'virtual-os': '/js/virtual-os.bundle.js',
   };
 
   const inflight = Object.create(null);

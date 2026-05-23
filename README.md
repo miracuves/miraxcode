@@ -212,7 +212,7 @@ npm test
 |---|---|
 | Shell | Tauri v2, Rust |
 | Frontend | ES modules → **esbuild** → `app.bundle.js` |
-| Modes | `code-mode.js`, `virtual-os.js`, `forge-mode.js`, … |
+| Modes | esbuild bundles: `code-mode.bundle.js`, `virtual-os.bundle.js`; sources in `src/js/modes/` |
 | Editor | Monaco |
 | Secrets | macOS Keychain (`keyring` crate) |
 | Styles | Aura / UI v3 CSS layers on design tokens |
